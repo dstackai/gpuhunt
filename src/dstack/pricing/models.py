@@ -7,14 +7,14 @@ class InstanceOffer(BaseModel):
     instance_name: str
     location: str  # region or zone
     price: float  # $ per hour
-    cpu: int
-    memory: float  # in GB
-    gpu_count: int = 0
+    cpu: Optional[int] = None
+    memory: Optional[float] = None  # in GB
+    gpu_count: Optional[int] = None
     gpu_name: Optional[str] = None
     gpu_memory: Optional[float] = None  # in GB
     spot: bool
 
-    @field_validator("gpu_name", "gpu_memory", mode="before")
+    @field_validator("cpu", "memory", "gpu_count", "gpu_name", "gpu_memory", mode="before")
     @classmethod
     def parse_empty_as_none(cls, v: str):
         if v == "":
