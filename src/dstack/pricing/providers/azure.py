@@ -5,8 +5,15 @@ from dstack.pricing.models import InstanceOffer
 from dstack.pricing.providers import AbstractProvider
 
 
-api_url = "https://prices.azure.com/api/retail/prices"
-api_version = "2023-01-01-preview"
+prices_url = "https://prices.azure.com/api/retail/prices"
+prices_version = "2023-01-01-preview"
+prices_filters = [
+    "serviceName eq 'Virtual Machines'",
+    "priceType eq 'Consumption'",
+    "contains(productName, 'Windows') eq false",
+    "contains(productName, 'Dedicated') eq false",
+    "contains(meterName, 'Low Priority') eq false",  # retires in 2025
+]
 
 
 class AzureProvider(AbstractProvider):
