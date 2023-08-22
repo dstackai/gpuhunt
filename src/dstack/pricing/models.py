@@ -5,7 +5,7 @@ from pydantic import BaseModel, model_validator
 
 class InstanceOffer(BaseModel):
     instance_name: str
-    location: str  # region or zone
+    location: Optional[str] = None  # region or zone
     price: Optional[float] = None  # $ per hour
     cpu: Optional[int] = None
     memory: Optional[float] = None  # in GB
