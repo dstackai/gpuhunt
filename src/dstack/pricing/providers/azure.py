@@ -1,9 +1,11 @@
 import os
 import re
 import json
-from typing import Tuple, Optional
+import urllib.parse
+from typing import Tuple, Optional, Iterable
 from collections import namedtuple
 
+import requests
 from azure.core.credentials import TokenCredential
 from azure.mgmt.compute import ComputeManagementClient
 
@@ -55,21 +57,43 @@ retired_vm_series = [
 
 
 class AzureProvider(AbstractProvider):
-    def __init__(self, cache_dir: str, credential: TokenCredential, subscription_id: str):
+    def __init__(self, credential: TokenCredential, subscription_id: str, cache_dir: Optional[str] = None):
         self.cache_dir = cache_dir
         self.client = ComputeManagementClient(credential=credential, subscription_id=subscription_id)
 
-    def get_page(self, page: int) -> dict:
-        with open(os.path.join(self.cache_dir, f"{page:04}.json")) as f:
-            return json.load(f)
+    def get_pages(self) -> Iterable[list[dict]]:
+        page_id = 0
+        query = urllib.parse.urlencode({
+            "$filter": " and ".join(prices_filters),
+            "api-version": "2023-01-01-preview",
+        })
+        next_page = f"{prices_url}?{query}"
+        while True:
+            cached_page = None
+            if self.cache_dir is not None:
+                cached_page = os.path.join(self.cache_dir, f"{page_id:04}.json")
+            if cached_page is not None and os.path.exists(cached_page):
+                with open(cached_page, "r") as f:
+                    data = json.load(f)
+            else:
+                data = requests.get(next_page).json()
+                if cached_page is not None:
+                    with open(cached_page, "w") as f:
+                        json.dump(data, f)
+
+            yield data["Items"]
+            next_page = data["NextPageLink"]
+            if not next_page:
+                break
+            page_id += 1
 
     def get(self) -> list[InstanceOffer]:
-        page = 0
         offers = []
-        while True:
-            data = self.get_page(page)
-            for item in data["Items"]:
+        for page in self.get_pages():
+            for item in page:
                 if is_retired(item["armSkuName"]):
+                    continue
+                if not item["armSkuName"]:
                     continue
                 offer = InstanceOffer(
                     instance_name=item["armSkuName"],
@@ -78,10 +102,7 @@ class AzureProvider(AbstractProvider):
                     spot="Spot" in item["meterName"],
                 )
                 offers.append(offer)
-            if not data["NextPageLink"]:
-                break
-            page += 1
-        return offers
+        return self.fill_details(offers)
 
     def fill_details(self, offers: list[InstanceOffer]) -> list[InstanceOffer]:
         instances = {}
@@ -98,7 +119,6 @@ class AzureProvider(AbstractProvider):
                 gpu_name, gpu_memory = get_gpu_name_memory(resource.name)
             instances[resource.name] = InstanceOffer(
                 instance_name=resource.name,
-                location=None,
                 cpu=capabilities["vCPUs"],
                 memory=float(capabilities["MemoryGB"]),
                 gpu_count=gpu_count,
