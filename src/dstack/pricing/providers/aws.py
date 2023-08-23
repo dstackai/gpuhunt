@@ -1,11 +1,13 @@
 import copy
 import csv
+import datetime
 import os
 import re
 from collections import defaultdict
 from typing import Iterable
 
 import boto3
+from botocore.exceptions import ClientError, EndpointConnectionError
 
 from dstack.pricing.models import InstanceOffer
 from dstack.pricing.providers import AbstractProvider
@@ -96,6 +98,46 @@ class AWSProvider(AbstractProvider):
         for offer in offers:
             if offer.gpu_count > 0:
                 offer.gpu_name, offer.gpu_memory = gpus[offer.instance_name]
+
+    def add_spots(self, offers: list[InstanceOffer]) -> list[InstanceOffer]:
+        region_instances = defaultdict(set)
+        for offer in offers:
+            region_instances[offer.location].add(offer.instance_name)
+
+        spot_prices = dict()
+        for region, instance_types in region_instances.items():
+            print(region)
+            try:
+                client = boto3.client("ec2", region_name=region)  # todo creds
+                pages = client.get_paginator("describe_spot_price_history").paginate(
+                    Filters=[
+                        {
+                            "Name": "product-description",
+                            "Values": ["Linux/UNIX"],
+                        }
+                    ],
+                    InstanceTypes=list(instance_types),
+                    StartTime=datetime.datetime.utcnow(),
+                )
+
+                instance_prices = defaultdict(list)
+                for page in pages:
+                    for item in page["SpotPriceHistory"]:
+                        instance_prices[item["InstanceType"]].append(float(item["SpotPrice"]))
+                for instance_type, zone_prices in instance_prices.items():  # reduce zone prices to a single value
+                    spot_prices[(instance_type, region)] = min(zone_prices)
+            except (ClientError, EndpointConnectionError) as e:
+                pass
+
+        spot_offers = []
+        for offer in offers:
+            if (price := spot_prices.get((offer.instance_name, offer.location))) is None:
+                continue
+            spot_offer = copy.deepcopy(offer)
+            spot_offer.spot = True
+            spot_offer.price = price
+            spot_offers.append(spot_offer)
+        return offers + spot_offers
 
 
 def parse_memory(s: str) -> float:
