@@ -7,6 +7,7 @@ from collections import namedtuple
 
 import requests
 from azure.core.credentials import TokenCredential
+from azure.identity import DefaultAzureCredential
 from azure.mgmt.compute import ComputeManagementClient
 
 from dstack.pricing.models import InstanceOffer
@@ -25,14 +26,14 @@ prices_filters = [
 VMSeries = namedtuple("VMSeries", ["pattern", "gpu_name", "gpu_memory"])
 gpu_vm_series = [
     VMSeries(r"NC(\d+)ads_A100_v4", "A100", 80.0),  # NC A100 v4-series [A100 80GB]
-    VMSeries(r"NC(\d+)ads_A10_v4", "A10", None),  # NC A10 v4-series [A10]  # todo, retired?
+    VMSeries(r"NC(\d+)ads_A10_v4", "A10", 24.0),  # NC A10 v4-series [A10]
     VMSeries(r"NC(\d+)as_T4_v3", "T4", 16.0),  # NCasT4_v3-series [T4]
     VMSeries(r"NC(\d+)r?s_v3", "V100", 16.0),  # NCv3-series [V100 16GB]
     VMSeries(r"ND(\d+)amsr_A100_v4", "A100", 80.0),  # NDm A100 v4-series [8xA100 80GB]
     VMSeries(r"ND(\d+)asr_v4", "A100", 40.0),  # ND A100 v4-series [8xA100 40GB]
     VMSeries(r"ND(\d+)rs_v2", "V100", 32.0),  # NDv2-series [8xV100 32GB]
     VMSeries(r"NG(\d+)adm?s_V620_v1", "V620", None),  # NGads V620-series [V620]  # todo
-    VMSeries(r"NV(\d+)adm?s_A10_v5", "A10", None),  # NVadsA10 v5-series [A10]  # todo
+    VMSeries(r"NV(\d+)adm?s_A10_v5", "A10", 24.0),  # NVadsA10 v5-series [A10]
     VMSeries(r"NV(\d+)as_v4", "MI25", None),  # NVv4-series [MI25]  # todo
     VMSeries(r"NV(\d+)s_v3", "M60", None),  # NVv3-series [M60]  # todo
 ]
@@ -57,9 +58,12 @@ retired_vm_series = [
 
 
 class AzureProvider(AbstractProvider):
-    def __init__(self, credential: TokenCredential, subscription_id: str, cache_dir: Optional[str] = None):
+    def __init__(self, subscription_id: str, credential: Optional[TokenCredential] = None, cache_dir: Optional[str] = None):
         self.cache_dir = cache_dir
-        self.client = ComputeManagementClient(credential=credential, subscription_id=subscription_id)
+        self.client = ComputeManagementClient(
+            credential=credential or DefaultAzureCredential(),
+            subscription_id=subscription_id
+        )
 
     def get_pages(self) -> Iterable[list[dict]]:
         page_id = 0
@@ -145,6 +149,11 @@ def get_gpu_name_memory(vm_name: str) -> Tuple[Optional[str], Optional[float]]:
         m = re.match(f"^Standard_{pattern}$", vm_name)
         if m is None:
             continue
+        if gpu_name == "A10" and vm_name.endswith("_v4"):
+            gpu_memory = gpu_memory * min(1.0, int(m.group(1)) / 16)
+        elif gpu_name == "A10" and vm_name.endswith("_v5"):
+            gpu_memory = gpu_memory * min(1.0, int(m.group(1)) / 36)
+
         return gpu_name, gpu_memory
     return None, None
 
