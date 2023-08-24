@@ -99,10 +99,10 @@ jobs:
           name: catalogs
       - name: Write version
         run: date +%Y%m%d > version
-      - name: Package catalogs
-        run: zip catalogs.zip *.csv version
+#      - name: Package catalogs
+#        run: zip catalogs.zip *.csv version
       - uses: actions/upload-artifact@v3  # todo replace with s3 bucket
         with:
           name: catalogs
-          path: catalogs.zip
+          path: version
           retention-days: 1
