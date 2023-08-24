@@ -1,4 +1,5 @@
 import re
+import logging
 from collections import namedtuple
 from collections import defaultdict
 
@@ -8,6 +9,7 @@ import google.cloud.compute_v1 as compute_v1
 from dstack.pricing.models import InstanceOffer
 from dstack.pricing.providers import AbstractProvider
 
+logger = logging.getLogger(__name__)
 compute_service = "services/6F81-5844-456A"
 AcceleratorDetails = namedtuple("AcceleratorDetails", ["name", "memory"])
 accelerator_details = {
@@ -45,6 +47,7 @@ class GCPProvider(AbstractProvider):
         for region in self.regions_client.list(project=self.project):
             for zone_url in region.zones:
                 zone = zone_url.split('/')[-1]
+                logger.info("Fetching instances for zone %s", zone)
                 for machine_type in self.machine_types_client.list(project=self.project, zone=zone):
                     if machine_type.deprecated.state == compute_v1.DeprecationStatus.State.DEPRECATED:
                         continue
@@ -71,6 +74,7 @@ class GCPProvider(AbstractProvider):
 
         instances_with_gpus = []
         for zone, zone_n1_instances in n1_instances.items():
+            logger.info("Fetching GPUs for zone %s", zone)
             for accelerator in self.accelerator_types_client.list(project=self.project, zone=zone):
                 if accelerator.name not in accelerator_limits:
                     continue
@@ -86,6 +90,7 @@ class GCPProvider(AbstractProvider):
         instances += instances_with_gpus
 
     def fill_prices(self, instances: list[InstanceOffer]) -> list[InstanceOffer]:
+        logger.info("Fetching prices")
         # fetch per-unit prices
         families = {
             "gpu": defaultdict(dict),

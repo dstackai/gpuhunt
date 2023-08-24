@@ -7,6 +7,7 @@ from collections import defaultdict
 from typing import Iterable
 
 import boto3
+import requests
 from botocore.exceptions import ClientError, EndpointConnectionError
 
 from dstack.pricing.models import InstanceOffer
@@ -42,7 +43,11 @@ class AWSProvider(AbstractProvider):
 
     def get(self) -> list[InstanceOffer]:
         if not os.path.exists(self.cache_path):
-            raise NotImplementedError()  # todo download
+            with requests.get(ec2_pricing_url, stream=True) as r:
+                r.raise_for_status()
+                with open(self.cache_path, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
 
         offers = []
         with open(self.cache_path, "r", newline="") as f:
@@ -63,7 +68,7 @@ class AWSProvider(AbstractProvider):
                 )
                 offers.append(offer)
         self.fill_gpu_details(offers)
-        return offers
+        return self.add_spots(offers)
 
     def skip(self, row: dict[str, str]) -> bool:
         for key, values in self.filters.items():
@@ -106,7 +111,6 @@ class AWSProvider(AbstractProvider):
 
         spot_prices = dict()
         for region, instance_types in region_instances.items():
-            print(region)
             try:
                 client = boto3.client("ec2", region_name=region)  # todo creds
                 pages = client.get_paginator("describe_spot_price_history").paginate(

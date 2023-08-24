@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import logging
 import urllib.parse
 from typing import Tuple, Optional, Iterable
 from collections import namedtuple
@@ -14,6 +15,7 @@ from dstack.pricing.models import InstanceOffer
 from dstack.pricing.providers import AbstractProvider
 
 
+logger = logging.getLogger(__name__)
 prices_url = "https://prices.azure.com/api/retail/prices"
 prices_version = "2023-01-01-preview"
 prices_filters = [
@@ -80,6 +82,7 @@ class AzureProvider(AbstractProvider):
                 with open(cached_page, "r") as f:
                     data = json.load(f)
             else:
+                logger.info("Fetching pricing page %s", page_id)
                 data = requests.get(next_page).json()
                 if cached_page is not None:
                     with open(cached_page, "w") as f:
@@ -109,6 +112,7 @@ class AzureProvider(AbstractProvider):
         return self.fill_details(offers)
 
     def fill_details(self, offers: list[InstanceOffer]) -> list[InstanceOffer]:
+        logger.info("Fetching instance details")
         instances = {}
         resources = self.client.resource_skus.list()
         for resource in resources:
