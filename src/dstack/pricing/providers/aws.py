@@ -3,8 +3,9 @@ import csv
 import datetime
 import os
 import re
+import tempfile
 from collections import defaultdict
-from typing import Iterable
+from typing import Iterable, Optional
 
 import boto3
 import requests
@@ -25,8 +26,12 @@ class AWSProvider(AbstractProvider):
     Required IAM permissions:
     * `ec2:DescribeInstanceTypes`
     """
-    def __init__(self, cache_path: str):
-        self.cache_path = cache_path
+    def __init__(self, cache_path: Optional[str] = None):
+        if cache_path:
+            self.cache_path = cache_path
+        else:
+            self._temp = tempfile.NamedTemporaryFile()
+            self.cache_path = self._temp.name
         # todo aws creds
         self.filters = {
             "TermType": ["OnDemand"],
