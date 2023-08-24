@@ -9,8 +9,8 @@ jobs:
     name: Collect AWS catalog
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: 3.11
       - name: Install dependencies
@@ -33,11 +33,11 @@ jobs:
 #    name: Collect Azure catalog
 #    runs-on: ubuntu-latest
 #    steps:
-#      - uses: actions/checkout@v2
+#      - uses: actions/checkout@v3
 #      - uses: Azure/login@v1
 #        with:
 #          creds: ${{ secrets.AZURE_CREDENTIALS }}
-#      - uses: actions/setup-python@v2
+#      - uses: actions/setup-python@v4
 #        with:
 #          python-version: 3.11
 #      - name: Install dependencies
@@ -62,13 +62,13 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: google-github-actions/auth@v1
         with:
           workload_identity_provider: 'projects/531508670106/locations/global/workloadIdentityPools/github-identity-pool/providers/github-id-provider'
           service_account: 'dstack-gpu-pricing-ci@dstack.iam.gserviceaccount.com'
           create_credentials_file: true
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         with:
           python-version: 3.11
       - name: Install dependencies

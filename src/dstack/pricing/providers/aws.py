@@ -1,6 +1,7 @@
 import copy
 import csv
 import datetime
+import logging
 import os
 import re
 import tempfile
@@ -15,6 +16,7 @@ from dstack.pricing.models import InstanceOffer
 from dstack.pricing.providers import AbstractProvider
 
 
+logger = logging.getLogger(__name__)
 ec2_pricing_url = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/index.csv"
 disclaimer_rows_skip = 5
 
@@ -30,8 +32,8 @@ class AWSProvider(AbstractProvider):
         if cache_path:
             self.cache_path = cache_path
         else:
-            self._temp = tempfile.NamedTemporaryFile()
-            self.cache_path = self._temp.name
+            self.temp_dir = tempfile.TemporaryDirectory()
+            self.cache_path = self.temp_dir.name + "/index.csv"
         # todo aws creds
         self.filters = {
             "TermType": ["OnDemand"],
@@ -48,6 +50,7 @@ class AWSProvider(AbstractProvider):
 
     def get(self) -> list[InstanceOffer]:
         if not os.path.exists(self.cache_path):
+            logger.info("Downloading EC2 prices to %s", self.cache_path)
             with requests.get(ec2_pricing_url, stream=True) as r:
                 r.raise_for_status()
                 with open(self.cache_path, "wb") as f:
@@ -92,6 +95,7 @@ class AWSProvider(AbstractProvider):
             region = max(regions, key=lambda r: len(regions[r]))
             instance_types = regions.pop(region)
 
+            logger.info("Fetching GPU details for %s", region)
             client = boto3.client("ec2", region_name=region)
             paginator = client.get_paginator("describe_instance_types")
             for page in paginator.paginate(InstanceTypes=instance_types):
@@ -116,6 +120,7 @@ class AWSProvider(AbstractProvider):
 
         spot_prices = dict()
         for region, instance_types in region_instances.items():
+            logger.info("Fetching spot prices for %s", region)
             try:
                 client = boto3.client("ec2", region_name=region)  # todo creds
                 pages = client.get_paginator("describe_spot_price_history").paginate(
