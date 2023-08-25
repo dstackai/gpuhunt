@@ -93,9 +93,6 @@ class AzureProvider(AbstractProvider):
             if not next_page:
                 break
             page_id += 1
-            # todo remove debug code:
-            if page_id > 25:
-                break
 
     def get(self) -> list[InstanceOffer]:
         offers = []
