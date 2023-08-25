@@ -5,43 +5,11 @@ on:
 #    - cron: '0 0 * * *'
 
 jobs:
-#  catalog-aws:
-#    name: Collect AWS catalog
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v3
-#      - uses: actions/setup-python@v4
-#        with:
-#          python-version: 3.11
-#      - name: Install dependencies
-#        run: |
-#          python -m pip install --upgrade pip
-#          pip install -r requirements.txt
-#      - name: Collect catalog
-#        working-directory: src
-#        env:
-#          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#        run: python -m dstack.pricing aws --output ../aws.csv
-#      - uses: actions/upload-artifact@v3
-#        with:
-#          name: catalogs
-#          path: aws.csv
-#          retention-days: 1
-
-  catalog-azure:
-    name: Collect Azure catalog
+  catalog-aws:
+    name: Collect AWS catalog
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     steps:
       - uses: actions/checkout@v3
-      - uses: azure/login@v1
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       - uses: actions/setup-python@v4
         with:
           python-version: 3.11
@@ -52,27 +20,28 @@ jobs:
       - name: Collect catalog
         working-directory: src
         env:
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-        run: python -m dstack.pricing azure --output ../azure.csv
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: python -m dstack.pricing aws --output ../aws.csv
       - uses: actions/upload-artifact@v3
         with:
           name: catalogs
-          path: azure.csv
+          path: aws.csv
           retention-days: 1
 
-#  catalog-gcp:
-#    name: Collect GCP catalog
+#  catalog-azure:
+#    name: Collect Azure catalog
 #    runs-on: ubuntu-latest
 #    permissions:
-#      contents: read
 #      id-token: write
+#      contents: read
 #    steps:
 #      - uses: actions/checkout@v3
-#      - uses: google-github-actions/auth@v1
+#      - uses: azure/login@v1
 #        with:
-#          workload_identity_provider: 'projects/531508670106/locations/global/workloadIdentityPools/github-identity-pool/providers/github-id-provider'
-#          service_account: 'dstack-gpu-pricing-ci@dstack.iam.gserviceaccount.com'
-#          create_credentials_file: true
+#          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+#          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+#          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 #      - uses: actions/setup-python@v4
 #        with:
 #          python-version: 3.11
@@ -83,31 +52,68 @@ jobs:
 #      - name: Collect catalog
 #        working-directory: src
 #        env:
-#          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-#        run: python -m dstack.pricing gcp --output ../gcp.csv
+#          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+#        run: python -m dstack.pricing azure --output ../azure.csv
 #      - uses: actions/upload-artifact@v3
 #        with:
 #          name: catalogs
-#          path: gcp.csv
+#          path: azure.csv
 #          retention-days: 1
+
+  catalog-gcp:
+    name: Collect GCP catalog
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v3
+      - uses: google-github-actions/auth@v1
+        with:
+          workload_identity_provider: 'projects/531508670106/locations/global/workloadIdentityPools/github-identity-pool/providers/github-id-provider'
+          service_account: 'dstack-gpu-pricing-ci@dstack.iam.gserviceaccount.com'
+          create_credentials_file: true
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Collect catalog
+        working-directory: src
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: python -m dstack.pricing gcp --output ../gcp.csv
+      - uses: actions/upload-artifact@v3
+        with:
+          name: catalogs
+          path: gcp.csv
+          retention-days: 1
 
   publish-catalog:
     name: Publish catalogs
     needs:
 #      - catalog-aws
-      - catalog-azure
-#      - catalog-gcp
+#      - catalog-azure
+      - catalog-gcp
     runs-on: ubuntu-latest
     steps:
+      - name: Install AWS CLI
+        run: pip install awscli
       - uses: actions/download-artifact@v3
         with:
           name: catalogs
       - name: Write version
         run: date +%Y%m%d > version
-#      - name: Package catalogs
-#        run: zip catalogs.zip *.csv version
-      - uses: actions/upload-artifact@v3  # todo replace with s3 bucket
-        with:
-          name: catalogs
-          path: version
-          retention-days: 1
+      - name: Package catalogs
+        run: zip catalogs.zip *.csv version
+      - name: Upload to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          VERSION=$(cat version)
+          aws s3 cp catalogs.zip "s3://dstack-gpu-pricing/v1/$VERSION/catalogs.zip" --acl public-read
+#          aws s3 cp "s3://dstack-gpu-pricing/v1/$VERSION/catalogs.zip" "s3://dstack-gpu-pricing/v1/latest/catalogs.zip" --acl public-read
+          cat version | aws s3 cp - "s3://dstack-gpu-pricing/v1/version" --acl public-read
