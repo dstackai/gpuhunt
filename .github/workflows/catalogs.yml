@@ -5,29 +5,29 @@ on:
 #    - cron: '0 0 * * *'
 
 jobs:
-  catalog-aws:
-    name: Collect AWS catalog
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: 3.11
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Collect catalog
-        working-directory: src
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: python -m dstack.pricing aws --output ../aws.csv
-      - uses: actions/upload-artifact@v3
-        with:
-          name: catalogs
-          path: aws.csv
-          retention-days: 1
+#  catalog-aws:
+#    name: Collect AWS catalog
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v3
+#      - uses: actions/setup-python@v4
+#        with:
+#          python-version: 3.11
+#      - name: Install dependencies
+#        run: |
+#          python -m pip install --upgrade pip
+#          pip install -r requirements.txt
+#      - name: Collect catalog
+#        working-directory: src
+#        env:
+#          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#        run: python -m dstack.pricing aws --output ../aws.csv
+#      - uses: actions/upload-artifact@v3
+#        with:
+#          name: catalogs
+#          path: aws.csv
+#          retention-days: 1
 
 #  catalog-azure:
 #    name: Collect Azure catalog
@@ -115,5 +115,5 @@ jobs:
         run: |
           VERSION=$(cat version)
           aws s3 cp catalogs.zip "s3://dstack-gpu-pricing/v1/$VERSION/catalogs.zip" --acl public-read
-#          aws s3 cp "s3://dstack-gpu-pricing/v1/$VERSION/catalogs.zip" "s3://dstack-gpu-pricing/v1/latest/catalogs.zip" --acl public-read
           cat version | aws s3 cp - "s3://dstack-gpu-pricing/v1/version" --acl public-read
+#          aws s3 cp "s3://dstack-gpu-pricing/v1/$VERSION/catalogs.zip" "s3://dstack-gpu-pricing/v1/latest/catalogs.zip" --acl public-read
