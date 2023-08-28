@@ -3,8 +3,10 @@ import re
 import json
 import logging
 import urllib.parse
-from typing import Tuple, Optional, Iterable
 from collections import namedtuple
+from queue import Queue
+from threading import Thread
+from typing import Tuple, Optional, Iterable
 
 import requests
 from azure.core.credentials import TokenCredential
@@ -67,13 +69,23 @@ class AzureProvider(AbstractProvider):
             subscription_id=subscription_id
         )
 
-    def get_pages(self) -> Iterable[list[dict]]:
-        page_id = 0
-        query = urllib.parse.urlencode({
-            "$filter": " and ".join(prices_filters),
-            "api-version": "2023-01-01-preview",
-        })
-        next_page = f"{prices_url}?{query}"
+    def get_pages(self, threads: int = 8) -> Iterable[list[dict]]:
+        q = Queue()
+        workers = [Thread(target=self._get_pages_worker, args=(q, threads, i), daemon=True) for i in range(threads)]
+        for worker in workers:
+            worker.start()
+
+        exited = 0
+        while exited < threads:
+            page = q.get()
+            if page is None:
+                exited += 1
+            else:
+                yield page
+            q.task_done()
+
+    def _get_pages_worker(self, q: Queue, stride: int, worker_id: int):
+        page_id = worker_id
         while True:
             cached_page = None
             if self.cache_dir is not None:
@@ -82,17 +94,22 @@ class AzureProvider(AbstractProvider):
                 with open(cached_page, "r") as f:
                     data = json.load(f)
             else:
-                logger.info("Fetching pricing page %s", page_id)
-                data = requests.get(next_page).json()
+                logger.info("Worker %s fetches pricing page %s", worker_id, page_id)
+                data = requests.get(prices_url, params={
+                    "api-version": "2023-01-01-preview",
+                    "$filter": " and ".join(prices_filters),
+                    "$skip": page_id * 100,
+                }).json()
                 if cached_page is not None:
                     with open(cached_page, "w") as f:
                         json.dump(data, f)
 
-            yield data["Items"]
-            next_page = data["NextPageLink"]
-            if not next_page:
-                break
-            page_id += 1
+            if not data["Items"]:
+                q.put(None)
+                logger.info("Worker %s exited", worker_id)
+                return
+            q.put(data["Items"])
+            page_id += stride
 
     def get(self) -> list[InstanceOffer]:
         offers = []
