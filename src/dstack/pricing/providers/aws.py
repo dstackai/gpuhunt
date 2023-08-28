@@ -153,6 +153,22 @@ class AWSProvider(AbstractProvider):
             spot_offers.append(spot_offer)
         return offers + spot_offers
 
+    @classmethod
+    def filter(cls, offers: list[InstanceOffer]) -> list[InstanceOffer]:
+        return [
+            i for i in offers
+            if any(i.instance_name.startswith(family) for family in [
+                "t2.small",
+                "c5.",
+                "m5.",
+                "p3.",
+                "g5.",
+                "g4dn.",
+                "p4d.",
+                "p4de.",
+            ])
+        ]
+
 
 def parse_memory(s: str) -> float:
     r = re.match(r"^([0-9.]+) GiB$", s)

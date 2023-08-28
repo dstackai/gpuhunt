@@ -147,6 +147,23 @@ class AzureProvider(AbstractProvider):
             with_details.append(offer)
         return with_details + without_details
 
+    @classmethod
+    def filter(cls, offers: list[InstanceOffer]) -> list[InstanceOffer]:
+        vm_series = [
+            VMSeries(r"D(\d+)s_v3", None, None),  # Dsv3-series
+            VMSeries(r"E(\d+)i?s_v4", None, None),  # Esv4-series
+            VMSeries(r"E(\d+)-(\d+)s_v4", None, None),  # Esv4-series (constrained vCPU)
+            VMSeries(r"NC(\d+)s_v3", "V100", 16 * 1024),  # NCv3-series [V100 16GB]
+            VMSeries(r"NC(\d+)as_T4_v3", "T4", 16 * 1024),  # NCasT4_v3-series [T4]
+            VMSeries(r"ND(\d+)rs_v2", "V100", 32 * 1024),  # NDv2-series [8xV100 32GB]
+            VMSeries(r"NV(\d+)adm?s_A10_v5", "A10", 24 * 1024),  # NVadsA10 v5-series [A10]
+            VMSeries(r"NC(\d+)ads_A100_v4", "A100", 80 * 1024),  # NC A100 v4-series [A100 80GB]
+            VMSeries(r"ND(\d+)asr_v4", "A100", 40 * 1024),  # ND A100 v4-series [8xA100 40GB]
+            VMSeries(r"ND(\d+)amsr_A100_v4", "A100", 80 * 1024),  # NDm A100 v4-series [8xA100 80GB]
+        ]
+        vm_series_pattern = re.compile(f"^Standard_({'|'.join(series.pattern for series in vm_series)})$")
+        return [i for i in offers if vm_series_pattern.match(i.instance_name)]
+
 
 def get_gpu_name_memory(vm_name: str) -> Tuple[Optional[str], Optional[float]]:
     for pattern, gpu_name, gpu_memory in gpu_vm_series:

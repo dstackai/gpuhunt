@@ -162,3 +162,12 @@ class GCPProvider(AbstractProvider):
         instances = self.list_preconfigured_instances()
         self.add_gpus(instances)
         return self.fill_prices(instances)
+
+    @classmethod
+    def filter(cls, offers: list[InstanceOffer]) -> list[InstanceOffer]:
+        return [
+            i for i in offers
+            if any(i.instance_name.startswith(family) for family in [
+                "e2-medium", "e2-standard-", "e2-highmem-", "e2-highcpu-", "m1-", "a2-", "g2-"
+            ]) or (i.gpu_name and i.gpu_name not in ["K80", "P4"])
+        ]

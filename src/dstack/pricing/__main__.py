@@ -13,6 +13,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("provider", choices=["aws", "azure", "gcp"])
     parser.add_argument("--output", required=True)
+    parser.add_argument("--no-filter", action="store_true")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -24,7 +25,10 @@ def main():
         provider = GCPProvider(os.getenv("GCP_PROJECT_ID"))
     else:
         exit(f"Unknown provider {args.provider}")
+
     offers = provider.get()
+    if not args.no_filter:
+        offers = provider.filter(offers)
     storage.dump(offers, args.output)
 
 
