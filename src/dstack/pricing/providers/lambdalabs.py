@@ -8,6 +8,19 @@ from dstack.pricing.models import InstanceOffer
 from dstack.pricing.providers import AbstractProvider
 
 specs_page_url = "https://lambdalabs.com/service/gpu-cloud"
+all_regions = [
+    "us-south-1",
+    "us-west-2",
+    "us-west-1",
+    "us-midwest-1",
+    "us-west-3",
+    "us-east-1",
+    "europe-central-1",
+    "asia-south-1",
+    "me-west-1",
+    "asia-northeast-1",
+    "asia-northeast-2",
+]
 
 
 class LambdaLabsProvider(AbstractProvider):
@@ -35,7 +48,17 @@ class LambdaLabsProvider(AbstractProvider):
                 offer = offer.model_copy()
                 offer.instance_name += "_sxm4"
                 offers.append(offer)
-        return offers
+        return self.add_regions(offers)
+
+    def add_regions(self, offers: list[InstanceOffer]) -> list[InstanceOffer]:
+        # TODO: we don't know which regions are actually available for each instance type
+        region_offers = []
+        for region in all_regions:
+            for offer in offers:
+                offer = offer.model_copy()
+                offer.location = region
+                region_offers.append(offer)
+        return region_offers
 
 
 def parse_memory(v: str) -> float:
