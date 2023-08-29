@@ -89,12 +89,37 @@ jobs:
           path: gcp.csv
           retention-days: 1
 
+  catalog-lambdalabs:
+    name: Collect LambdaLabs catalog
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Collect catalog
+        working-directory: src
+        run: python -m dstack.pricing lambdalabs --output ../lambdalabs.csv
+      - uses: actions/upload-artifact@v3
+        with:
+          name: catalogs
+          path: lambdalabs.csv
+          retention-days: 1
+
   publish-catalog:
     name: Publish catalogs
     needs:
       - catalog-aws
       - catalog-azure
       - catalog-gcp
+      - catalog-lambdalabs
     runs-on: ubuntu-latest
     steps:
       - name: Install AWS CLI

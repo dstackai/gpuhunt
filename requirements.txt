@@ -5,3 +5,4 @@ google-cloud-billing
 google-cloud-compute
 azure-mgmt-compute
 azure-identity
+beautifulsoup4
