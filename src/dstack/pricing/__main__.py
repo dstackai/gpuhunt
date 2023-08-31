@@ -25,7 +25,7 @@ def main():
     elif args.provider == "gcp":
         provider = GCPProvider(os.getenv("GCP_PROJECT_ID"))
     elif args.provider == "lambdalabs":
-        provider = LambdaLabsProvider()
+        provider = LambdaLabsProvider(os.getenv("LAMBDALABS_TOKEN"))
     else:
         exit(f"Unknown provider {args.provider}")
 
