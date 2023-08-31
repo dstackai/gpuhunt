@@ -106,6 +106,8 @@ jobs:
           pip install -r requirements.txt
       - name: Collect catalog
         working-directory: src
+        env:
+          LAMBDALABS_TOKEN: ${{ secrets.LAMBDALABS_TOKEN }}
         run: python -m dstack.pricing lambdalabs --output ../lambdalabs.csv
       - uses: actions/upload-artifact@v3
         with:
