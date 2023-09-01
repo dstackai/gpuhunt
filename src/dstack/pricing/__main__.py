@@ -9,11 +9,12 @@ from dstack.pricing.providers.azure import AzureProvider
 from dstack.pricing.providers.gcp import GCPProvider
 from dstack.pricing.providers.lambdalabs import LambdaLabsProvider
 from dstack.pricing.providers.tensordock import TensorDockProvider
+from dstack.pricing.providers.vastai import VastAIProvider
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("provider", choices=["aws", "azure", "gcp", "lambdalabs", "tensordock"])
+    parser.add_argument("provider", choices=["aws", "azure", "gcp", "lambdalabs", "tensordock", "vastai"])
     parser.add_argument("--output", required=True)
     parser.add_argument("--no-filter", action="store_true")
     args = parser.parse_args()
@@ -29,6 +30,8 @@ def main():
         provider = LambdaLabsProvider(os.getenv("LAMBDALABS_TOKEN"))
     elif args.provider == "tensordock":
         provider = TensorDockProvider()
+    elif args.provider == "vastai":
+        provider = VastAIProvider()
     else:
         exit(f"Unknown provider {args.provider}")
 
