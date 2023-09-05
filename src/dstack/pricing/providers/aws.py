@@ -12,7 +12,7 @@ import boto3
 import requests
 from botocore.exceptions import ClientError, EndpointConnectionError
 
-from dstack.pricing.models import InstanceOffer
+from dstack.pricing._models import InstanceOffer
 from dstack.pricing.providers import AbstractProvider
 
 

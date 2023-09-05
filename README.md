@@ -16,7 +16,7 @@ dstack.pricing.print_table(gpus)
 import dstack.pricing
 
 catalog = dstack.pricing.Catalog()
-catalog.load()
+catalog.load(version="20230831")
 gpus = catalog.query()
 dstack.pricing.print_table(gpus)
 ```

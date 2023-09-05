@@ -4,7 +4,7 @@ from typing import Tuple
 
 import requests
 
-from dstack.pricing.models import InstanceOffer
+from dstack.pricing._models import InstanceOffer
 from dstack.pricing.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)

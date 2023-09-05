@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 
-import dstack.pricing.storage as storage
+import dstack.pricing._storage as storage
 from dstack.pricing.providers.aws import AWSProvider
 from dstack.pricing.providers.azure import AzureProvider
 from dstack.pricing.providers.gcp import GCPProvider
@@ -13,7 +13,7 @@ from dstack.pricing.providers.vastai import VastAIProvider
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(prog="python3 -m dstack.pricing")
     parser.add_argument("provider", choices=["aws", "azure", "gcp", "lambdalabs", "tensordock", "vastai"])
     parser.add_argument("--output", required=True)
     parser.add_argument("--no-filter", action="store_true")

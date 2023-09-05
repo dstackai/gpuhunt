@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from dstack.pricing.models import InstanceOffer
+from dstack.pricing._models import InstanceOffer
 
 
 class AbstractProvider(ABC):
