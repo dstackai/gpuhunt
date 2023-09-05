@@ -6,7 +6,7 @@ from collections import defaultdict
 import google.cloud.billing_v1 as billing_v1
 import google.cloud.compute_v1 as compute_v1
 
-from dstack.pricing.models import InstanceOffer
+from dstack.pricing._models import InstanceOffer
 from dstack.pricing.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)

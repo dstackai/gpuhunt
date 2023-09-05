@@ -13,7 +13,7 @@ from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.compute import ComputeManagementClient
 
-from dstack.pricing.models import InstanceOffer
+from dstack.pricing._models import InstanceOffer
 from dstack.pricing.providers import AbstractProvider
 
 

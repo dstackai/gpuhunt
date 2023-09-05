@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dstack-gpu-pricing"
+authors = [
+    { name = "dstack.ai" },
+]
+description = "A catalog of GPU pricing for different cloud providers"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Operating System :: OS Independent",
+]
+keywords = ["gpu", "cloud", "pricing"]
+dynamic = ["version"]
+
+[project.urls]
+"Homepage" = "https://github.com/dstackai/dstack-gpu-pricing"
+"Bug Tracker" = "https://github.com/dstackai/dstack-gpu-pricing/issues"
+
+[project.optional-dependencies]
+fetch = [
+    "requests",
+    "pydantic>=2.0.0"
+]
+aws = [
+    "boto3"
+]
+azure = [
+    "azure-mgmt-compute",
+    "azure-identity"
+]
+gcp = [
+    "google-cloud-billing",
+    "google-cloud-compute"
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "dstack.pricing.version.__version__"}

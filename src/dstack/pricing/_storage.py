@@ -1,7 +1,7 @@
 import csv
 from typing import Iterable
 
-from dstack.pricing.models import InstanceOffer
+from dstack.pricing._models import InstanceOffer
 
 
 def dump(offers: list[InstanceOffer], path: str):

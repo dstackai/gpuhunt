@@ -2,7 +2,7 @@ import math
 
 import requests
 
-from dstack.pricing.models import InstanceOffer
+from dstack.pricing._models import InstanceOffer
 from dstack.pricing.providers import AbstractProvider
 
 
