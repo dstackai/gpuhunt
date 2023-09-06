@@ -1,7 +1,6 @@
 from functools import lru_cache
 
-from dstack.pricing._catalog import Catalog
-from dstack.pricing._utils import print_table
+from gpuhunt._catalog import Catalog
 
 
 @lru_cache()

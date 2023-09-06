@@ -1,13 +1,12 @@
-import re
 import logging
-from collections import namedtuple
-from collections import defaultdict
+import re
+from collections import defaultdict, namedtuple
 
 import google.cloud.billing_v1 as billing_v1
 import google.cloud.compute_v1 as compute_v1
 
-from dstack.pricing._models import InstanceOffer
-from dstack.pricing.providers import AbstractProvider
+from gpuhunt._models import InstanceOffer
+from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
 compute_service = "services/6F81-5844-456A"
@@ -24,11 +23,21 @@ accelerator_details = {
 }
 CpuMemory = namedtuple("CpuMemory", ["cpu", "memory"])
 accelerator_limits = {
-    "nvidia-tesla-k80": [CpuMemory(8, 52), CpuMemory(16, 104), CpuMemory(32, 208), CpuMemory(64, 208)],
+    "nvidia-tesla-k80": [
+        CpuMemory(8, 52),
+        CpuMemory(16, 104),
+        CpuMemory(32, 208),
+        CpuMemory(64, 208),
+    ],
     "nvidia-tesla-p100": [CpuMemory(16, 104), CpuMemory(32, 208), CpuMemory(96, 624)],
     "nvidia-tesla-p4": [CpuMemory(24, 156), CpuMemory(48, 312), CpuMemory(96, 624)],
     "nvidia-tesla-t4": [CpuMemory(48, 312), CpuMemory(48, 312), CpuMemory(96, 624)],
-    "nvidia-tesla-v100": [CpuMemory(12, 78), CpuMemory(24, 156), CpuMemory(48, 312), CpuMemory(96, 624)],
+    "nvidia-tesla-v100": [
+        CpuMemory(12, 78),
+        CpuMemory(24, 156),
+        CpuMemory(48, 312),
+        CpuMemory(96, 624),
+    ],
 }
 accelerator_counts = [1, 2, 4, 8, 16]
 
@@ -46,21 +55,32 @@ class GCPProvider(AbstractProvider):
         instances = []
         for region in self.regions_client.list(project=self.project):
             for zone_url in region.zones:
-                zone = zone_url.split('/')[-1]
+                zone = zone_url.split("/")[-1]
                 logger.info("Fetching instances for zone %s", zone)
-                for machine_type in self.machine_types_client.list(project=self.project, zone=zone):
-                    if machine_type.deprecated.state == compute_v1.DeprecationStatus.State.DEPRECATED:
+                for machine_type in self.machine_types_client.list(
+                    project=self.project, zone=zone
+                ):
+                    if (
+                        machine_type.deprecated.state
+                        == compute_v1.DeprecationStatus.State.DEPRECATED
+                    ):
                         continue
                     gpu = None
                     if machine_type.accelerators:
-                        gpu = accelerator_details[machine_type.accelerators[0].guest_accelerator_type]
+                        gpu = accelerator_details[
+                            machine_type.accelerators[0].guest_accelerator_type
+                        ]
                     instance = InstanceOffer(
                         instance_name=machine_type.name,
                         location=zone,
                         cpu=machine_type.guest_cpus,
                         memory=round(machine_type.memory_mb / 1024, 1),
-                        gpu_count=machine_type.accelerators[0].guest_accelerator_count if gpu else 0,
-                        gpu_name=machine_type.accelerators[0].guest_accelerator_type if gpu else None,
+                        gpu_count=machine_type.accelerators[0].guest_accelerator_count
+                        if gpu
+                        else 0,
+                        gpu_name=machine_type.accelerators[0].guest_accelerator_type
+                        if gpu
+                        else None,
                         gpu_memory=gpu.memory if gpu else None,
                     )
                     instances.append(instance)
@@ -69,16 +89,20 @@ class GCPProvider(AbstractProvider):
     def add_gpus(self, instances: list[InstanceOffer]):
         n1_instances = defaultdict(list)
         for instance in instances:
-            if instance.instance_name.startswith('n1-'):
+            if instance.instance_name.startswith("n1-"):
                 n1_instances[instance.location].append(instance)
 
         instances_with_gpus = []
         for zone, zone_n1_instances in n1_instances.items():
             logger.info("Fetching GPUs for zone %s", zone)
-            for accelerator in self.accelerator_types_client.list(project=self.project, zone=zone):
+            for accelerator in self.accelerator_types_client.list(
+                project=self.project, zone=zone
+            ):
                 if accelerator.name not in accelerator_limits:
                     continue
-                for n, limit in zip(accelerator_counts, accelerator_limits[accelerator.name]):
+                for n, limit in zip(
+                    accelerator_counts, accelerator_limits[accelerator.name]
+                ):
                     for instance in zone_n1_instances:
                         if instance.cpu > limit.cpu or instance.memory > limit.memory:
                             continue
@@ -103,9 +127,22 @@ class GCPProvider(AbstractProvider):
                 continue
             if sku.category.usage_type not in ["OnDemand", "Preemptible"]:
                 continue
-            if any(word in sku.description for word in ["Sole Tenancy", "Reserved", "Premium", "Custom", "suspended"]):
+            if any(
+                word in sku.description
+                for word in [
+                    "Sole Tenancy",
+                    "Reserved",
+                    "Premium",
+                    "Custom",
+                    "suspended",
+                ]
+            ):
                 continue
-            r = re.match(r"^(?:spot preemptible )?(.+) (gpu|ram|core)", sku.description, flags=re.IGNORECASE)
+            r = re.match(
+                r"^(?:spot preemptible )?(.+) (gpu|ram|core)",
+                sku.description,
+                flags=re.IGNORECASE,
+            )
             if not r:
                 continue
 
@@ -113,7 +150,9 @@ class GCPProvider(AbstractProvider):
             resource = resource.lower()
             if resource == "gpu":
                 family = family.replace(" ", "-").lower()
-                family = {"nvidia-tesla-a100-80gb": "nvidia-a100-80gb"}.get(family, family)
+                family = {"nvidia-tesla-a100-80gb": "nvidia-a100-80gb"}.get(
+                    family, family
+                )
             else:
                 r = re.match(r"^([a-z]\d.?) ", family.lower())
                 if r:
@@ -135,7 +174,11 @@ class GCPProvider(AbstractProvider):
         offers = []
         for instance in instances:
             vm_family = instance.instance_name.split("-")[0]
-            if vm_family in ["g1", "f1", "m2"]:  # ignore shared-core and reservation-only
+            if vm_family in [
+                "g1",
+                "f1",
+                "m2",
+            ]:  # ignore shared-core and reservation-only
                 continue
             for spot in (False, True):
                 region_spot = (instance.location[:-2], spot)
@@ -148,7 +191,10 @@ class GCPProvider(AbstractProvider):
                 if instance.gpu_name:
                     if region_spot not in families["gpu"][instance.gpu_name]:
                         continue
-                    price += instance.gpu_count * families["gpu"][instance.gpu_name][region_spot]
+                    price += (
+                        instance.gpu_count
+                        * families["gpu"][instance.gpu_name][region_spot]
+                    )
 
                 offer = instance.model_copy()
                 offer.price = round(price, 6)
@@ -166,8 +212,19 @@ class GCPProvider(AbstractProvider):
     @classmethod
     def filter(cls, offers: list[InstanceOffer]) -> list[InstanceOffer]:
         return [
-            i for i in offers
-            if any(i.instance_name.startswith(family) for family in [
-                "e2-medium", "e2-standard-", "e2-highmem-", "e2-highcpu-", "m1-", "a2-", "g2-"
-            ]) or (i.gpu_name and i.gpu_name not in ["K80", "P4"])
+            i
+            for i in offers
+            if any(
+                i.instance_name.startswith(family)
+                for family in [
+                    "e2-medium",
+                    "e2-standard-",
+                    "e2-highmem-",
+                    "e2-highcpu-",
+                    "m1-",
+                    "a2-",
+                    "g2-",
+                ]
+            )
+            or (i.gpu_name and i.gpu_name not in ["K80", "P4"])
         ]

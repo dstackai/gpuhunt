@@ -2,9 +2,8 @@ from typing import Optional
 
 import requests
 
-from dstack.pricing._models import InstanceOffer
-from dstack.pricing.providers import AbstractProvider
-
+from gpuhunt._models import InstanceOffer
+from gpuhunt.providers import AbstractProvider
 
 bundles_url = "https://console.vast.ai/api/v0/bundles"
 

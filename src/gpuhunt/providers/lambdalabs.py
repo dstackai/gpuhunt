@@ -1,11 +1,11 @@
-import re
 import logging
+import re
 from typing import Tuple
 
 import requests
 
-from dstack.pricing._models import InstanceOffer
-from dstack.pricing.providers import AbstractProvider
+from gpuhunt._models import InstanceOffer
+from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
 instance_types_url = "https://cloud.lambdalabs.com/api/v1/instance-types"
@@ -30,7 +30,9 @@ class LambdaLabsProvider(AbstractProvider):
 
     def get(self) -> list[InstanceOffer]:
         offers = []
-        data = requests.get(instance_types_url, headers={"Authorization": f"Bearer {self.token}"}).json()["data"]
+        data = requests.get(
+            instance_types_url, headers={"Authorization": f"Bearer {self.token}"}
+        ).json()["data"]
         for instance in data.values():
             instance = instance["instance_type"]
             logger.info(instance["name"])

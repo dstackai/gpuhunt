@@ -12,9 +12,8 @@ import boto3
 import requests
 from botocore.exceptions import ClientError, EndpointConnectionError
 
-from dstack.pricing._models import InstanceOffer
-from dstack.pricing.providers import AbstractProvider
-
+from gpuhunt._models import InstanceOffer
+from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
 ec2_pricing_url = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/index.csv"
@@ -28,6 +27,7 @@ class AWSProvider(AbstractProvider):
     Required IAM permissions:
     * `ec2:DescribeInstanceTypes`
     """
+
     def __init__(self, cache_path: Optional[str] = None):
         if cache_path:
             self.cache_path = cache_path
@@ -101,7 +101,10 @@ class AWSProvider(AbstractProvider):
             for page in paginator.paginate(InstanceTypes=instance_types):
                 for i in page["InstanceTypes"]:
                     gpu = i["GpuInfo"]["Gpus"][0]
-                    gpus[i["InstanceType"]] = (gpu["Name"], gpu["MemoryInfo"]["SizeInMiB"] / 1024)
+                    gpus[i["InstanceType"]] = (
+                        gpu["Name"],
+                        gpu["MemoryInfo"]["SizeInMiB"] / 1024,
+                    )
 
             regions = {
                 region: left
@@ -137,15 +140,22 @@ class AWSProvider(AbstractProvider):
                 instance_prices = defaultdict(list)
                 for page in pages:
                     for item in page["SpotPriceHistory"]:
-                        instance_prices[item["InstanceType"]].append(float(item["SpotPrice"]))
-                for instance_type, zone_prices in instance_prices.items():  # reduce zone prices to a single value
+                        instance_prices[item["InstanceType"]].append(
+                            float(item["SpotPrice"])
+                        )
+                for (
+                    instance_type,
+                    zone_prices,
+                ) in instance_prices.items():  # reduce zone prices to a single value
                     spot_prices[(instance_type, region)] = min(zone_prices)
             except (ClientError, EndpointConnectionError) as e:
                 pass
 
         spot_offers = []
         for offer in offers:
-            if (price := spot_prices.get((offer.instance_name, offer.location))) is None:
+            if (
+                price := spot_prices.get((offer.instance_name, offer.location))
+            ) is None:
                 continue
             spot_offer = copy.deepcopy(offer)
             spot_offer.spot = True
@@ -156,17 +166,21 @@ class AWSProvider(AbstractProvider):
     @classmethod
     def filter(cls, offers: list[InstanceOffer]) -> list[InstanceOffer]:
         return [
-            i for i in offers
-            if any(i.instance_name.startswith(family) for family in [
-                "t2.small",
-                "c5.",
-                "m5.",
-                "p3.",
-                "g5.",
-                "g4dn.",
-                "p4d.",
-                "p4de.",
-            ])
+            i
+            for i in offers
+            if any(
+                i.instance_name.startswith(family)
+                for family in [
+                    "t2.small",
+                    "c5.",
+                    "m5.",
+                    "p3.",
+                    "g5.",
+                    "g4dn.",
+                    "p4d.",
+                    "p4de.",
+                ]
+            )
         ]
 
 

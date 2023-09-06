@@ -2,14 +2,15 @@ import math
 
 import requests
 
-from dstack.pricing._models import InstanceOffer
-from dstack.pricing.providers import AbstractProvider
-
+from gpuhunt._models import InstanceOffer
+from gpuhunt.providers import AbstractProvider
 
 # https://documenter.getpostman.com/view/10732984/UVC3j7Kz#f1eeb07f-294d-4a7a-b7d9-b3ede1605c01
 core_cloud_instances_url = "https://console.tensordock.com/api/metadata/instances"
 # https://documenter.getpostman.com/view/20973002/2s8YzMYRDc#2b4a3db0-c162-438c-aae4-6a88afc96fdb
-marketplace_hostnodes_url = "https://marketplace.tensordock.com/api/v0/client/deploy/hostnodes"
+marketplace_hostnodes_url = (
+    "https://marketplace.tensordock.com/api/v0/client/deploy/hostnodes"
+)
 marketplace_gpus = {
     "a100-pcie-80gb": "A100",
     "geforcegtx1070-pcie-8gb": "GTX1070",
@@ -35,7 +36,9 @@ class TensorDockProvider(AbstractProvider):
         offers = []
         for name, resources in data["cpu"].items():
             for location in resources["locations"]:
-                for multiples in range(1, resources["restrictions"]["maxMultiples"] + 1):
+                for multiples in range(
+                    1, resources["restrictions"]["maxMultiples"] + 1
+                ):
                     offer = InstanceOffer(
                         instance_name=f"{name.lower()}_{multiples}",
                         location=location,
@@ -54,13 +57,26 @@ class TensorDockProvider(AbstractProvider):
             restrictions = resources["restrictions"]
             for location in resources["locations"]:
                 for gpu_count in range(1, restrictions["maxGPUsPerInstance"] + 1):
-                    memory = min(2 * gpu_count * resources["specs"]["vram"], restrictions["maxRAMPerInstance"])
+                    memory = min(
+                        2 * gpu_count * resources["specs"]["vram"],
+                        restrictions["maxRAMPerInstance"],
+                    )
                     min_cpu = math.ceil(memory / restrictions["maxRAMPervCPU"])
-                    cpu = min(max(min_cpu, gpu_count * min(12, restrictions["maxvCPUsPerGPU"])), restrictions["maxvCPUsPerInstance"])
+                    cpu = min(
+                        max(
+                            min_cpu, gpu_count * min(12, restrictions["maxvCPUsPerGPU"])
+                        ),
+                        restrictions["maxvCPUsPerInstance"],
+                    )
                     offer = InstanceOffer(
                         instance_name=f"{name.lower()}_{gpu_count}_{cpu}_{memory}",
                         location=location,
-                        price=round(gpu_count * resources["cost"]["costHr"] + cpu * cpu_price + memory * memory_price, 5),
+                        price=round(
+                            gpu_count * resources["cost"]["costHr"]
+                            + cpu * cpu_price
+                            + memory * memory_price,
+                            5,
+                        ),
                         cpu=cpu,
                         memory=memory,
                         gpu_count=gpu_count,
@@ -75,10 +91,19 @@ class TensorDockProvider(AbstractProvider):
         hostnodes = requests.get(marketplace_hostnodes_url).json()["hostnodes"]
         offers = []
         for hostnode, details in hostnodes.items():
-            location = "-".join([details["location"][key] for key in ["country", "region", "city"]]).lower().replace(" ", "")
+            location = (
+                "-".join(
+                    [details["location"][key] for key in ["country", "region", "city"]]
+                )
+                .lower()
+                .replace(" ", "")
+            )
             cpu = details["specs"]["cpu"]["amount"]
             memory = details["specs"]["ram"]["amount"]
-            base_price = cpu * details["specs"]["cpu"]["price"] + memory * details["specs"]["ram"]["price"]
+            base_price = (
+                cpu * details["specs"]["cpu"]["price"]
+                + memory * details["specs"]["ram"]["price"]
+            )
             for gpu_name, gpu in details["specs"]["gpu"].items():
                 gpu_count = gpu["amount"]
                 if gpu_count == 0:

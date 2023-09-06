@@ -6,10 +6,11 @@ import zipfile
 from dataclasses import dataclass
 from typing import Iterable, Optional
 
-
 logger = logging.getLogger(__name__)
 version_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v1/version"
-catalog_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v1/{version}/catalog.zip"
+catalog_url = (
+    "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v1/{version}/catalog.zip"
+)
 
 
 @dataclass(frozen=True)
@@ -50,7 +51,9 @@ class Catalog:
             providers = [f[:-4] for f in zip_file.namelist() if f.endswith(".csv")]
             for provider in providers:
                 with zip_file.open(f"{provider}.csv", "r") as csv_file:
-                    reader: Iterable[dict[str, str]] = csv.DictReader(io.TextIOWrapper(csv_file, "utf-8"))
+                    reader: Iterable[dict[str, str]] = csv.DictReader(
+                        io.TextIOWrapper(csv_file, "utf-8")
+                    )
                     for row in reader:
                         yield CatalogItem(
                             provider=provider,
@@ -61,6 +64,8 @@ class Catalog:
                             memory=float(row["memory"]),
                             gpu_count=int(row["gpu_count"]),
                             gpu_name=row["gpu_name"] or None,
-                            gpu_memory=float(row["gpu_memory"]) if row["gpu_memory"] else None,
+                            gpu_memory=float(row["gpu_memory"])
+                            if row["gpu_memory"]
+                            else None,
                             spot=row["spot"] == "True",
                         )

@@ -15,14 +15,14 @@ jobs:
           python-version: 3.11
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          pip install pip -U
           pip install -r requirements.txt
       - name: Collect catalog
         working-directory: src
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: python -m dstack.pricing aws --output ../aws.csv
+        run: python -m gpuhunt aws --output ../aws.csv
       - uses: actions/upload-artifact@v3
         with:
           name: catalogs
@@ -45,13 +45,13 @@ jobs:
           python-version: 3.11
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          pip install pip -U
           pip install -r requirements.txt
       - name: Collect catalog
         working-directory: src
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-        run: python -m dstack.pricing azure --output ../azure.csv
+        run: python -m gpuhunt azure --output ../azure.csv
       - uses: actions/upload-artifact@v3
         with:
           name: catalogs
@@ -76,13 +76,13 @@ jobs:
           python-version: 3.11
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          pip install pip -U
           pip install -r requirements.txt
       - name: Collect catalog
         working-directory: src
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-        run: python -m dstack.pricing gcp --output ../gcp.csv
+        run: python -m gpuhunt gcp --output ../gcp.csv
       - uses: actions/upload-artifact@v3
         with:
           name: catalogs
@@ -102,13 +102,13 @@ jobs:
           python-version: 3.11
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          pip install pip -U
           pip install -r requirements.txt
       - name: Collect catalog
         working-directory: src
         env:
           LAMBDALABS_TOKEN: ${{ secrets.LAMBDALABS_TOKEN }}
-        run: python -m dstack.pricing lambdalabs --output ../lambdalabs.csv
+        run: python -m gpuhunt lambdalabs --output ../lambdalabs.csv
       - uses: actions/upload-artifact@v3
         with:
           name: catalogs
