@@ -1,0 +1,27 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  upload-pypi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+      - name: Install dependencies
+        run: |
+          pip install pip -U
+          pip install build wheel twine
+          pip install -r requirements.txt
+      - name: Upload pypi package
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "__version__ = \"$VERSION\"" > src/version.py
+          python -m build
+          python -m twine upload --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }} dist/*

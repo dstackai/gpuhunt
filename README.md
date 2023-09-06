@@ -4,21 +4,23 @@ The catalog includes details about prices, locations, CPUs, RAM, GPUs, and spots
 ## Usage
 
 ```python
-import dstack.pricing
+import gpuhunt
 
-gpus = dstack.pricing.query()
-dstack.pricing.print_table(gpus)
+items = gpuhunt.query()
+
+print(*items, sep="\n")
 ```
 
 ## Advanced usage
 
 ```python
-import dstack.pricing
+from gpuhunt import Catalog
 
-catalog = dstack.pricing.Catalog()
+catalog = Catalog()
 catalog.load(version="20230831")
-gpus = catalog.query()
-dstack.pricing.print_table(gpus)
+items = catalog.query()
+
+print(*items, sep="\n")
 ```
 
 ## See also

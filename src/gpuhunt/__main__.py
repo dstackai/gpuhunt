@@ -3,22 +3,29 @@ import logging
 import os
 import sys
 
-import dstack.pricing._storage as storage
-from dstack.pricing.providers.aws import AWSProvider
-from dstack.pricing.providers.azure import AzureProvider
-from dstack.pricing.providers.gcp import GCPProvider
-from dstack.pricing.providers.lambdalabs import LambdaLabsProvider
-from dstack.pricing.providers.tensordock import TensorDockProvider
-from dstack.pricing.providers.vastai import VastAIProvider
+import gpuhunt._storage as storage
+from gpuhunt.providers.aws import AWSProvider
+from gpuhunt.providers.azure import AzureProvider
+from gpuhunt.providers.gcp import GCPProvider
+from gpuhunt.providers.lambdalabs import LambdaLabsProvider
+from gpuhunt.providers.tensordock import TensorDockProvider
+from gpuhunt.providers.vastai import VastAIProvider
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="python3 -m dstack.pricing")
-    parser.add_argument("provider", choices=["aws", "azure", "gcp", "lambdalabs", "tensordock", "vastai"])
+    parser = argparse.ArgumentParser(prog="python3 -m gpuhunt")
+    parser.add_argument(
+        "provider",
+        choices=["aws", "azure", "gcp", "lambdalabs", "tensordock", "vastai"],
+    )
     parser.add_argument("--output", required=True)
     parser.add_argument("--no-filter", action="store_true")
     args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO,
+        stream=sys.stdout,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
 
     if args.provider == "aws":
         provider = AWSProvider()

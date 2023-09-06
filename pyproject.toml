@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dstack-gpu-pricing"
+name = "gpuhunt"
 authors = [
-    { name = "dstack.ai" },
+    { name = "dstack GmbH" },
 ]
 description = "A catalog of GPU pricing for different cloud providers"
 readme = "README.md"
@@ -19,8 +19,8 @@ keywords = ["gpu", "cloud", "pricing"]
 dynamic = ["version"]
 
 [project.urls]
-"Homepage" = "https://github.com/dstackai/dstack-gpu-pricing"
-"Bug Tracker" = "https://github.com/dstackai/dstack-gpu-pricing/issues"
+"GitHub" = "https://github.com/dstackai/gpuhunt"
+"Issues" = "https://github.com/dstackai/gpuhunt/issues"
 
 [project.optional-dependencies]
 fetch = [
@@ -40,4 +40,4 @@ gcp = [
 ]
 
 [tool.setuptools.dynamic]
-version = {attr = "dstack.pricing.version.__version__"}
+version = {attr = "gpuhunt.version.__version__"}

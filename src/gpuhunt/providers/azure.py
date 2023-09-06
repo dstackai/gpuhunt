@@ -1,21 +1,20 @@
-import os
-import re
 import json
 import logging
+import os
+import re
 import urllib.parse
 from collections import namedtuple
 from queue import Queue
 from threading import Thread
-from typing import Tuple, Optional, Iterable
+from typing import Iterable, Optional, Tuple
 
 import requests
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.compute import ComputeManagementClient
 
-from dstack.pricing._models import InstanceOffer
-from dstack.pricing.providers import AbstractProvider
-
+from gpuhunt._models import InstanceOffer
+from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
 prices_url = "https://prices.azure.com/api/retail/prices"
@@ -62,16 +61,24 @@ retired_vm_series = [
 
 
 class AzureProvider(AbstractProvider):
-    def __init__(self, subscription_id: str, credential: Optional[TokenCredential] = None, cache_dir: Optional[str] = None):
+    def __init__(
+        self,
+        subscription_id: str,
+        credential: Optional[TokenCredential] = None,
+        cache_dir: Optional[str] = None,
+    ):
         self.cache_dir = cache_dir
         self.client = ComputeManagementClient(
             credential=credential or DefaultAzureCredential(),
-            subscription_id=subscription_id
+            subscription_id=subscription_id,
         )
 
     def get_pages(self, threads: int = 8) -> Iterable[list[dict]]:
         q = Queue()
-        workers = [Thread(target=self._get_pages_worker, args=(q, threads, i), daemon=True) for i in range(threads)]
+        workers = [
+            Thread(target=self._get_pages_worker, args=(q, threads, i), daemon=True)
+            for i in range(threads)
+        ]
         for worker in workers:
             worker.start()
 
@@ -95,11 +102,14 @@ class AzureProvider(AbstractProvider):
                     data = json.load(f)
             else:
                 logger.info("Worker %s fetches pricing page %s", worker_id, page_id)
-                data = requests.get(prices_url, params={
-                    "api-version": "2023-01-01-preview",
-                    "$filter": " and ".join(prices_filters),
-                    "$skip": page_id * 100,
-                }).json()
+                data = requests.get(
+                    prices_url,
+                    params={
+                        "api-version": "2023-01-01-preview",
+                        "$filter": " and ".join(prices_filters),
+                        "$skip": page_id * 100,
+                    },
+                ).json()
                 if cached_page is not None:
                     with open(cached_page, "w") as f:
                         json.dump(data, f)
@@ -173,12 +183,22 @@ class AzureProvider(AbstractProvider):
             VMSeries(r"NC(\d+)s_v3", "V100", 16 * 1024),  # NCv3-series [V100 16GB]
             VMSeries(r"NC(\d+)as_T4_v3", "T4", 16 * 1024),  # NCasT4_v3-series [T4]
             VMSeries(r"ND(\d+)rs_v2", "V100", 32 * 1024),  # NDv2-series [8xV100 32GB]
-            VMSeries(r"NV(\d+)adm?s_A10_v5", "A10", 24 * 1024),  # NVadsA10 v5-series [A10]
-            VMSeries(r"NC(\d+)ads_A100_v4", "A100", 80 * 1024),  # NC A100 v4-series [A100 80GB]
-            VMSeries(r"ND(\d+)asr_v4", "A100", 40 * 1024),  # ND A100 v4-series [8xA100 40GB]
-            VMSeries(r"ND(\d+)amsr_A100_v4", "A100", 80 * 1024),  # NDm A100 v4-series [8xA100 80GB]
+            VMSeries(
+                r"NV(\d+)adm?s_A10_v5", "A10", 24 * 1024
+            ),  # NVadsA10 v5-series [A10]
+            VMSeries(
+                r"NC(\d+)ads_A100_v4", "A100", 80 * 1024
+            ),  # NC A100 v4-series [A100 80GB]
+            VMSeries(
+                r"ND(\d+)asr_v4", "A100", 40 * 1024
+            ),  # ND A100 v4-series [8xA100 40GB]
+            VMSeries(
+                r"ND(\d+)amsr_A100_v4", "A100", 80 * 1024
+            ),  # NDm A100 v4-series [8xA100 80GB]
         ]
-        vm_series_pattern = re.compile(f"^Standard_({'|'.join(series.pattern for series in vm_series)})$")
+        vm_series_pattern = re.compile(
+            f"^Standard_({'|'.join(series.pattern for series in vm_series)})$"
+        )
         return [i for i in offers if vm_series_pattern.match(i.instance_name)]
 
 
