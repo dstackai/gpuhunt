@@ -115,13 +115,34 @@ jobs:
           path: lambdalabs.csv
           retention-days: 1
 
-  publish-catalog:
-    name: Publish catalogs
+  test-catalog:
+    name: Test catalogs integrity
     needs:
       - catalog-aws
       - catalog-azure
       - catalog-gcp
       - catalog-lambdalabs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install dependencies
+        run: |
+          pip install pip -U
+          pip install pytest
+      - uses: actions/download-artifact@v3
+        with:
+          name: catalogs
+      - name: Run integrity tests
+        env:
+          CATALOG_DIR: .
+        run: pytest src/integrity_tests
+
+  publish-catalog:
+    name: Publish catalogs
+    needs: [ test-catalog ]
     runs-on: ubuntu-latest
     steps:
       - name: Install AWS CLI
