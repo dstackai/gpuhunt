@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import time
 import urllib.parse
 from collections import namedtuple
 from queue import Queue
@@ -18,6 +19,7 @@ from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
 prices_url = "https://prices.azure.com/api/retail/prices"
+retail_prices_page_size = 1000
 prices_version = "2023-01-01-preview"
 prices_filters = [
     "serviceName eq 'Virtual Machines'",
@@ -93,33 +95,42 @@ class AzureProvider(AbstractProvider):
 
     def _get_pages_worker(self, q: Queue, stride: int, worker_id: int):
         page_id = worker_id
-        while True:
-            cached_page = None
-            if self.cache_dir is not None:
-                cached_page = os.path.join(self.cache_dir, f"{page_id:04}.json")
-            if cached_page is not None and os.path.exists(cached_page):
-                with open(cached_page, "r") as f:
-                    data = json.load(f)
-            else:
-                logger.info("Worker %s fetches pricing page %s", worker_id, page_id)
-                data = requests.get(
-                    prices_url,
-                    params={
-                        "api-version": "2023-01-01-preview",
-                        "$filter": " and ".join(prices_filters),
-                        "$skip": page_id * 100,
-                    },
-                ).json()
-                if cached_page is not None:
-                    with open(cached_page, "w") as f:
-                        json.dump(data, f)
-
-            if not data["Items"]:
-                q.put(None)
-                logger.info("Worker %s exited", worker_id)
-                return
-            q.put(data["Items"])
-            page_id += stride
+        try:
+            while True:
+                cached_page = None
+                if self.cache_dir is not None:
+                    cached_page = os.path.join(self.cache_dir, f"{page_id:04}.json")
+                if cached_page is not None and os.path.exists(cached_page):
+                    with open(cached_page, "r") as f:
+                        data = json.load(f)
+                else:
+                    logger.info("Worker %s fetches pricing page %s", worker_id, page_id)
+                    res = requests.get(
+                        prices_url,
+                        params={
+                            "api-version": "2023-01-01-preview",
+                            "$filter": " and ".join(prices_filters),
+                            "$skip": page_id * retail_prices_page_size,
+                        },
+                    )
+                    if res.status_code == 429:
+                        logger.warning("Worker %s got 429: sleep 3 & retry", worker_id)
+                        time.sleep(3)
+                        continue
+                    res.raise_for_status()
+                    if cached_page is not None:
+                        with open(cached_page, "w") as f:
+                            f.write(res.text)
+                    data = res.json()
+                if not data["Items"]:
+                    logger.info("Worker %s exited", worker_id)
+                    return
+                q.put(data["Items"])
+                page_id += stride
+        except Exception as e:
+            logger.exception("Worker %s failed: %s", worker_id, e)
+        finally:
+            q.put(None)
 
     def get(self) -> list[InstanceOffer]:
         offers = []

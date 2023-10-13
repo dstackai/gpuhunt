@@ -6,6 +6,7 @@ import os
 import re
 import tempfile
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Iterable, Optional
 
 import boto3
@@ -18,6 +19,18 @@ from gpuhunt.providers import AbstractProvider
 logger = logging.getLogger(__name__)
 ec2_pricing_url = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/index.csv"
 disclaimer_rows_skip = 5
+# https://aws.amazon.com/ec2/previous-generation/
+previous_generation_families = ["t1.", "m1.", "m3.", "c1.", "c3.", "i2.", "m2.", "cr1.", "r3.", "hs1.", "g2.", "a1."]
+pricing_filters = {
+    "TermType": ["OnDemand"],
+    "Tenancy": ["Shared"],
+    "Operating System": ["Linux"],
+    "CapacityStatus": ["Used"],
+    "Unit": ["Hrs"],
+    "Currency": ["USD"],
+    "Pre Installed S/W": ["", "NA"],
+}
+describe_instances_limit = 100
 
 
 class AWSProvider(AbstractProvider):
@@ -35,15 +48,6 @@ class AWSProvider(AbstractProvider):
             self.temp_dir = tempfile.TemporaryDirectory()
             self.cache_path = self.temp_dir.name + "/index.csv"
         # todo aws creds
-        self.filters = {
-            "TermType": ["OnDemand"],
-            "Tenancy": ["Shared"],
-            "Operating System": ["Linux"],
-            "CapacityStatus": ["Used"],
-            "Unit": ["Hrs"],
-            "Currency": ["USD"],
-            "Pre Installed S/W": ["", "NA"],
-        }
         self.preview_gpus = {
             "p4de.24xlarge": ("A100", 80.0),
         }
@@ -79,7 +83,9 @@ class AWSProvider(AbstractProvider):
         return self.add_spots(offers)
 
     def skip(self, row: dict[str, str]) -> bool:
-        for key, values in self.filters.items():
+        if any(row["Instance Type"].startswith(family) for family in previous_generation_families):
+            return True
+        for key, values in pricing_filters.items():
             if row[key] not in values:
                 return True
         return False
@@ -95,16 +101,18 @@ class AWSProvider(AbstractProvider):
             region = max(regions, key=lambda r: len(regions[r]))
             instance_types = regions.pop(region)
 
-            logger.info("Fetching GPU details for %s", region)
             client = boto3.client("ec2", region_name=region)
             paginator = client.get_paginator("describe_instance_types")
-            for page in paginator.paginate(InstanceTypes=instance_types):
-                for i in page["InstanceTypes"]:
-                    gpu = i["GpuInfo"]["Gpus"][0]
-                    gpus[i["InstanceType"]] = (
-                        gpu["Name"],
-                        gpu["MemoryInfo"]["SizeInMiB"] / 1024,
-                    )
+            for offset in range(0, len(instance_types), describe_instances_limit):
+                logger.info("Fetching GPU details for %s (offset=%s)", region, offset)
+                pages = paginator.paginate(InstanceTypes=instance_types[offset:offset + describe_instances_limit])
+                for page in pages:
+                    for i in page["InstanceTypes"]:
+                        gpu = i["GpuInfo"]["Gpus"][0]
+                        gpus[i["InstanceType"]] = (
+                            gpu["Name"],
+                            gpu["MemoryInfo"]["SizeInMiB"] / 1024,
+                        )
 
             regions = {
                 region: left
@@ -116,40 +124,50 @@ class AWSProvider(AbstractProvider):
             if offer.gpu_count > 0:
                 offer.gpu_name, offer.gpu_memory = gpus[offer.instance_name]
 
+    def _add_spots_worker(self, region: str, instance_types: set[str]) -> dict[tuple[str, str], float]:
+        spot_prices = dict()
+        logger.info("Fetching spot prices for %s", region)
+        try:
+            client = boto3.client("ec2", region_name=region)  # todo creds
+            pages = client.get_paginator("describe_spot_price_history").paginate(
+                Filters=[
+                    {
+                        "Name": "product-description",
+                        "Values": ["Linux/UNIX"],
+                    }
+                ],
+                InstanceTypes=list(instance_types),
+                StartTime=datetime.datetime.utcnow(),
+            )
+
+            instance_prices = defaultdict(list)
+            for page in pages:
+                for item in page["SpotPriceHistory"]:
+                    instance_prices[item["InstanceType"]].append(
+                        float(item["SpotPrice"])
+                    )
+            for (
+                    instance_type,
+                    zone_prices,
+            ) in instance_prices.items():  # reduce zone prices to a single value
+                spot_prices[(instance_type, region)] = min(zone_prices)
+        except (ClientError, EndpointConnectionError):
+            return {}
+        return spot_prices
+
     def add_spots(self, offers: list[InstanceOffer]) -> list[InstanceOffer]:
         region_instances = defaultdict(set)
         for offer in offers:
             region_instances[offer.location].add(offer.instance_name)
 
         spot_prices = dict()
-        for region, instance_types in region_instances.items():
-            logger.info("Fetching spot prices for %s", region)
-            try:
-                client = boto3.client("ec2", region_name=region)  # todo creds
-                pages = client.get_paginator("describe_spot_price_history").paginate(
-                    Filters=[
-                        {
-                            "Name": "product-description",
-                            "Values": ["Linux/UNIX"],
-                        }
-                    ],
-                    InstanceTypes=list(instance_types),
-                    StartTime=datetime.datetime.utcnow(),
-                )
-
-                instance_prices = defaultdict(list)
-                for page in pages:
-                    for item in page["SpotPriceHistory"]:
-                        instance_prices[item["InstanceType"]].append(
-                            float(item["SpotPrice"])
-                        )
-                for (
-                    instance_type,
-                    zone_prices,
-                ) in instance_prices.items():  # reduce zone prices to a single value
-                    spot_prices[(instance_type, region)] = min(zone_prices)
-            except (ClientError, EndpointConnectionError) as e:
-                pass
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            future_to_region = {}
+            for region, instance_types in region_instances.items():
+                future = executor.submit(self._add_spots_worker, region, instance_types)
+                future_to_region[future] = region
+            for future in as_completed(future_to_region):
+                spot_prices.update(future.result())
 
         spot_offers = []
         for offer in offers:

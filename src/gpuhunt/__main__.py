@@ -28,7 +28,7 @@ def main():
     )
 
     if args.provider == "aws":
-        provider = AWSProvider()
+        provider = AWSProvider(os.getenv("AWS_CACHE_PATH"))
     elif args.provider == "azure":
         provider = AzureProvider(os.getenv("AZURE_SUBSCRIPTION_ID"))
     elif args.provider == "gcp":
@@ -42,6 +42,7 @@ def main():
     else:
         exit(f"Unknown provider {args.provider}")
 
+    logging.info("Fetching offers for %s", args.provider)
     offers = provider.get()
     if not args.no_filter:
         offers = provider.filter(offers)

@@ -16,7 +16,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pip -U
-          pip install -r requirements.txt
+          pip install -e '.[fetch,aws]'
       - name: Collect catalog
         working-directory: src
         env:
@@ -46,7 +46,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pip -U
-          pip install -r requirements.txt
+          pip install -e '.[fetch,azure]'
       - name: Collect catalog
         working-directory: src
         env:
@@ -77,7 +77,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pip -U
-          pip install -r requirements.txt
+          pip install -e '.[fetch,gcp]'
       - name: Collect catalog
         working-directory: src
         env:
@@ -103,7 +103,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pip -U
-          pip install -r requirements.txt
+          pip install -e '.[fetch]'
       - name: Collect catalog
         working-directory: src
         env:
