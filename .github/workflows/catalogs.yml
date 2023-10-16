@@ -1,8 +1,8 @@
 name: Collect and publish catalogs
 on:
   workflow_dispatch:
-#  schedule:
-#    - cron: '0 0 * * *'
+  schedule:
+    - cron: '0 1 * * *'  # 01:00 UTC every day
 
 jobs:
   catalog-aws:
