@@ -1,4 +1,4 @@
-from typing import TypeVar, Union, Optional, Callable
+from typing import Callable, Optional, TypeVar, Union
 
 T = TypeVar("T", bound=Union[int, float])
 

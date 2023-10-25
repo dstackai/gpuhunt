@@ -6,14 +6,14 @@ import time
 from collections import namedtuple
 from queue import Queue
 from threading import Thread
-from typing import Iterable, Optional, Tuple, List
+from typing import Iterable, List, Optional, Tuple
 
 import requests
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.compute import ComputeManagementClient
 
-from gpuhunt._internal.models import RawCatalogItem, QueryFilter
+from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -203,15 +203,9 @@ class AzureProvider(AbstractProvider):
             VMSeries(r"NC(\d+)s_v3", "V100", 16 * 1024),  # NCv3-series [V100 16GB]
             VMSeries(r"NC(\d+)as_T4_v3", "T4", 16 * 1024),  # NCasT4_v3-series [T4]
             VMSeries(r"ND(\d+)rs_v2", "V100", 32 * 1024),  # NDv2-series [8xV100 32GB]
-            VMSeries(
-                r"NV(\d+)adm?s_A10_v5", "A10", 24 * 1024
-            ),  # NVadsA10 v5-series [A10]
-            VMSeries(
-                r"NC(\d+)ads_A100_v4", "A100", 80 * 1024
-            ),  # NC A100 v4-series [A100 80GB]
-            VMSeries(
-                r"ND(\d+)asr_v4", "A100", 40 * 1024
-            ),  # ND A100 v4-series [8xA100 40GB]
+            VMSeries(r"NV(\d+)adm?s_A10_v5", "A10", 24 * 1024),  # NVadsA10 v5-series [A10]
+            VMSeries(r"NC(\d+)ads_A100_v4", "A100", 80 * 1024),  # NC A100 v4-series [A100 80GB]
+            VMSeries(r"ND(\d+)asr_v4", "A100", 40 * 1024),  # ND A100 v4-series [8xA100 40GB]
             VMSeries(
                 r"ND(\d+)amsr_A100_v4", "A100", 80 * 1024
             ),  # NDm A100 v4-series [8xA100 80GB]

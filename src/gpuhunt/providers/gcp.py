@@ -2,7 +2,7 @@ import copy
 import logging
 import re
 from collections import defaultdict, namedtuple
-from typing import Optional, List
+from typing import List, Optional
 
 import google.cloud.billing_v1 as billing_v1
 import google.cloud.compute_v1 as compute_v1
@@ -101,14 +101,10 @@ class GCPProvider(AbstractProvider):
         instances_with_gpus = []
         for zone, zone_n1_instances in n1_instances.items():
             logger.info("Fetching GPUs for zone %s", zone)
-            for accelerator in self.accelerator_types_client.list(
-                project=self.project, zone=zone
-            ):
+            for accelerator in self.accelerator_types_client.list(project=self.project, zone=zone):
                 if accelerator.name not in accelerator_limits:
                     continue
-                for n, limit in zip(
-                    accelerator_counts, accelerator_limits[accelerator.name]
-                ):
+                for n, limit in zip(accelerator_counts, accelerator_limits[accelerator.name]):
                     for instance in zone_n1_instances:
                         if instance.cpu > limit.cpu or instance.memory > limit.memory:
                             continue
@@ -156,9 +152,7 @@ class GCPProvider(AbstractProvider):
             resource = resource.lower()
             if resource == "gpu":
                 family = family.replace(" ", "-").lower()
-                family = {"nvidia-tesla-a100-80gb": "nvidia-a100-80gb"}.get(
-                    family, family
-                )
+                family = {"nvidia-tesla-a100-80gb": "nvidia-a100-80gb"}.get(family, family)
             else:
                 r = re.match(r"^([a-z]\d.?) ", family.lower())
                 if r:
@@ -197,10 +191,7 @@ class GCPProvider(AbstractProvider):
                 if instance.gpu_name:
                     if region_spot not in families["gpu"][instance.gpu_name]:
                         continue
-                    price += (
-                        instance.gpu_count
-                        * families["gpu"][instance.gpu_name][region_spot]
-                    )
+                    price += instance.gpu_count * families["gpu"][instance.gpu_name][region_spot]
 
                 offer = copy.deepcopy(instance)
                 offer.price = round(price, 6)

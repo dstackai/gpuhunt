@@ -5,16 +5,14 @@ import logging
 import urllib.request
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Iterable, Optional, Union, List
+from typing import Iterable, List, Optional, Union
 
 from gpuhunt._internal.models import CatalogItem, QueryFilter
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
 version_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v1/version"
-catalog_url = (
-    "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v1/{version}/catalog.zip"
-)
+catalog_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v1/{version}/catalog.zip"
 OFFLINE_PROVIDERS = ["aws", "azure", "gcp", "lambdalabs"]
 ONLINE_PROVIDERS = ["tensordock"]
 
@@ -148,7 +146,9 @@ class Catalog:
         """
         self.providers.append(provider)
 
-    def _get_offline_provider_items(self, provider_name: str, query_filter: QueryFilter) -> List[CatalogItem]:
+    def _get_offline_provider_items(
+        self, provider_name: str, query_filter: QueryFilter
+    ) -> List[CatalogItem]:
         items = []
         with zipfile.ZipFile(self.catalog) as zip_file:
             with zip_file.open(f"{provider_name}.csv", "r") as csv_file:
@@ -161,7 +161,9 @@ class Catalog:
                         items.append(item)
         return items
 
-    def _get_online_provider_items(self, provider_name: str, query_filter: QueryFilter) -> List[CatalogItem]:
+    def _get_online_provider_items(
+        self, provider_name: str, query_filter: QueryFilter
+    ) -> List[CatalogItem]:
         items = []
         found = False
         for provider in self.providers:

@@ -1,11 +1,11 @@
 import copy
 import logging
 import re
-from typing import Tuple, Optional, List
+from typing import List, Optional, Tuple
 
 import requests
 
-from gpuhunt._internal.models import RawCatalogItem, QueryFilter
+from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)

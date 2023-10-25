@@ -3,10 +3,9 @@ import importlib
 import logging
 from typing import Callable, TypeVar
 
-from typing_extensions import ParamSpec, Concatenate
+from typing_extensions import Concatenate, ParamSpec
 
 from gpuhunt._internal.catalog import Catalog
-
 
 logger = logging.getLogger(__name__)
 

@@ -10,11 +10,7 @@ from gpuhunt.providers.tensordock import TensorDockProvider
 @pytest.fixture
 def specs() -> dict:
     return {
-        "cpu": {
-            "amount": 256,
-            "price": 0.003,
-            "type": "Intel Xeon Platinum 8352Y"
-        },
+        "cpu": {"amount": 256, "price": 0.003, "type": "Intel Xeon Platinum 8352Y"},
         "gpu": {
             "l40-pcie-48gb": {
                 "amount": 8,
@@ -22,17 +18,11 @@ def specs() -> dict:
                 "pcie": True,
                 "price": 1.05,
                 "rtx": False,
-                "vram": 48
+                "vram": 48,
             }
         },
-        "ram": {
-            "amount": 1495,
-            "price": 0.002
-        },
-        "storage": {
-            "amount": 10252,
-            "price": 5e-05
-        }
+        "ram": {"amount": 1495, "price": 0.002},
+        "storage": {"amount": 10252, "price": 5e-05},
     }
 
 
@@ -58,7 +48,9 @@ class TestTensorDockMinimalConfiguration:
         assert offers == []
 
     def test_controversial_cpu(self, specs: dict):
-        offers = TensorDockProvider.optimize_offers(QueryFilter(min_memory=8, max_memory=4), specs, "", "")
+        offers = TensorDockProvider.optimize_offers(
+            QueryFilter(min_memory=8, max_memory=4), specs, "", ""
+        )
         assert offers == []
 
     def test_min_gpu_count(self, specs: dict):
@@ -70,28 +62,36 @@ class TestTensorDockMinimalConfiguration:
         assert offers == []
 
     def test_min_total_gpu_memory(self, specs: dict):
-        offers = TensorDockProvider.optimize_offers(QueryFilter(min_total_gpu_memory=100), specs, "", "")
+        offers = TensorDockProvider.optimize_offers(
+            QueryFilter(min_total_gpu_memory=100), specs, "", ""
+        )
         assert offers == make_offers(specs, cpu=1, memory=2, disk_size=30, gpu_count=3)
 
     def test_controversial_gpu(self, specs: dict):
-        offers = TensorDockProvider.optimize_offers(QueryFilter(min_total_gpu_memory=100, max_gpu_count=2), specs, "", "")
+        offers = TensorDockProvider.optimize_offers(
+            QueryFilter(min_total_gpu_memory=100, max_gpu_count=2), specs, "", ""
+        )
         assert offers == []
 
 
-def make_offers(specs: dict, cpu: int, memory: int, disk_size: int, gpu_count: int) -> List[RawCatalogItem]:
+def make_offers(
+    specs: dict, cpu: int, memory: int, disk_size: int, gpu_count: int
+) -> List[RawCatalogItem]:
     gpu = list(specs["gpu"].values())[0]
     price = cpu * specs["cpu"]["price"]
     price += memory * specs["ram"]["price"]
     price += disk_size * specs["storage"]["price"]
     price += gpu_count * gpu["price"]
-    return [RawCatalogItem(
-        instance_name="",
-        location="",
-        price=round(price, 5),
-        cpu=cpu,
-        memory=memory,
-        gpu_count=gpu_count,
-        gpu_name="L40",
-        gpu_memory=gpu["vram"],
-        spot=False,
-    )]
+    return [
+        RawCatalogItem(
+            instance_name="",
+            location="",
+            price=round(price, 5),
+            cpu=cpu,
+            memory=memory,
+            gpu_count=gpu_count,
+            gpu_name="L40",
+            gpu_memory=gpu["vram"],
+            spot=False,
+        )
+    ]

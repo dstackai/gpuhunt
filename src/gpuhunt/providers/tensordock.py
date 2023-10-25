@@ -1,18 +1,16 @@
 import logging
-from typing import Optional, List, Union
+from typing import List, Optional, Union
 
 import requests
 
-from gpuhunt._internal.utils import optimize, is_between
-from gpuhunt._internal.models import RawCatalogItem, QueryFilter
+from gpuhunt._internal.models import QueryFilter, RawCatalogItem
+from gpuhunt._internal.utils import is_between, optimize
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
 
 # https://documenter.getpostman.com/view/20973002/2s8YzMYRDc#2b4a3db0-c162-438c-aae4-6a88afc96fdb
-marketplace_hostnodes_url = (
-    "https://marketplace.tensordock.com/api/v0/client/deploy/hostnodes"
-)
+marketplace_hostnodes_url = "https://marketplace.tensordock.com/api/v0/client/deploy/hostnodes"
 marketplace_gpus = {
     "a100-pcie-80gb": "A100",
     "geforcegtx1070-pcie-8gb": "GTX1070",
@@ -42,9 +40,7 @@ class TensorDockProvider(AbstractProvider):
         offers = []
         for hostnode, details in hostnodes.items():
             location = (
-                "-".join(
-                    [details["location"][key] for key in ["country", "region", "city"]]
-                )
+                "-".join([details["location"][key] for key in ["country", "region", "city"]])
                 .lower()
                 .replace(" ", "")
             )
@@ -52,7 +48,9 @@ class TensorDockProvider(AbstractProvider):
         return offers
 
     @staticmethod
-    def optimize_offers(q: QueryFilter, specs: dict, instance_name: str, location: str) -> List[RawCatalogItem]:
+    def optimize_offers(
+        q: QueryFilter, specs: dict, instance_name: str, location: str
+    ) -> List[RawCatalogItem]:
         cpu = optimize(specs["cpu"]["amount"], q.min_cpu or 1, q.max_cpu)
         memory = optimize(  # has to be even
             round_down(specs["ram"]["amount"], 2),
@@ -66,7 +64,10 @@ class TensorDockProvider(AbstractProvider):
         )
         if cpu is None or memory is None or disk_size is None:
             return []
-        base_price = sum(n * specs[key]["price"] for key, n in [("cpu", cpu), ("ram", memory), ("storage", disk_size)])
+        base_price = sum(
+            n * specs[key]["price"]
+            for key, n in [("cpu", cpu), ("ram", memory), ("storage", disk_size)]
+        )
         offers = []
         for gpu_name, gpu in specs["gpu"].items():
             gpu_name = marketplace_gpus.get(gpu_name, gpu_name)
@@ -74,7 +75,9 @@ class TensorDockProvider(AbstractProvider):
                 continue
             if not is_between(gpu["vram"], q.min_gpu_memory, q.max_gpu_memory):
                 continue
-            if (gpu_count := optimize(gpu["amount"], q.min_gpu_count or 1, q.max_gpu_count)) is None:
+            if (
+                gpu_count := optimize(gpu["amount"], q.min_gpu_count or 1, q.max_gpu_count)
+            ) is None:
                 continue
             # filter by total gpu memory
             if q.min_total_gpu_memory is None:
@@ -84,7 +87,9 @@ class TensorDockProvider(AbstractProvider):
             gpu_total_memory = optimize(
                 gpu["amount"] * gpu["vram"],
                 round_up(min_total_gpu_memory, gpu["vram"]),
-                round_down(q.max_total_gpu_memory, gpu["vram"]) if q.max_total_gpu_memory is not None else None,
+                round_down(q.max_total_gpu_memory, gpu["vram"])
+                if q.max_total_gpu_memory is not None
+                else None,
             )
             if gpu_total_memory is None:
                 continue

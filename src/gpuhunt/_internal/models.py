@@ -1,7 +1,7 @@
-from dataclasses import dataclass, asdict
-from typing import Optional, List, Dict, Union
+from dataclasses import asdict, dataclass
+from typing import Dict, List, Optional, Union
 
-from gpuhunt._internal.utils import is_between, empty_as_none
+from gpuhunt._internal.utils import empty_as_none, is_between
 
 
 @dataclass
@@ -49,6 +49,7 @@ class CatalogItem(RawCatalogItem):
         spot: whether the instance is a spot instance
         provider: name of the provider
     """
+
     instance_name: str
     location: str
     price: float
@@ -87,6 +88,7 @@ class QueryFilter:
         max_price: maximum price per hour in USD
         spot: if `False`, only ondemand offers will be returned. If `True`, only spot offers will be returned
     """
+
     provider: Optional[List[str]] = None
     min_cpu: Optional[int] = None
     max_cpu: Optional[int] = None
@@ -125,10 +127,14 @@ class QueryFilter:
             return False
         if self.gpu_name is not None and item.gpu_name not in self.gpu_name:
             return False
-        if not is_between(item.gpu_memory if item.gpu_count > 0 else 0, self.min_gpu_memory, self.max_gpu_memory):
+        if not is_between(
+            item.gpu_memory if item.gpu_count > 0 else 0, self.min_gpu_memory, self.max_gpu_memory
+        ):
             return False
         if not is_between(
-                (item.gpu_count * item.gpu_memory) if item.gpu_count > 0 else 0, self.min_total_gpu_memory, self.max_total_gpu_memory
+            (item.gpu_count * item.gpu_memory) if item.gpu_count > 0 else 0,
+            self.min_total_gpu_memory,
+            self.max_total_gpu_memory,
         ):
             return False
         # TODO(egor-s): add disk_size to CatalogItem

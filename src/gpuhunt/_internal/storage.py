@@ -1,9 +1,8 @@
 import csv
 import dataclasses
-from typing import Iterable, List, TypeVar, Type
+from typing import Iterable, List, Type, TypeVar
 
 from gpuhunt._internal.models import RawCatalogItem
-
 
 T = TypeVar("T", bound=RawCatalogItem)
 

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import List, Optional
 
-from gpuhunt._internal.models import RawCatalogItem, QueryFilter
+from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 
 
 class AbstractProvider(ABC):

@@ -1,9 +1,9 @@
 import copy
-from typing import Optional, List
+from typing import List, Optional
 
 import requests
 
-from gpuhunt._internal.models import RawCatalogItem, QueryFilter
+from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
 bundles_url = "https://console.vast.ai/api/v0/bundles"
