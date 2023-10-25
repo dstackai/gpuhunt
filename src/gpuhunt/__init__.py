@@ -1,14 +1,3 @@
-from functools import lru_cache
-
-from gpuhunt._catalog import Catalog
-
-
-@lru_cache()
-def default_catalog() -> Catalog:
-    catalog = Catalog()
-    catalog.load()
-    return catalog
-
-
-def query() -> list:  # todo
-    return default_catalog().query()
+from gpuhunt._internal.catalog import Catalog
+from gpuhunt._internal.default import default_catalog, query
+from gpuhunt._internal.models import QueryFilter, CatalogItem

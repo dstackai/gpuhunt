@@ -1,10 +1,11 @@
+import copy
 import logging
 import re
-from typing import Tuple
+from typing import Tuple, Optional, List
 
 import requests
 
-from gpuhunt._models import InstanceOffer
+from gpuhunt._internal.models import RawCatalogItem, QueryFilter
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -25,10 +26,12 @@ all_regions = [
 
 
 class LambdaLabsProvider(AbstractProvider):
+    NAME = "lambdalabs"
+
     def __init__(self, token: str):
         self.token = token
 
-    def get(self) -> list[InstanceOffer]:
+    def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
         offers = []
         data = requests.get(
             instance_types_url, headers={"Authorization": f"Bearer {self.token}"}
@@ -37,7 +40,7 @@ class LambdaLabsProvider(AbstractProvider):
             instance = instance["instance_type"]
             logger.info(instance["name"])
             gpu_count, gpu_name, gpu_memory = parse_description(instance["description"])
-            offer = InstanceOffer(
+            offer = RawCatalogItem(
                 instance_name=instance["name"],
                 price=instance["price_cents_per_hour"] / 100,
                 cpu=instance["specs"]["vcpus"],
@@ -46,16 +49,17 @@ class LambdaLabsProvider(AbstractProvider):
                 gpu_name=gpu_name,
                 gpu_memory=gpu_memory,
                 spot=False,
+                location=None,
             )
             offers.append(offer)
         return self.add_regions(offers)
 
-    def add_regions(self, offers: list[InstanceOffer]) -> list[InstanceOffer]:
+    def add_regions(self, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
         # TODO: we don't know which regions are actually available for each instance type
         region_offers = []
         for region in all_regions:
             for offer in offers:
-                offer = offer.model_copy()
+                offer = copy.deepcopy(offer)
                 offer.location = region
                 region_offers.append(offer)
         return region_offers

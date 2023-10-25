@@ -1,4 +1,4 @@
-pydantic>=2.0.0
+typing-extensions
 requests
 boto3
 google-cloud-billing

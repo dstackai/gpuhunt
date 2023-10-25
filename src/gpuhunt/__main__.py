@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 
-import gpuhunt._storage as storage
+import gpuhunt._internal.storage as storage
 
 
 def main():

@@ -17,6 +17,9 @@ classifiers = [
 ]
 keywords = ["gpu", "cloud", "pricing"]
 dynamic = ["version"]
+dependencies = [
+    "typing-extensions"
+]
 
 [project.urls]
 "GitHub" = "https://github.com/dstackai/gpuhunt"
@@ -25,7 +28,6 @@ dynamic = ["version"]
 [project.optional-dependencies]
 fetch = [
     "requests",
-    "pydantic>=2.0.0"
 ]
 aws = [
     "boto3"
