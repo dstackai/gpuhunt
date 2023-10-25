@@ -6,10 +6,35 @@ The catalog includes details about prices, locations, CPUs, RAM, GPUs, and spots
 ```python
 import gpuhunt
 
-items = gpuhunt.query()
+items = gpuhunt.query(
+    min_memory=16,
+    min_cpu=8,
+    min_gpu_count=1,
+    max_price=1.0,
+)
 
 print(*items, sep="\n")
 ```
+
+List of all available filters:
+
+* `provider`: name of the provider to filter by. If not specified, all providers will be used. One or many
+* `min_cpu`: minimum number of CPUs
+* `max_cpu`: maximum number of CPUs
+* `min_memory`: minimum amount of RAM in GB
+* `max_memory`: maximum amount of RAM in GB
+* `min_gpu_count`: minimum number of GPUs
+* `max_gpu_count`: maximum number of GPUs
+* `gpu_name`: case-sensitive name of the GPU to filter by. If not specified, all GPUs will be used. One or many
+* `min_gpu_memory`: minimum amount of GPU VRAM in GB for each GPU
+* `max_gpu_memory`: maximum amount of GPU VRAM in GB for each GPU
+* `min_total_gpu_memory`: minimum amount of GPU VRAM in GB for all GPUs combined
+* `max_total_gpu_memory`: maximum amount of GPU VRAM in GB for all GPUs combined
+* `min_disk_size`: *currently not in use*
+* `max_disk_size`: *currently not in use*
+* `min_price`: minimum price per hour in USD
+* `max_price`: maximum price per hour in USD
+* `spot`: if `False`, only ondemand offers will be returned. If `True`, only spot offers will be returned
 
 ## Advanced usage
 
