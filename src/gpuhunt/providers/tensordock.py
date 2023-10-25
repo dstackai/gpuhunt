@@ -1,8 +1,9 @@
 import logging
-from typing import Optional, List
+from typing import Optional, List, Union
 
 import requests
 
+from gpuhunt._internal.utils import optimize, is_between
 from gpuhunt._internal.models import RawCatalogItem, QueryFilter
 from gpuhunt.providers import AbstractProvider
 
@@ -47,28 +48,68 @@ class TensorDockProvider(AbstractProvider):
                 .lower()
                 .replace(" ", "")
             )
-            cpu = details["specs"]["cpu"]["amount"]
-            memory = details["specs"]["ram"]["amount"]
-            base_price = (
-                cpu * details["specs"]["cpu"]["price"]
-                + memory * details["specs"]["ram"]["price"]
-            )
-            for gpu_name, gpu in details["specs"]["gpu"].items():
-                gpu_count = gpu["amount"]
-                if gpu_count == 0:
-                    continue
-                gpu_name = marketplace_gpus.get(gpu_name, gpu_name)
-                # TODO use minimal required resources
-                offer = RawCatalogItem(
-                    instance_name=f"{gpu_name.lower()}_{gpu_count}_{hostnode}",
-                    location=location,
-                    price=round(gpu_count * gpu["price"] + base_price, 5),
-                    cpu=cpu,
-                    memory=memory,
-                    gpu_count=gpu_count,
-                    gpu_name=gpu_name,
-                    gpu_memory=gpu["vram"],
-                    spot=False,
-                )
-                offers.append(offer)
+            offers += self.optimize_offers(query_filter, details["specs"], hostnode, location)
         return offers
+
+    @staticmethod
+    def optimize_offers(q: QueryFilter, specs: dict, instance_name: str, location: str) -> List[RawCatalogItem]:
+        cpu = optimize(specs["cpu"]["amount"], q.min_cpu or 1, q.max_cpu)
+        memory = optimize(  # has to be even
+            round_down(specs["ram"]["amount"], 2),
+            round_up(q.min_memory or 1, 2),
+            round_down(q.max_memory, 2) if q.max_memory is not None else None,
+        )
+        disk_size = optimize(  # 30 GB at least for Ubuntu
+            specs["storage"]["amount"],
+            q.min_disk_size or 30,
+            q.max_disk_size,
+        )
+        if cpu is None or memory is None or disk_size is None:
+            return []
+        base_price = sum(n * specs[key]["price"] for key, n in [("cpu", cpu), ("ram", memory), ("storage", disk_size)])
+        offers = []
+        for gpu_name, gpu in specs["gpu"].items():
+            gpu_name = marketplace_gpus.get(gpu_name, gpu_name)
+            if q.gpu_name is not None and gpu_name not in q.gpu_name:
+                continue
+            if not is_between(gpu["vram"], q.min_gpu_memory, q.max_gpu_memory):
+                continue
+            if (gpu_count := optimize(gpu["amount"], q.min_gpu_count or 1, q.max_gpu_count)) is None:
+                continue
+            # filter by total gpu memory
+            if q.min_total_gpu_memory is None:
+                min_total_gpu_memory = gpu_count * gpu["vram"]
+            else:
+                min_total_gpu_memory = max(q.min_total_gpu_memory, gpu_count * gpu["vram"])
+            gpu_total_memory = optimize(
+                gpu["amount"] * gpu["vram"],
+                round_up(min_total_gpu_memory, gpu["vram"]),
+                round_down(q.max_total_gpu_memory, gpu["vram"]) if q.max_total_gpu_memory is not None else None,
+            )
+            if gpu_total_memory is None:
+                continue
+            gpu_count = gpu_total_memory // gpu["vram"]
+            if not is_between(gpu_count, q.min_gpu_count, q.max_gpu_count):
+                continue
+            # make an offer
+            offer = RawCatalogItem(
+                instance_name=instance_name,
+                location=location,
+                price=round(gpu_count * gpu["price"] + base_price, 5),
+                cpu=cpu,
+                memory=memory,
+                gpu_count=gpu_count,
+                gpu_name=gpu_name,
+                gpu_memory=gpu["vram"],
+                spot=False,
+            )
+            offers.append(offer)
+        return offers
+
+
+def round_up(value: Union[int, float], step: int) -> int:
+    return round_down(value + step - 1, step)
+
+
+def round_down(value: Union[int, float], step: int) -> int:
+    return value // step * step
