@@ -1,11 +1,13 @@
+import copy
 import logging
 import re
 from collections import defaultdict, namedtuple
+from typing import List, Optional
 
 import google.cloud.billing_v1 as billing_v1
 import google.cloud.compute_v1 as compute_v1
 
-from gpuhunt._models import InstanceOffer
+from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -43,6 +45,8 @@ accelerator_counts = [1, 2, 4, 8, 16]
 
 
 class GCPProvider(AbstractProvider):
+    NAME = "gcp"
+
     def __init__(self, project: str):
         # todo credentials
         self.project = project
@@ -51,7 +55,7 @@ class GCPProvider(AbstractProvider):
         self.regions_client = compute_v1.RegionsClient()
         self.cloud_catalog_client = billing_v1.CloudCatalogClient()
 
-    def list_preconfigured_instances(self) -> list[InstanceOffer]:
+    def list_preconfigured_instances(self) -> List[RawCatalogItem]:
         instances = []
         for region in self.regions_client.list(project=self.project):
             for zone_url in region.zones:
@@ -70,7 +74,7 @@ class GCPProvider(AbstractProvider):
                         gpu = accelerator_details[
                             machine_type.accelerators[0].guest_accelerator_type
                         ]
-                    instance = InstanceOffer(
+                    instance = RawCatalogItem(
                         instance_name=machine_type.name,
                         location=zone,
                         cpu=machine_type.guest_cpus,
@@ -82,11 +86,13 @@ class GCPProvider(AbstractProvider):
                         if gpu
                         else None,
                         gpu_memory=gpu.memory if gpu else None,
+                        price=None,
+                        spot=None,
                     )
                     instances.append(instance)
         return instances
 
-    def add_gpus(self, instances: list[InstanceOffer]):
+    def add_gpus(self, instances: List[RawCatalogItem]):
         n1_instances = defaultdict(list)
         for instance in instances:
             if instance.instance_name.startswith("n1-"):
@@ -95,25 +101,21 @@ class GCPProvider(AbstractProvider):
         instances_with_gpus = []
         for zone, zone_n1_instances in n1_instances.items():
             logger.info("Fetching GPUs for zone %s", zone)
-            for accelerator in self.accelerator_types_client.list(
-                project=self.project, zone=zone
-            ):
+            for accelerator in self.accelerator_types_client.list(project=self.project, zone=zone):
                 if accelerator.name not in accelerator_limits:
                     continue
-                for n, limit in zip(
-                    accelerator_counts, accelerator_limits[accelerator.name]
-                ):
+                for n, limit in zip(accelerator_counts, accelerator_limits[accelerator.name]):
                     for instance in zone_n1_instances:
                         if instance.cpu > limit.cpu or instance.memory > limit.memory:
                             continue
-                        i = instance.model_copy()
+                        i = copy.deepcopy(instance)
                         i.gpu_count = n
                         i.gpu_name = accelerator.name
                         i.gpu_memory = accelerator_details[accelerator.name].memory
                         instances_with_gpus.append(i)
         instances += instances_with_gpus
 
-    def fill_prices(self, instances: list[InstanceOffer]) -> list[InstanceOffer]:
+    def fill_prices(self, instances: List[RawCatalogItem]) -> List[RawCatalogItem]:
         logger.info("Fetching prices")
         # fetch per-unit prices
         families = {
@@ -150,9 +152,7 @@ class GCPProvider(AbstractProvider):
             resource = resource.lower()
             if resource == "gpu":
                 family = family.replace(" ", "-").lower()
-                family = {"nvidia-tesla-a100-80gb": "nvidia-a100-80gb"}.get(
-                    family, family
-                )
+                family = {"nvidia-tesla-a100-80gb": "nvidia-a100-80gb"}.get(family, family)
             else:
                 r = re.match(r"^([a-z]\d.?) ", family.lower())
                 if r:
@@ -191,12 +191,9 @@ class GCPProvider(AbstractProvider):
                 if instance.gpu_name:
                     if region_spot not in families["gpu"][instance.gpu_name]:
                         continue
-                    price += (
-                        instance.gpu_count
-                        * families["gpu"][instance.gpu_name][region_spot]
-                    )
+                    price += instance.gpu_count * families["gpu"][instance.gpu_name][region_spot]
 
-                offer = instance.model_copy()
+                offer = copy.deepcopy(instance)
                 offer.price = round(price, 6)
                 offer.spot = spot
                 if offer.gpu_name:
@@ -204,13 +201,13 @@ class GCPProvider(AbstractProvider):
                 offers.append(offer)
         return offers
 
-    def get(self) -> list[InstanceOffer]:
+    def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
         instances = self.list_preconfigured_instances()
         self.add_gpus(instances)
         return self.fill_prices(instances)
 
     @classmethod
-    def filter(cls, offers: list[InstanceOffer]) -> list[InstanceOffer]:
+    def filter(cls, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
         return [
             i
             for i in offers

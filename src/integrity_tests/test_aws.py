@@ -42,7 +42,7 @@ class TestAWSCatalog:
             "us-gov-west-1",
             "us-west-1",
             "us-west-2",
-            "us-west-2-lax-1"
+            "us-west-2-lax-1",
         ]
         assert all(f"\n{instance},{i}," in data for i in regions)
 

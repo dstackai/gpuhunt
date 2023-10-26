@@ -1,20 +1,23 @@
-from typing import Optional
+import copy
+from typing import List, Optional
 
 import requests
 
-from gpuhunt._models import InstanceOffer
+from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
 bundles_url = "https://console.vast.ai/api/v0/bundles"
 
 
 class VastAIProvider(AbstractProvider):
-    def get(self) -> list[InstanceOffer]:
+    NAME = "vastai"
+
+    def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
         data = requests.get(bundles_url).json()
         instance_offers = []
         for offer in data["offers"]:
             gpu_name = get_gpu_name(offer["gpu_name"])
-            ondemand_offer = InstanceOffer(
+            ondemand_offer = RawCatalogItem(
                 instance_name=f"{offer['host_id']}",
                 location=get_location(offer["geolocation"]),
                 price=round(offer["dph_total"], 5),
@@ -27,7 +30,7 @@ class VastAIProvider(AbstractProvider):
             )
             instance_offers.append(ondemand_offer)
 
-            spot_offer = ondemand_offer.model_copy()
+            spot_offer = copy.deepcopy(ondemand_offer)
             spot_offer.price = round(offer["min_bid"], 5)
             spot_offer.spot = True
             instance_offers.append(spot_offer)

@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 
-import gpuhunt._storage as storage
+import gpuhunt._internal.storage as storage
 
 
 def main():
@@ -23,21 +23,27 @@ def main():
 
     if args.provider == "aws":
         from gpuhunt.providers.aws import AWSProvider
+
         provider = AWSProvider(os.getenv("AWS_CACHE_PATH"))
     elif args.provider == "azure":
         from gpuhunt.providers.azure import AzureProvider
+
         provider = AzureProvider(os.getenv("AZURE_SUBSCRIPTION_ID"))
     elif args.provider == "gcp":
         from gpuhunt.providers.gcp import GCPProvider
+
         provider = GCPProvider(os.getenv("GCP_PROJECT_ID"))
     elif args.provider == "lambdalabs":
         from gpuhunt.providers.lambdalabs import LambdaLabsProvider
+
         provider = LambdaLabsProvider(os.getenv("LAMBDALABS_TOKEN"))
     elif args.provider == "tensordock":
         from gpuhunt.providers.tensordock import TensorDockProvider
+
         provider = TensorDockProvider()
     elif args.provider == "vastai":
         from gpuhunt.providers.vastai import VastAIProvider
+
         provider = VastAIProvider()
     else:
         exit(f"Unknown provider {args.provider}")

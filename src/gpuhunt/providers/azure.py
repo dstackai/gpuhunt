@@ -3,18 +3,17 @@ import logging
 import os
 import re
 import time
-import urllib.parse
 from collections import namedtuple
 from queue import Queue
 from threading import Thread
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple
 
 import requests
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.compute import ComputeManagementClient
 
-from gpuhunt._models import InstanceOffer
+from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -63,6 +62,8 @@ retired_vm_series = [
 
 
 class AzureProvider(AbstractProvider):
+    NAME = "azure"
+
     def __init__(
         self,
         subscription_id: str,
@@ -75,7 +76,7 @@ class AzureProvider(AbstractProvider):
             subscription_id=subscription_id,
         )
 
-    def get_pages(self, threads: int = 8) -> Iterable[list[dict]]:
+    def get_pages(self, threads: int = 8) -> Iterable[List[dict]]:
         q = Queue()
         workers = [
             Thread(target=self._get_pages_worker, args=(q, threads, i), daemon=True)
@@ -132,7 +133,7 @@ class AzureProvider(AbstractProvider):
         finally:
             q.put(None)
 
-    def get(self) -> list[InstanceOffer]:
+    def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
         offers = []
         for page in self.get_pages():
             for item in page:
@@ -140,16 +141,21 @@ class AzureProvider(AbstractProvider):
                     continue
                 if not item["armSkuName"]:
                     continue
-                offer = InstanceOffer(
+                offer = RawCatalogItem(
                     instance_name=item["armSkuName"],
                     location=item["armRegionName"],
                     price=item["retailPrice"],
                     spot="Spot" in item["meterName"],
+                    cpu=None,
+                    memory=None,
+                    gpu_count=None,
+                    gpu_name=None,
+                    gpu_memory=None,
                 )
                 offers.append(offer)
         return self.fill_details(offers)
 
-    def fill_details(self, offers: list[InstanceOffer]) -> list[InstanceOffer]:
+    def fill_details(self, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
         logger.info("Fetching instance details")
         instances = {}
         resources = self.client.resource_skus.list()
@@ -163,13 +169,16 @@ class AzureProvider(AbstractProvider):
             if "GPUs" in capabilities:
                 gpu_count = int(capabilities["GPUs"])
                 gpu_name, gpu_memory = get_gpu_name_memory(resource.name)
-            instances[resource.name] = InstanceOffer(
+            instances[resource.name] = RawCatalogItem(
                 instance_name=resource.name,
                 cpu=capabilities["vCPUs"],
                 memory=float(capabilities["MemoryGB"]),
                 gpu_count=gpu_count,
                 gpu_name=gpu_name,
                 gpu_memory=gpu_memory,
+                location=None,
+                price=None,
+                spot=None,
             )
         with_details = []
         without_details = []
@@ -186,7 +195,7 @@ class AzureProvider(AbstractProvider):
         return with_details + without_details
 
     @classmethod
-    def filter(cls, offers: list[InstanceOffer]) -> list[InstanceOffer]:
+    def filter(cls, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
         vm_series = [
             VMSeries(r"D(\d+)s_v3", None, None),  # Dsv3-series
             VMSeries(r"E(\d+)i?s_v4", None, None),  # Esv4-series
@@ -194,15 +203,9 @@ class AzureProvider(AbstractProvider):
             VMSeries(r"NC(\d+)s_v3", "V100", 16 * 1024),  # NCv3-series [V100 16GB]
             VMSeries(r"NC(\d+)as_T4_v3", "T4", 16 * 1024),  # NCasT4_v3-series [T4]
             VMSeries(r"ND(\d+)rs_v2", "V100", 32 * 1024),  # NDv2-series [8xV100 32GB]
-            VMSeries(
-                r"NV(\d+)adm?s_A10_v5", "A10", 24 * 1024
-            ),  # NVadsA10 v5-series [A10]
-            VMSeries(
-                r"NC(\d+)ads_A100_v4", "A100", 80 * 1024
-            ),  # NC A100 v4-series [A100 80GB]
-            VMSeries(
-                r"ND(\d+)asr_v4", "A100", 40 * 1024
-            ),  # ND A100 v4-series [8xA100 40GB]
+            VMSeries(r"NV(\d+)adm?s_A10_v5", "A10", 24 * 1024),  # NVadsA10 v5-series [A10]
+            VMSeries(r"NC(\d+)ads_A100_v4", "A100", 80 * 1024),  # NC A100 v4-series [A100 80GB]
+            VMSeries(r"ND(\d+)asr_v4", "A100", 40 * 1024),  # ND A100 v4-series [8xA100 40GB]
             VMSeries(
                 r"ND(\d+)amsr_A100_v4", "A100", 80 * 1024
             ),  # NDm A100 v4-series [8xA100 80GB]

@@ -7,20 +7,35 @@ import re
 import tempfile
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Iterable, Optional
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 import boto3
 import requests
 from botocore.exceptions import ClientError, EndpointConnectionError
 
-from gpuhunt._models import InstanceOffer
+from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
-ec2_pricing_url = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/index.csv"
+ec2_pricing_url = (
+    "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/index.csv"
+)
 disclaimer_rows_skip = 5
 # https://aws.amazon.com/ec2/previous-generation/
-previous_generation_families = ["t1.", "m1.", "m3.", "c1.", "c3.", "i2.", "m2.", "cr1.", "r3.", "hs1.", "g2.", "a1."]
+previous_generation_families = [
+    "t1.",
+    "m1.",
+    "m3.",
+    "c1.",
+    "c3.",
+    "i2.",
+    "m2.",
+    "cr1.",
+    "r3.",
+    "hs1.",
+    "g2.",
+    "a1.",
+]
 pricing_filters = {
     "TermType": ["OnDemand"],
     "Tenancy": ["Shared"],
@@ -41,6 +56,8 @@ class AWSProvider(AbstractProvider):
     * `ec2:DescribeInstanceTypes`
     """
 
+    NAME = "aws"
+
     def __init__(self, cache_path: Optional[str] = None):
         if cache_path:
             self.cache_path = cache_path
@@ -52,7 +69,7 @@ class AWSProvider(AbstractProvider):
             "p4de.24xlarge": ("A100", 80.0),
         }
 
-    def get(self) -> list[InstanceOffer]:
+    def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
         if not os.path.exists(self.cache_path):
             logger.info("Downloading EC2 prices to %s", self.cache_path)
             with requests.get(ec2_pricing_url, stream=True) as r:
@@ -69,7 +86,7 @@ class AWSProvider(AbstractProvider):
             for row in reader:
                 if self.skip(row):
                     continue
-                offer = InstanceOffer(
+                offer = RawCatalogItem(
                     instance_name=row["Instance Type"],
                     location=row["Region Code"],
                     price=float(row["PricePerUnit"]),
@@ -77,12 +94,14 @@ class AWSProvider(AbstractProvider):
                     memory=parse_memory(row["Memory"]),
                     gpu_count=parse_optional_count(row["GPU"]),
                     spot=False,
+                    gpu_name=None,
+                    gpu_memory=None,
                 )
                 offers.append(offer)
         self.fill_gpu_details(offers)
         return self.add_spots(offers)
 
-    def skip(self, row: dict[str, str]) -> bool:
+    def skip(self, row: Dict[str, str]) -> bool:
         if any(row["Instance Type"].startswith(family) for family in previous_generation_families):
             return True
         for key, values in pricing_filters.items():
@@ -90,7 +109,7 @@ class AWSProvider(AbstractProvider):
                 return True
         return False
 
-    def fill_gpu_details(self, offers: list[InstanceOffer]):
+    def fill_gpu_details(self, offers: List[RawCatalogItem]):
         regions = defaultdict(list)
         for offer in offers:
             if offer.gpu_count > 0 and offer.instance_name not in self.preview_gpus:
@@ -105,7 +124,9 @@ class AWSProvider(AbstractProvider):
             paginator = client.get_paginator("describe_instance_types")
             for offset in range(0, len(instance_types), describe_instances_limit):
                 logger.info("Fetching GPU details for %s (offset=%s)", region, offset)
-                pages = paginator.paginate(InstanceTypes=instance_types[offset:offset + describe_instances_limit])
+                pages = paginator.paginate(
+                    InstanceTypes=instance_types[offset : offset + describe_instances_limit]
+                )
                 for page in pages:
                     for i in page["InstanceTypes"]:
                         gpu = i["GpuInfo"]["Gpus"][0]
@@ -124,7 +145,9 @@ class AWSProvider(AbstractProvider):
             if offer.gpu_count > 0:
                 offer.gpu_name, offer.gpu_memory = gpus[offer.instance_name]
 
-    def _add_spots_worker(self, region: str, instance_types: set[str]) -> dict[tuple[str, str], float]:
+    def _add_spots_worker(
+        self, region: str, instance_types: Set[str]
+    ) -> Dict[Tuple[str, str], float]:
         spot_prices = dict()
         logger.info("Fetching spot prices for %s", region)
         try:
@@ -143,19 +166,17 @@ class AWSProvider(AbstractProvider):
             instance_prices = defaultdict(list)
             for page in pages:
                 for item in page["SpotPriceHistory"]:
-                    instance_prices[item["InstanceType"]].append(
-                        float(item["SpotPrice"])
-                    )
+                    instance_prices[item["InstanceType"]].append(float(item["SpotPrice"]))
             for (
-                    instance_type,
-                    zone_prices,
+                instance_type,
+                zone_prices,
             ) in instance_prices.items():  # reduce zone prices to a single value
                 spot_prices[(instance_type, region)] = min(zone_prices)
         except (ClientError, EndpointConnectionError):
             return {}
         return spot_prices
 
-    def add_spots(self, offers: list[InstanceOffer]) -> list[InstanceOffer]:
+    def add_spots(self, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
         region_instances = defaultdict(set)
         for offer in offers:
             region_instances[offer.location].add(offer.instance_name)
@@ -171,9 +192,7 @@ class AWSProvider(AbstractProvider):
 
         spot_offers = []
         for offer in offers:
-            if (
-                price := spot_prices.get((offer.instance_name, offer.location))
-            ) is None:
+            if (price := spot_prices.get((offer.instance_name, offer.location))) is None:
                 continue
             spot_offer = copy.deepcopy(offer)
             spot_offer.spot = True
@@ -182,7 +201,7 @@ class AWSProvider(AbstractProvider):
         return offers + spot_offers
 
     @classmethod
-    def filter(cls, offers: list[InstanceOffer]) -> list[InstanceOffer]:
+    def filter(cls, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
         return [
             i
             for i in offers

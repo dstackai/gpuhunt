@@ -69,7 +69,7 @@ class TestAzureCatalog:
             "westindia",
             "westus",
             "westus2",
-            "westus3"
+            "westus3",
         ]
         assert all(f"\nStandard_D2s_v3,{i}," in data for i in locations)
 

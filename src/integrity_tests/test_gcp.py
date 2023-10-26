@@ -128,7 +128,7 @@ class TestGCPCatalog:
             "us-west3-c",
             "us-west4-a",
             "us-west4-b",
-            "us-west4-c"
+            "us-west4-c",
         ]
         assert all(f"\ne2-highcpu-2,{i}," in data for i in zones)
 
