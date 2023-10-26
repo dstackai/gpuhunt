@@ -44,7 +44,33 @@ class TensorDockProvider(AbstractProvider):
                 .lower()
                 .replace(" ", "")
             )
-            offers += self.optimize_offers(query_filter, details["specs"], hostnode, location)
+            if query_filter is not None:
+                offers += self.optimize_offers(query_filter, details["specs"], hostnode, location)
+            else:
+                for gpu_name, gpu in details["specs"]["gpu"].items():
+                    if gpu["amount"] == 0:
+                        continue
+                    offers.append(
+                        RawCatalogItem(
+                            instance_name=hostnode,
+                            location=location,
+                            price=round(
+                                sum(
+                                    details["specs"][key]["price"]
+                                    * details["specs"][key]["amount"]
+                                    for key in ("cpu", "ram", "storage")
+                                )
+                                + gpu["amount"] * gpu["price"],
+                                5,
+                            ),
+                            cpu=details["specs"]["cpu"]["amount"],
+                            memory=float(round_down(details["specs"]["ram"]["amount"], 2)),
+                            gpu_count=gpu["amount"],
+                            gpu_name=marketplace_gpus.get(gpu_name, gpu_name),
+                            gpu_memory=float(gpu["vram"]),
+                            spot=False,
+                        )
+                    )
         return offers
 
     @staticmethod
@@ -102,10 +128,10 @@ class TensorDockProvider(AbstractProvider):
                 location=location,
                 price=round(gpu_count * gpu["price"] + base_price, 5),
                 cpu=cpu,
-                memory=memory,
+                memory=float(memory),
                 gpu_count=gpu_count,
                 gpu_name=gpu_name,
-                gpu_memory=gpu["vram"],
+                gpu_memory=float(gpu["vram"]),
                 spot=False,
             )
             offers.append(offer)
