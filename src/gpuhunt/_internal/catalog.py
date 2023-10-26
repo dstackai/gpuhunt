@@ -2,6 +2,7 @@ import csv
 import dataclasses
 import io
 import logging
+import time
 import urllib.request
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -17,17 +18,21 @@ version_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v1/version"
 catalog_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v1/{version}/catalog.zip"
 OFFLINE_PROVIDERS = ["aws", "azure", "gcp", "lambdalabs"]
 ONLINE_PROVIDERS = ["tensordock"]
+RELOAD_INTERVAL = 4 * 60 * 60  # 4 hours
 
 
 class Catalog:
-    def __init__(self, fill_missing: bool = True):
+    def __init__(self, fill_missing: bool = True, auto_reload: bool = True):
         """
         Args:
             fill_missing: derive missing constraints from other constraints
+            auto_reload: if `True`, the catalog will be automatically loaded from the S3 bucket every 4 hours
         """
         self.catalog = None
+        self.loaded_at = None
         self.providers: List[AbstractProvider] = []
         self.fill_missing = fill_missing
+        self.auto_reload = auto_reload
 
     def query(
         self,
@@ -79,6 +84,11 @@ class Catalog:
         Returns:
             list of matching offers
         """
+        if self.auto_reload and (
+            self.loaded_at is None or time.monotonic() - self.loaded_at > RELOAD_INTERVAL
+        ):
+            self.load()
+
         query_filter = QueryFilter(
             provider=[provider] if isinstance(provider, str) else provider,
             min_cpu=min_cpu,
@@ -142,6 +152,7 @@ class Catalog:
             version = self.get_latest_version()
         logger.debug("Downloading catalog %s...", version)
         with urllib.request.urlopen(catalog_url.format(version=version)) as f:
+            self.loaded_at = time.monotonic()
             self.catalog = io.BytesIO(f.read())
 
     @staticmethod
@@ -164,6 +175,7 @@ class Catalog:
     def _get_offline_provider_items(
         self, provider_name: str, query_filter: QueryFilter
     ) -> List[CatalogItem]:
+        logger.debug("Loading items for offline provider %s", provider_name)
         items = []
         with zipfile.ZipFile(self.catalog) as zip_file:
             with zip_file.open(f"{provider_name}.csv", "r") as csv_file:
@@ -179,6 +191,7 @@ class Catalog:
     def _get_online_provider_items(
         self, provider_name: str, query_filter: QueryFilter
     ) -> List[CatalogItem]:
+        logger.debug("Loading items for online provider %s", provider_name)
         items = []
         found = False
         for provider in self.providers:

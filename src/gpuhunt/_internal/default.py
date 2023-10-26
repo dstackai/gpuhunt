@@ -12,7 +12,10 @@ logger = logging.getLogger(__name__)
 
 @functools.lru_cache()
 def default_catalog() -> Catalog:
-    # TODO refresh every 4 hours
+    """
+    Returns:
+        the latest catalog with all available providers loaded
+    """
     catalog = Catalog()
     catalog.load()
     for module, provider in [("gpuhunt.providers.tensordock", "TensorDockProvider")]:
@@ -49,4 +52,11 @@ def with_signature(method: CatalogMethod) -> Callable[[Method], Method]:
 
 @with_signature(Catalog.query)
 def query(*args: P.args, **kwargs: P.kwargs) -> R:
+    """
+    Query the `default_catalog`.
+    See `Catalog.query` for more details on parameters
+
+    Returns:
+        (List[CatalogItem]): the result of the query
+    """
     return default_catalog().query(*args, **kwargs)
