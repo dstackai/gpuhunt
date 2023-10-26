@@ -16,7 +16,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pip -U
-          pip install -e '.[fetch,aws]'
+          pip install -e '.[aws]'
       - name: Collect catalog
         working-directory: src
         env:
@@ -46,7 +46,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pip -U
-          pip install -e '.[fetch,azure]'
+          pip install -e '.[azure]'
       - name: Collect catalog
         working-directory: src
         env:
@@ -77,7 +77,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pip -U
-          pip install -e '.[fetch,gcp]'
+          pip install -e '.[gcp]'
       - name: Collect catalog
         working-directory: src
         env:
@@ -103,7 +103,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pip -U
-          pip install -e '.[fetch]'
+          pip install -e '.'
       - name: Collect catalog
         working-directory: src
         env:
