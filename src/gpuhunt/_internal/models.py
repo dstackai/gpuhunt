@@ -1,7 +1,7 @@
 from dataclasses import asdict, dataclass
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
-from gpuhunt._internal.utils import empty_as_none, is_between
+from gpuhunt._internal.utils import empty_as_none
 
 
 @dataclass
@@ -86,6 +86,8 @@ class QueryFilter:
         max_disk_size: *currently not in use*
         min_price: minimum price per hour in USD
         max_price: maximum price per hour in USD
+        min_compute_capability: minimum compute capability of the GPU
+        max_compute_capability: maximum compute capability of the GPU
         spot: if `False`, only ondemand offers will be returned. If `True`, only spot offers will be returned
     """
 
@@ -105,43 +107,13 @@ class QueryFilter:
     max_disk_size: Optional[int] = None
     min_price: Optional[float] = None
     max_price: Optional[float] = None
+    min_compute_capability: Optional[Tuple[int, int]] = None
+    max_compute_capability: Optional[Tuple[int, int]] = None
     spot: Optional[bool] = None
 
-    def matches(self, item: CatalogItem) -> bool:
-        """
-        Check if the catalog item matches the filters
 
-        Args:
-            item: catalog item
-
-        Returns:
-            whether the catalog item matches the filters
-        """
-        if self.provider is not None and item.provider not in self.provider:
-            return False
-        if not is_between(item.cpu, self.min_cpu, self.max_cpu):
-            return False
-        if not is_between(item.memory, self.min_memory, self.max_memory):
-            return False
-        if not is_between(item.gpu_count, self.min_gpu_count, self.max_gpu_count):
-            return False
-        if self.gpu_name is not None and item.gpu_name not in self.gpu_name:
-            return False
-        if not is_between(
-            item.gpu_memory if item.gpu_count > 0 else 0, self.min_gpu_memory, self.max_gpu_memory
-        ):
-            return False
-        if not is_between(
-            (item.gpu_count * item.gpu_memory) if item.gpu_count > 0 else 0,
-            self.min_total_gpu_memory,
-            self.max_total_gpu_memory,
-        ):
-            return False
-        # TODO(egor-s): add disk_size to CatalogItem
-        # if not is_between(item.disk_size, self.min_disk_size, self.max_disk_size):
-        #     return False
-        if not is_between(item.price, self.min_price, self.max_price):
-            return False
-        if self.spot is not None and item.spot != self.spot:
-            return False
-        return True
+@dataclass
+class GPUInfo:
+    name: str
+    memory: int
+    compute_capability: Tuple[int, int]

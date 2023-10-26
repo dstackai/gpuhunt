@@ -3,8 +3,8 @@ from typing import List, Optional, Union
 
 import requests
 
+from gpuhunt._internal.constraints import is_between, optimize
 from gpuhunt._internal.models import QueryFilter, RawCatalogItem
-from gpuhunt._internal.utils import is_between, optimize
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)

@@ -7,6 +7,7 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Iterable, List, Optional, Union
 
+from gpuhunt._internal.constraints import matches
 from gpuhunt._internal.models import CatalogItem, QueryFilter
 from gpuhunt.providers import AbstractProvider
 
@@ -157,7 +158,7 @@ class Catalog:
                 )
                 for row in reader:
                     item = CatalogItem.from_dict(row, provider=provider_name)
-                    if query_filter.matches(item):
+                    if matches(item, query_filter):
                         items.append(item)
         return items
 
@@ -172,7 +173,7 @@ class Catalog:
             found = True
             for i in provider.get(query_filter=query_filter):
                 item = CatalogItem(provider=provider_name, **dataclasses.asdict(i))
-                if query_filter.matches(item):
+                if matches(item, query_filter):
                     items.append(item)
         if not found:
             raise ValueError(f"Provider is not loaded: {provider_name}")
