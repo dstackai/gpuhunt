@@ -34,6 +34,8 @@ List of all available filters:
 * `max_disk_size`: *currently not in use*
 * `min_price`: minimum price per hour in USD
 * `max_price`: maximum price per hour in USD
+* `min_compute_capability`: minimum compute capability of the GPU
+* `max_compute_capability`: maximum compute capability of the GPU
 * `spot`: if `False`, only ondemand offers will be returned. If `True`, only spot offers will be returned
 
 ## Advanced usage
@@ -47,6 +49,14 @@ items = catalog.query()
 
 print(*items, sep="\n")
 ```
+
+## Supported providers
+
+* AWS
+* Azure
+* GCP
+* LambdaLabs
+* TensorDock
 
 ## See also
 

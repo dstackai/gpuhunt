@@ -32,6 +32,11 @@ CatalogMethod = Callable[Concatenate[Catalog, P], R]
 
 
 def with_signature(method: CatalogMethod) -> Callable[[Method], Method]:
+    """
+    Returns:
+        decorator to add the signature of the Catalog method to the decorated method
+    """
+
     def decorator(func: Method) -> Method:
         @functools.wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
@@ -44,5 +49,4 @@ def with_signature(method: CatalogMethod) -> Callable[[Method], Method]:
 
 @with_signature(Catalog.query)
 def query(*args: P.args, **kwargs: P.kwargs) -> R:
-    # TODO fill reasonable min requirements
     return default_catalog().query(*args, **kwargs)

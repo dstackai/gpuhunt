@@ -5,10 +5,11 @@ import logging
 import urllib.request
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Iterable, List, Optional, Union
+from typing import Iterable, List, Optional, Tuple, Union
 
-from gpuhunt._internal.constraints import matches
+import gpuhunt._internal.constraints as constraints
 from gpuhunt._internal.models import CatalogItem, QueryFilter
+from gpuhunt._internal.utils import parse_compute_capability
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -19,9 +20,14 @@ ONLINE_PROVIDERS = ["tensordock"]
 
 
 class Catalog:
-    def __init__(self):
+    def __init__(self, fill_missing: bool = True):
+        """
+        Args:
+            fill_missing: derive missing constraints from other constraints
+        """
         self.catalog = None
         self.providers: List[AbstractProvider] = []
+        self.fill_missing = fill_missing
 
     def query(
         self,
@@ -42,6 +48,8 @@ class Catalog:
         max_disk_size: Optional[int] = None,
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
+        min_compute_capability: Optional[Union[str, Tuple[int, int]]] = None,
+        max_compute_capability: Optional[Union[str, Tuple[int, int]]] = None,
         spot: Optional[bool] = None,
     ) -> List[CatalogItem]:
         """
@@ -64,6 +72,8 @@ class Catalog:
             max_disk_size: *currently not in use*
             min_price: minimum price per hour in USD
             max_price: maximum price per hour in USD
+            min_compute_capability: minimum compute capability of the GPU
+            max_compute_capability: maximum compute capability of the GPU
             spot: if `False`, only ondemand offers will be returned. If `True`, only spot offers will be returned
 
         Returns:
@@ -86,8 +96,12 @@ class Catalog:
             max_disk_size=max_disk_size,
             min_price=min_price,
             max_price=max_price,
+            min_compute_capability=parse_compute_capability(min_compute_capability),
+            max_compute_capability=parse_compute_capability(max_compute_capability),
             spot=spot,
         )
+        if self.fill_missing:
+            query_filter = constraints.fill_missing(query_filter)
         # validate providers
         if provider is not None:
             provider = [p.lower() for p in provider]
@@ -158,7 +172,7 @@ class Catalog:
                 )
                 for row in reader:
                     item = CatalogItem.from_dict(row, provider=provider_name)
-                    if matches(item, query_filter):
+                    if constraints.matches(item, query_filter):
                         items.append(item)
         return items
 
@@ -173,7 +187,7 @@ class Catalog:
             found = True
             for i in provider.get(query_filter=query_filter):
                 item = CatalogItem(provider=provider_name, **dataclasses.asdict(i))
-                if matches(item, query_filter):
+                if constraints.matches(item, query_filter):
                     items.append(item)
         if not found:
             raise ValueError(f"Provider is not loaded: {provider_name}")
