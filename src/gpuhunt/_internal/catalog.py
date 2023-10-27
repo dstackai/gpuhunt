@@ -113,9 +113,9 @@ class Catalog:
         if self.fill_missing:
             query_filter = constraints.fill_missing(query_filter)
         # validate providers
-        if provider is not None:
-            provider = [p.lower() for p in provider]
-            for p in provider:
+        if query_filter.provider is not None:
+            query_filter.provider = [p.lower() for p in query_filter.provider]
+            for p in query_filter.provider:
                 if p not in OFFLINE_PROVIDERS + ONLINE_PROVIDERS:
                     raise ValueError(f"Unknown provider: {p}")
 
