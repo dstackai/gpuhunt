@@ -3,7 +3,7 @@ from typing import List, Optional, Union
 
 import requests
 
-from gpuhunt._internal.constraints import is_between, optimize
+from gpuhunt._internal.constraints import get_compute_capability, is_between, optimize
 from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
@@ -77,64 +77,67 @@ class TensorDockProvider(AbstractProvider):
     def optimize_offers(
         q: QueryFilter, specs: dict, instance_name: str, location: str
     ) -> List[RawCatalogItem]:
-        cpu = optimize(specs["cpu"]["amount"], q.min_cpu or 1, q.max_cpu)
-        memory = optimize(  # has to be even
-            round_down(specs["ram"]["amount"], 2),
-            round_up(q.min_memory or 1, 2),
-            round_down(q.max_memory, 2) if q.max_memory is not None else None,
-        )
-        disk_size = optimize(  # 30 GB at least for Ubuntu
-            specs["storage"]["amount"],
-            q.min_disk_size or 30,
-            q.max_disk_size,
-        )
-        if cpu is None or memory is None or disk_size is None:
-            return []
-        base_price = sum(
-            n * specs[key]["price"]
-            for key, n in [("cpu", cpu), ("ram", memory), ("storage", disk_size)]
-        )
         offers = []
-        for gpu_name, gpu in specs["gpu"].items():
-            gpu_name = convert_gpu_name(gpu_name)
-            if q.gpu_name is not None and gpu_name not in q.gpu_name:
+        for gpu_model, gpu_info in specs["gpu"].items():
+            # filter by single gpu characteristics
+            if not is_between(gpu_info["vram"], q.min_gpu_memory, q.max_gpu_memory):
                 continue
-            if not is_between(gpu["vram"], q.min_gpu_memory, q.max_gpu_memory):
+            gpu_name = convert_gpu_name(gpu_model)
+            if q.gpu_name is not None and gpu_name.lower() not in q.gpu_name:
                 continue
-            if (
-                gpu_count := optimize(gpu["amount"], q.min_gpu_count or 1, q.max_gpu_count)
-            ) is None:
-                continue
-            # filter by total gpu memory
-            if q.min_total_gpu_memory is None:
-                min_total_gpu_memory = gpu_count * gpu["vram"]
-            else:
-                min_total_gpu_memory = max(q.min_total_gpu_memory, gpu_count * gpu["vram"])
-            gpu_total_memory = optimize(
-                gpu["amount"] * gpu["vram"],
-                round_up(min_total_gpu_memory, gpu["vram"]),
-                round_down(q.max_total_gpu_memory, gpu["vram"])
-                if q.max_total_gpu_memory is not None
-                else None,
-            )
-            if gpu_total_memory is None:
-                continue
-            gpu_count = gpu_total_memory // gpu["vram"]
-            if not is_between(gpu_count, q.min_gpu_count, q.max_gpu_count):
-                continue
-            # make an offer
-            offer = RawCatalogItem(
-                instance_name=instance_name,
-                location=location,
-                price=round(gpu_count * gpu["price"] + base_price, 5),
-                cpu=cpu,
-                memory=float(memory),
-                gpu_count=gpu_count,
-                gpu_name=gpu_name,
-                gpu_memory=float(gpu["vram"]),
-                spot=False,
-            )
-            offers.append(offer)
+            if q.min_compute_capability is not None or q.max_compute_capability is not None:
+                cc = get_compute_capability(gpu_name)
+                if not cc or not is_between(
+                    cc, q.min_compute_capability, q.max_compute_capability
+                ):
+                    continue
+
+            for gpu_count in range(1, gpu_info["amount"] + 1):  # try all possible gpu counts
+                if not is_between(gpu_count, q.min_gpu_count, q.max_gpu_count):
+                    continue
+                if not is_between(
+                    gpu_count * gpu_info["vram"], q.min_total_gpu_memory, q.max_total_gpu_memory
+                ):
+                    continue
+                # we can't take 100% of CPU/RAM/storage if we don't take all GPUs
+                multiplier = 0.75 if gpu_count < gpu_info["amount"] else 1
+                cpu = optimize(
+                    int(multiplier * specs["cpu"]["amount"]),
+                    q.min_cpu or 1,
+                    q.max_cpu,
+                )
+                memory = optimize(  # has to be even
+                    round_down(int(multiplier * specs["ram"]["amount"]), 2),
+                    round_up(q.min_memory or 1, 2),
+                    round_down(q.max_memory, 2) if q.max_memory is not None else None,
+                )
+                disk_size = optimize(  # 30 GB at least for Ubuntu
+                    int(multiplier * specs["storage"]["amount"]),
+                    q.min_disk_size or 30,
+                    q.max_disk_size,
+                )
+                if cpu is None or memory is None or disk_size is None:
+                    continue
+                price = round(
+                    cpu * specs["cpu"]["price"]
+                    + memory * specs["ram"]["price"]
+                    + disk_size * specs["storage"]["price"]
+                    + gpu_count * gpu_info["price"],
+                    5,
+                )
+                offer = RawCatalogItem(
+                    instance_name=instance_name,
+                    location=location,
+                    price=price,
+                    cpu=cpu,
+                    memory=float(memory),
+                    gpu_name=gpu_name,
+                    gpu_count=gpu_count,
+                    gpu_memory=float(gpu_info["vram"]),
+                    spot=False,
+                )
+                offers.append(offer)
+                break  # stop increasing gpu count
         return offers
 
 
