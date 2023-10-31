@@ -25,7 +25,7 @@ List of all available filters:
 * `max_memory`: maximum amount of RAM in GB
 * `min_gpu_count`: minimum number of GPUs
 * `max_gpu_count`: maximum number of GPUs
-* `gpu_name`: case-sensitive name of the GPU to filter by. If not specified, all GPUs will be used. One or many
+* `gpu_name`: name of the GPU to filter by. If not specified, all GPUs will be used. One or many
 * `min_gpu_memory`: minimum amount of GPU VRAM in GB for each GPU
 * `max_gpu_memory`: maximum amount of GPU VRAM in GB for each GPU
 * `min_total_gpu_memory`: minimum amount of GPU VRAM in GB for all GPUs combined
