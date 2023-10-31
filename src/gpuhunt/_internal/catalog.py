@@ -68,7 +68,7 @@ class Catalog:
             max_memory: maximum amount of RAM in GB
             min_gpu_count: minimum number of GPUs
             max_gpu_count: maximum number of GPUs
-            gpu_name: case-sensitive name of the GPU to filter by. If not specified, all GPUs will be used
+            gpu_name: name of the GPU to filter by. If not specified, all GPUs will be used
             min_gpu_memory: minimum amount of GPU VRAM in GB for each GPU
             max_gpu_memory: maximum amount of GPU VRAM in GB for each GPU
             min_total_gpu_memory: minimum amount of GPU VRAM in GB for all GPUs combined
@@ -113,11 +113,9 @@ class Catalog:
         if self.fill_missing:
             query_filter = constraints.fill_missing(query_filter)
         # validate providers
-        if query_filter.provider is not None:
-            query_filter.provider = [p.lower() for p in query_filter.provider]
-            for p in query_filter.provider:
-                if p not in OFFLINE_PROVIDERS + ONLINE_PROVIDERS:
-                    raise ValueError(f"Unknown provider: {p}")
+        for p in query_filter.provider or []:
+            if p not in OFFLINE_PROVIDERS + ONLINE_PROVIDERS:
+                raise ValueError(f"Unknown provider: {p}")
 
         # fetch providers
         items = []

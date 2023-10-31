@@ -77,7 +77,7 @@ class QueryFilter:
         max_memory: maximum amount of RAM in GB
         min_gpu_count: minimum number of GPUs
         max_gpu_count: maximum number of GPUs
-        gpu_name: case-sensitive name of the GPU to filter by. If not specified, all GPUs will be used
+        gpu_name: name of the GPU to filter by. If not specified, all GPUs will be used
         min_gpu_memory: minimum amount of GPU VRAM in GB for each GPU
         max_gpu_memory: maximum amount of GPU VRAM in GB for each GPU
         min_total_gpu_memory: minimum amount of GPU VRAM in GB for all GPUs combined
@@ -110,6 +110,12 @@ class QueryFilter:
     min_compute_capability: Optional[Tuple[int, int]] = None
     max_compute_capability: Optional[Tuple[int, int]] = None
     spot: Optional[bool] = None
+
+    def __post_init__(self):
+        if self.provider is not None:
+            self.provider = [i.lower() for i in self.provider]
+        if self.gpu_name is not None:
+            self.gpu_name = [i.lower() for i in self.gpu_name]
 
 
 @dataclass
