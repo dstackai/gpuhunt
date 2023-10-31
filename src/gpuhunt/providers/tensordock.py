@@ -39,11 +39,7 @@ class TensorDockProvider(AbstractProvider):
         hostnodes = requests.get(marketplace_hostnodes_url).json()["hostnodes"]
         offers = []
         for hostnode, details in hostnodes.items():
-            location = (
-                "-".join([details["location"][key] for key in ["country", "region", "city"]])
-                .lower()
-                .replace(" ", "")
-            )
+            location = details["location"]["country"].lower().replace(" ", "")
             if query_filter is not None:
                 offers += self.optimize_offers(query_filter, details["specs"], hostnode, location)
             else:
