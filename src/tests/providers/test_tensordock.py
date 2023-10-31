@@ -73,6 +73,12 @@ class TestTensorDockMinimalConfiguration:
         )
         assert offers == []
 
+    def test_all_cpu_all_gpu(self, specs: dict):
+        offers = TensorDockProvider.optimize_offers(
+            QueryFilter(min_cpu=256, min_gpu_count=1), specs, "", ""
+        )
+        assert offers == make_offers(specs, cpu=256, memory=2, disk_size=30, gpu_count=8)
+
 
 def make_offers(
     specs: dict, cpu: int, memory: int, disk_size: int, gpu_count: int

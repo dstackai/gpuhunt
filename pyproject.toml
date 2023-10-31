@@ -38,6 +38,7 @@ gcp = [
     "google-cloud-billing",
     "google-cloud-compute"
 ]
+all = ["gpuhunt[aws,azure,gcp]"]
 
 [tool.setuptools.dynamic]
 version = {attr = "gpuhunt.version.__version__"}

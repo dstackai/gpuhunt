@@ -74,6 +74,21 @@ class TestMatches:
         assert not matches(item, QueryFilter(min_compute_capability=(8, 1)))
         assert not matches(item, QueryFilter(max_compute_capability=(7, 9)))
 
+    def test_ti_gpu(self):
+        item = CatalogItem(
+            instance_name="large",
+            location="us-east-1",
+            price=1.2,
+            cpu=16,
+            memory=64.0,
+            gpu_count=1,
+            gpu_name="RTX3060Ti",  # case-sensitive
+            gpu_memory=8.0,
+            spot=False,
+            provider="aws",
+        )
+        assert matches(item, QueryFilter(gpu_name=["RTX3060TI"]))
+
 
 class TestFillMissing:
     def test_empty(self):

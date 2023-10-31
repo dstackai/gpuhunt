@@ -35,7 +35,9 @@ def fill_missing(q: QueryFilter, *, memory_per_core: int = 8) -> QueryFilter:
                     ]
                 )
             if q.gpu_name is not None:
-                min_gpu_memory.extend([i.memory for i in KNOWN_GPUS if i.name in q.gpu_name])
+                min_gpu_memory.extend(
+                    [i.memory for i in KNOWN_GPUS if i.name.lower() in q.gpu_name]
+                )
             min_total_gpu_memory = (
                 min(min_gpu_memory, default=min(i.memory for i in KNOWN_GPUS)) * min_gpu_count
             )
@@ -102,7 +104,7 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
     Returns:
         whether the catalog item matches the filters
     """
-    if q.provider is not None and i.provider not in q.provider:
+    if q.provider is not None and i.provider.lower() not in q.provider:
         return False
     if not is_between(i.cpu, q.min_cpu, q.max_cpu):
         return False
@@ -111,11 +113,11 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
     if not is_between(i.gpu_count, q.min_gpu_count, q.max_gpu_count):
         return False
     if q.gpu_name is not None:
-        if i.gpu_name not in q.gpu_name:
+        if i.gpu_name.lower() not in q.gpu_name:
             return False
     if q.min_compute_capability is not None or q.max_compute_capability is not None:
-        cc = [info.compute_capability for info in KNOWN_GPUS if info.name == i.gpu_name]
-        if not cc or not is_between(min(cc), q.min_compute_capability, q.max_compute_capability):
+        cc = get_compute_capability(i.gpu_name)
+        if not cc or not is_between(cc, q.min_compute_capability, q.max_compute_capability):
             return False
     if not is_between(i.gpu_memory if i.gpu_count > 0 else 0, q.min_gpu_memory, q.max_gpu_memory):
         return False
@@ -133,6 +135,13 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
     if q.spot is not None and i.spot != q.spot:
         return False
     return True
+
+
+def get_compute_capability(gpu_name: str) -> Optional[Tuple[int, int]]:
+    for gpu in KNOWN_GPUS:
+        if gpu.name.lower() == gpu_name.lower():
+            return gpu.compute_capability
+    return None
 
 
 KNOWN_GPUS = [
