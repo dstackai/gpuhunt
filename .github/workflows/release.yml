@@ -44,6 +44,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install .
           pip install -r requirements_dev.txt
+      - name: Run doctest
+        run: |
+          pytest --doctest-modules src/gpuhunt
       - name: Run pytest
         run: |
           pytest src/tests
