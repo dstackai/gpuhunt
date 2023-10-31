@@ -66,7 +66,7 @@ class TensorDockProvider(AbstractProvider):
                             cpu=details["specs"]["cpu"]["amount"],
                             memory=float(round_down(details["specs"]["ram"]["amount"], 2)),
                             gpu_count=gpu["amount"],
-                            gpu_name=marketplace_gpus.get(gpu_name, gpu_name),
+                            gpu_name=convert_gpu_name(gpu_name),
                             gpu_memory=float(gpu["vram"]),
                             spot=False,
                         )
@@ -96,7 +96,7 @@ class TensorDockProvider(AbstractProvider):
         )
         offers = []
         for gpu_name, gpu in specs["gpu"].items():
-            gpu_name = marketplace_gpus.get(gpu_name, gpu_name)
+            gpu_name = convert_gpu_name(gpu_name)
             if q.gpu_name is not None and gpu_name not in q.gpu_name:
                 continue
             if not is_between(gpu["vram"], q.min_gpu_memory, q.max_gpu_memory):
@@ -144,3 +144,21 @@ def round_up(value: Union[int, float], step: int) -> int:
 
 def round_down(value: Union[int, float], step: int) -> int:
     return value // step * step
+
+
+def convert_gpu_name(model: str) -> str:
+    """
+    >>> convert_gpu_name("geforcegtx1070-pcie-8gb")
+    'GTX1070'
+    >>> convert_gpu_name("geforcertx1111ti-pcie-13gb")
+    'RTX1111Ti'
+    >>> convert_gpu_name("a100-pcie-40gb")
+    'A100'
+    """
+    if model in marketplace_gpus:
+        return marketplace_gpus[model]
+    model = model.split("-")[0]
+    prefix = "geforce"
+    if model.startswith(prefix):
+        model = model[len(prefix) :]
+    return model.upper().replace("TI", "Ti")
