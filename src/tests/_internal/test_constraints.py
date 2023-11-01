@@ -149,3 +149,14 @@ class TestFillMissing:
             min_disk_size=110,
             min_cpu=40,
         )
+
+    def test_from_gpu_name_and_gpu_memory(self):
+        assert fill_missing(
+            QueryFilter(gpu_name=["A100"], min_gpu_memory=80), memory_per_core=4
+        ) == QueryFilter(
+            gpu_name=["A100"],
+            min_gpu_memory=80,
+            min_memory=160,
+            min_disk_size=110,
+            min_cpu=40,
+        )
