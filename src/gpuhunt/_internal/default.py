@@ -18,7 +18,10 @@ def default_catalog() -> Catalog:
     """
     catalog = Catalog()
     catalog.load()
-    for module, provider in [("gpuhunt.providers.tensordock", "TensorDockProvider")]:
+    for module, provider in [
+        ("gpuhunt.providers.tensordock", "TensorDockProvider"),
+        ("gpuhunt.providers.vastai", "VastAIProvider"),
+    ]:
         try:
             module = importlib.import_module(module)
             provider = getattr(module, provider)()
