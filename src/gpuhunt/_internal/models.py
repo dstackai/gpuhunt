@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from typing import Dict, List, Optional, Tuple, Union
 
 from gpuhunt._internal.utils import empty_as_none
@@ -116,6 +116,22 @@ class QueryFilter:
             self.provider = [i.lower() for i in self.provider]
         if self.gpu_name is not None:
             self.gpu_name = [i.lower() for i in self.gpu_name]
+
+    def __repr__(self) -> str:
+        """
+        >>> QueryFilter()
+        QueryFilter()
+        >>> QueryFilter(min_cpu=4)
+        QueryFilter(min_cpu=4)
+        >>> QueryFilter(max_price=1.2, min_cpu=4)
+        QueryFilter(min_cpu=4, max_price=1.2)
+        """
+        kv = ", ".join(
+            f"{f.name}={value}"
+            for f in fields(self)
+            if (value := getattr(self, f.name)) is not None
+        )
+        return f"QueryFilter({kv})"
 
 
 @dataclass

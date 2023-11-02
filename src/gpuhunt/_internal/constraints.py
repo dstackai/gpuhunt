@@ -4,7 +4,7 @@ from typing import Optional, Tuple, TypeVar, Union
 from gpuhunt._internal.models import CatalogItem, GPUInfo, QueryFilter
 
 
-def fill_missing(q: QueryFilter, *, memory_per_core: int = 8) -> QueryFilter:
+def fill_missing(q: QueryFilter, *, memory_per_core: int = 6) -> QueryFilter:
     q = copy.deepcopy(q)
 
     # if there is some information about gpu
@@ -26,21 +26,15 @@ def fill_missing(q: QueryFilter, *, memory_per_core: int = 8) -> QueryFilter:
             min_gpu_memory = []
             if q.min_gpu_memory is not None:
                 min_gpu_memory.append(q.min_gpu_memory)
-            if q.min_compute_capability is not None:
-                min_gpu_memory.extend(
-                    [
-                        i.memory
-                        for i in KNOWN_GPUS
-                        if i.compute_capability >= q.min_compute_capability
-                    ]
-                )
-            if q.gpu_name is not None:
-                min_gpu_memory.extend(
-                    [i.memory for i in KNOWN_GPUS if i.name.lower() in q.gpu_name]
-                )
-            min_total_gpu_memory = (
-                min(min_gpu_memory, default=min(i.memory for i in KNOWN_GPUS)) * min_gpu_count
+            gpus = KNOWN_GPUS
+            if q.min_compute_capability is not None:  # filter gpus by compute capability
+                gpus = [i for i in gpus if i.compute_capability >= q.min_compute_capability]
+            if q.gpu_name is not None:  # filter gpus by name
+                gpus = [i for i in gpus if i.name.lower() in q.gpu_name]
+            min_gpu_memory.append(
+                min((i.memory for i in gpus), default=min(i.memory for i in KNOWN_GPUS))
             )
+            min_total_gpu_memory = max(min_gpu_memory) * min_gpu_count
 
     if min_total_gpu_memory is not None:
         if q.min_memory is None:  # gpu memory to memory
