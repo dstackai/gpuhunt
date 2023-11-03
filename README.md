@@ -57,6 +57,7 @@ print(*items, sep="\n")
 * GCP
 * LambdaLabs
 * TensorDock
+* Vast AI
 
 ## See also
 

@@ -1,7 +1,7 @@
 import copy
 import logging
 from collections import defaultdict
-from typing import Dict, List, Literal, Optional, Tuple
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 import requests
 
@@ -12,12 +12,13 @@ logger = logging.getLogger(__name__)
 bundles_url = "https://console.vast.ai/api/v0/bundles/"
 kilo = 1000
 Operators = Literal["lt", "lte", "eq", "gte", "gt"]
+FilterValue = Union[int, float, str, bool]
 
 
 class VastAIProvider(AbstractProvider):
     NAME = "vastai"
 
-    def __init__(self, extra_filters: Optional[Dict[str, Dict[Operators, str]]] = None):
+    def __init__(self, extra_filters: Optional[Dict[str, Dict[Operators, FilterValue]]] = None):
         self.extra_filters = extra_filters
 
     def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
@@ -58,7 +59,7 @@ class VastAIProvider(AbstractProvider):
         return instance_offers
 
     @staticmethod
-    def make_filters(q: QueryFilter) -> dict:
+    def make_filters(q: QueryFilter) -> Dict[str, Dict[Operators, FilterValue]]:
         filters = defaultdict(dict)
         if q.min_cpu is not None:
             filters["cpu_cores"]["gte"] = q.min_cpu
