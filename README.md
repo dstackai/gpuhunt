@@ -1,3 +1,5 @@
+[![](https://img.shields.io/pypi/v/gpuhunt)](https://pypi.org/project/gpuhunt/)
+
 Easy access to GPU pricing data for major cloud providers: AWS, Azure, GCP, and LambdaLabs.
 The catalog includes details about prices, locations, CPUs, RAM, GPUs, and spots (interruptable instances).
 
