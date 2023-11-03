@@ -1,7 +1,7 @@
 import copy
 import logging
 from collections import defaultdict
-from typing import List, Optional, Tuple
+from typing import Dict, List, Literal, Optional, Tuple
 
 import requests
 
@@ -11,16 +11,22 @@ from gpuhunt.providers import AbstractProvider
 logger = logging.getLogger(__name__)
 bundles_url = "https://console.vast.ai/api/v0/bundles/"
 kilo = 1000
+Operators = Literal["lt", "lte", "eq", "gte", "gt"]
 
 
 class VastAIProvider(AbstractProvider):
     NAME = "vastai"
 
+    def __init__(self, extra_filters: Optional[Dict[str, Dict[Operators, str]]] = None):
+        self.extra_filters = extra_filters
+
     def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
         filters = self.make_filters(query_filter or QueryFilter())
+        if self.extra_filters:
+            for key, constraints in self.extra_filters.items():
+                for op, value in constraints.items():
+                    filters[key][op] = value
         filters["rentable"]["eq"] = True
-        filters["direct_port_count"]["gte"] = 1  # publicly accessible
-        filters["reliability2"]["gte"] = 0.9
         resp = requests.post(bundles_url, json=filters)
         resp.raise_for_status()
         data = resp.json()
