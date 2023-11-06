@@ -5,7 +5,7 @@ on:
       channel:
         description: 'Channel to publish catalogs to'
         required: true
-        default: ${{ vars.CHANNEL }}
+        default: stgn
   schedule:
     - cron: '0 1 * * *'  # 01:00 UTC every day
 
