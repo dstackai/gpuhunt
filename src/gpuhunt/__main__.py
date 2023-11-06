@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import os
 import sys
@@ -10,7 +11,7 @@ def main():
     parser = argparse.ArgumentParser(prog="python3 -m gpuhunt")
     parser.add_argument(
         "provider",
-        choices=["aws", "azure", "gcp", "lambdalabs", "tensordock", "vastai"],
+        choices=["aws", "azure", "gcp", "lambdalabs", "nebius", "tensordock", "vastai"],
     )
     parser.add_argument("--output", required=True)
     parser.add_argument("--no-filter", action="store_true")
@@ -37,6 +38,10 @@ def main():
         from gpuhunt.providers.lambdalabs import LambdaLabsProvider
 
         provider = LambdaLabsProvider(os.getenv("LAMBDALABS_TOKEN"))
+    elif args.provider == "nebius":
+        from gpuhunt.providers.nebius import NebiusProvider
+
+        provider = NebiusProvider(json.loads(os.getenv("NEBIUS_SERVICE_ACCOUNT")))
     elif args.provider == "tensordock":
         from gpuhunt.providers.tensordock import TensorDockProvider
 

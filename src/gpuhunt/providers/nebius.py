@@ -34,6 +34,7 @@ class NebiusProvider(AbstractProvider):
         zone = self.api_client.compute_zones_list()[0]["id"]
         skus = []
         page_token = None
+        logger.info("Fetching SKUs")
         while True:
             page = self.api_client.billing_skus_list(
                 filter=f'serviceId="{COMPUTE_SERVICE_ID}"', page_token=page_token
@@ -50,7 +51,7 @@ class NebiusProvider(AbstractProvider):
     def get_gpu_platforms(
         self, zone: str, platform_resources: "PlatformResourcePrice"
     ) -> List[RawCatalogItem]:
-        logger.debug("Fetching GPU platforms")
+        logger.info("Fetching GPU platforms")
         resp = requests.get("https://nebius.ai/docs/compute/concepts/gpus")
         resp.raise_for_status()
         soup = bs4.BeautifulSoup(resp.text, "html.parser")
@@ -88,7 +89,7 @@ class NebiusProvider(AbstractProvider):
     def get_cpu_platforms(
         self, zone: str, platform_resources: "PlatformResourcePrice"
     ) -> List[RawCatalogItem]:
-        logger.debug("Fetching CPU platforms")
+        logger.info("Fetching CPU platforms")
         resp = requests.get("https://nebius.ai/docs/compute/concepts/performance-levels")
         resp.raise_for_status()
         soup = bs4.BeautifulSoup(resp.text, "html.parser")
