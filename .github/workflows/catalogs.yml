@@ -1,6 +1,11 @@
 name: Collect and publish catalogs
 on:
   workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Channel to publish catalogs to'
+        required: true
+        default: ${{ vars.CHANNEL }}
   schedule:
     - cron: '0 1 * * *'  # 01:00 UTC every day
 
@@ -178,12 +183,20 @@ jobs:
         run: date +%Y%m%d > version
       - name: Package catalogs
         run: zip catalog.zip *.csv version
+      - name: Set channel
+        run: |
+          if [[ ${{ github.event_name == 'workflow_dispatch' }} == true ]]; then
+            CHANNEL=${{ inputs.channel }}
+          else
+            CHANNEL=${{ vars.CHANNEL }}
+          fi
+          echo "CHANNEL=$CHANNEL" >> $GITHUB_ENV
       - name: Upload to S3
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           VERSION=$(cat version)
-          aws s3 cp catalog.zip "s3://dstack-gpu-pricing/v1/$VERSION/catalog.zip" --acl public-read
-          cat version | aws s3 cp - "s3://dstack-gpu-pricing/v1/version" --acl public-read
-          aws s3 cp "s3://dstack-gpu-pricing/v1/$VERSION/catalog.zip" "s3://dstack-gpu-pricing/v1/latest/catalog.zip" --acl public-read
+          aws s3 cp catalog.zip "s3://dstack-gpu-pricing/$CHANNEL/$VERSION/catalog.zip" --acl public-read
+          cat version | aws s3 cp - "s3://dstack-gpu-pricing/$CHANNEL/version" --acl public-read
+          aws s3 cp "s3://dstack-gpu-pricing/$CHANNEL/$VERSION/catalog.zip" "s3://dstack-gpu-pricing/$CHANNEL/latest/catalog.zip" --acl public-read
