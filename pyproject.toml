@@ -38,7 +38,12 @@ gcp = [
     "google-cloud-billing",
     "google-cloud-compute"
 ]
-all = ["gpuhunt[aws,azure,gcp]"]
+nebius = [
+    "pyjwt",
+    "cryptography",
+    "beautifulsoup4"
+]
+all = ["gpuhunt[aws,azure,gcp,nebius]"]
 
 [tool.setuptools.dynamic]
 version = {attr = "gpuhunt.version.__version__"}

@@ -58,6 +58,7 @@ print(*items, sep="\n")
 * Azure
 * GCP
 * LambdaLabs
+* Nebius
 * TensorDock
 * Vast AI
 
