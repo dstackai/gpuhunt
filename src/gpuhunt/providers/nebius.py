@@ -142,6 +142,8 @@ class NebiusProvider(AbstractProvider):
             if (r := vm_name_re.match(sku["name"])) is None:
                 continue  # storage, images, snapshots, infiniband
             cpu_name, gpu_name, resource_name, spot = r.groups()
+            if spot is not None:
+                continue
             if gpu_name not in GPU_NAME_PLATFORM:
                 logger.warning("Unknown GPU name: %s", gpu_name)
                 continue
