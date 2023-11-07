@@ -38,7 +38,12 @@ class VastAIProvider(AbstractProvider):
             ondemand_offer = RawCatalogItem(
                 instance_name=str(offer["id"]),
                 location=get_location(offer["geolocation"]),
-                price=round(offer["dph_total"], 5),  # TODO(egor-s) add disk price
+                # storage_cost is $/gb/month
+                price=round(
+                    offer["dph_base"]
+                    + (query_filter.min_disk_size or 0) * offer["storage_cost"] / 30 / 24,
+                    5,
+                ),
                 cpu=int(offer["cpu_cores_effective"]),
                 memory=float(
                     int(
