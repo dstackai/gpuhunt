@@ -27,8 +27,12 @@ def fill_missing(q: QueryFilter, *, memory_per_core: int = 6) -> QueryFilter:
             if q.min_gpu_memory is not None:
                 min_gpu_memory.append(q.min_gpu_memory)
             gpus = KNOWN_GPUS
-            if q.min_compute_capability is not None:  # filter gpus by compute capability
-                gpus = [i for i in gpus if i.compute_capability >= q.min_compute_capability]
+            if (
+                q.min_compute_capability is not None
+            ):  # filter gpus by compute capability
+                gpus = [
+                    i for i in gpus if i.compute_capability >= q.min_compute_capability
+                ]
             if q.gpu_name is not None:  # filter gpus by name
                 gpus = [i for i in gpus if i.name.lower() in q.gpu_name]
             min_gpu_memory.append(
@@ -69,7 +73,9 @@ def optimize(
 Comparable = TypeVar("Comparable", bound=Union[int, float, Tuple[int, int]])
 
 
-def is_between(value: Comparable, left: Optional[Comparable], right: Optional[Comparable]) -> bool:
+def is_between(
+    value: Comparable, left: Optional[Comparable], right: Optional[Comparable]
+) -> bool:
     if is_below(value, left) or is_above(value, right):
         return False
     return True
@@ -111,9 +117,13 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
             return False
     if q.min_compute_capability is not None or q.max_compute_capability is not None:
         cc = get_compute_capability(i.gpu_name)
-        if not cc or not is_between(cc, q.min_compute_capability, q.max_compute_capability):
+        if not cc or not is_between(
+            cc, q.min_compute_capability, q.max_compute_capability
+        ):
             return False
-    if not is_between(i.gpu_memory if i.gpu_count > 0 else 0, q.min_gpu_memory, q.max_gpu_memory):
+    if not is_between(
+        i.gpu_memory if i.gpu_count > 0 else 0, q.min_gpu_memory, q.max_gpu_memory
+    ):
         return False
     if not is_between(
         (i.gpu_count * i.gpu_memory) if i.gpu_count > 0 else 0,
@@ -144,11 +154,14 @@ KNOWN_GPUS = [
     GPUInfo(name="A100", memory=80, compute_capability=(8, 0)),
     GPUInfo(name="A10G", memory=24, compute_capability=(8, 6)),
     GPUInfo(name="A4000", memory=16, compute_capability=(8, 6)),
+    GPUInfo(name="A5000", memory=24, compute_capability=(8, 6)),
     GPUInfo(name="A6000", memory=48, compute_capability=(8, 6)),
     GPUInfo(name="H100", memory=80, compute_capability=(9, 0)),
     GPUInfo(name="L4", memory=24, compute_capability=(8, 9)),
     GPUInfo(name="L40", memory=48, compute_capability=(8, 9)),
     GPUInfo(name="P100", memory=16, compute_capability=(6, 0)),
+    GPUInfo(name="RTX3060", memory=8, compute_capability=(8, 6)),
+    GPUInfo(name="RTX3060", memory=12, compute_capability=(8, 6)),
     GPUInfo(name="RTX3060Ti", memory=8, compute_capability=(8, 6)),
     GPUInfo(name="RTX3070Ti", memory=8, compute_capability=(8, 6)),
     GPUInfo(name="RTX3080", memory=10, compute_capability=(8, 6)),
