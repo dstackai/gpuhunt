@@ -71,9 +71,12 @@ class GCPProvider(AbstractProvider):
                         continue
                     gpu = None
                     if machine_type.accelerators:
-                        gpu = accelerator_details[
-                            machine_type.accelerators[0].guest_accelerator_type
-                        ]
+                        accelerator = machine_type.accelerators[0].guest_accelerator_type
+                        gpu = accelerator_details.get(accelerator)
+                        if gpu is None:
+                            logger.warning("Unknown accelerator type: %s", accelerator)
+                            continue
+
                     instance = RawCatalogItem(
                         instance_name=machine_type.name,
                         location=zone,
