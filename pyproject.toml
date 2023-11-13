@@ -43,7 +43,10 @@ nebius = [
     "cryptography",
     "beautifulsoup4"
 ]
-all = ["gpuhunt[aws,azure,gcp,nebius]"]
+datarunch = [
+    "datacrunch",
+]
+all = ["gpuhunt[aws,azure,gcp,nebius,datacrunch]"]
 
 [tool.setuptools.dynamic]
 version = {attr = "gpuhunt.version.__version__"}
