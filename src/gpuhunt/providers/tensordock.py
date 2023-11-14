@@ -134,7 +134,7 @@ class TensorDockProvider(AbstractProvider):
                 )
                 offers.append(offer)
                 break  # stop increasing gpu count
-        return offers
+        return sorted(offers, key=lambda i: i.price)
 
 
 def round_up(value: Union[int, float], step: int) -> int:

@@ -23,7 +23,3 @@ def load(path: str, *, cls: Type[T] = RawCatalogItem) -> List[T]:
             item = cls.from_dict(row)
             items.append(item)
     return items
-
-
-def sort_key(offer: RawCatalogItem):
-    return offer.gpu_count, offer.instance_name, offer.price, offer.location

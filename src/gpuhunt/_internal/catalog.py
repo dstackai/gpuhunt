@@ -1,11 +1,12 @@
 import csv
 import dataclasses
+import heapq
 import io
 import logging
 import time
 import urllib.request
 import zipfile
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait
 from typing import Iterable, List, Optional, Tuple, Union
 
 import gpuhunt._internal.constraints as constraints
@@ -73,8 +74,8 @@ class Catalog:
             max_gpu_memory: maximum amount of GPU VRAM in GB for each GPU
             min_total_gpu_memory: minimum amount of GPU VRAM in GB for all GPUs combined
             max_total_gpu_memory: maximum amount of GPU VRAM in GB for all GPUs combined
-            min_disk_size: *currently not in use*
-            max_disk_size: *currently not in use*
+            min_disk_size: minimum disk size in GB
+            max_disk_size: maximum disk size in GB
             min_price: minimum price per hour in USD
             max_price: maximum price per hour in USD
             min_compute_capability: minimum compute capability of the GPU
@@ -119,7 +120,6 @@ class Catalog:
                 raise ValueError(f"Unknown provider: {p}")
 
         # fetch providers
-        items = []
         with ThreadPoolExecutor(max_workers=8) as executor:
             futures = []
             for provider_name in ONLINE_PROVIDERS:
@@ -136,8 +136,10 @@ class Catalog:
                             self._get_offline_provider_items, provider_name, query_filter
                         )
                     )
-            for future in as_completed(futures):
-                items += future.result()
+            completed, _ = wait(futures)
+            # The merge preserves provider-specific order, picking the cheapest offer at each step.
+            # The final list is not strictly sorted by the price.
+            items = list(heapq.merge(*[f.result() for f in completed], key=lambda i: i.price))
         return items
 
     def load(self, version: str = None):

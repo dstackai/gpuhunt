@@ -46,9 +46,9 @@ class NebiusProvider(AbstractProvider):
             if page_token is None:
                 break
         platform_resources = self.aggregate_skus(skus)
-        return self.get_gpu_platforms(zone, platform_resources) + self.get_cpu_platforms(
-            zone, platform_resources
-        )
+        offers = self.get_gpu_platforms(zone, platform_resources)
+        offers += self.get_cpu_platforms(zone, platform_resources)
+        return sorted(offers, key=lambda i: i.price)
 
     def get_gpu_platforms(
         self, zone: str, platform_resources: "PlatformResourcePrice"

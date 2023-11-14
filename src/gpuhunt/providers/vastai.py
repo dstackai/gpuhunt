@@ -61,7 +61,8 @@ class VastAIProvider(AbstractProvider):
             spot_offer.price = round(offer["min_bid"], 5)
             spot_offer.spot = True
             instance_offers.append(spot_offer)
-        return instance_offers
+        # TODO(egor-s) add custom sorting
+        return sorted(instance_offers, key=lambda i: i.price)
 
     @staticmethod
     def make_filters(q: QueryFilter) -> Dict[str, Dict[Operators, FilterValue]]:
