@@ -27,6 +27,8 @@ GPU_NAME_PLATFORM = {
 
 
 class NebiusProvider(AbstractProvider):
+    NAME = "nebius"
+
     def __init__(self, service_account: "ServiceAccount"):
         self.api_client = NebiusAPIClient(service_account)
 
