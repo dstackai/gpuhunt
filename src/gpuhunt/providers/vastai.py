@@ -31,9 +31,17 @@ class VastAIProvider(AbstractProvider):
         resp = requests.post(bundles_url, json=filters)
         resp.raise_for_status()
         data = resp.json()
+        raw_offers = sorted(
+            data["offers"],
+            key=lambda i: (i["reliability2"] ** 4) * i["dlperf_per_dphtotal"],
+            reverse=True,
+        )
 
         instance_offers = []
-        for offer in data["offers"]:
+        for offer in raw_offers:
+            if not self.satisfies_filters(offer, filters):
+                logger.warning("Offer %s does not satisfy filters", offer["id"])
+                continue
             gpu_name = get_gpu_name(offer["gpu_name"])
             ondemand_offer = RawCatalogItem(
                 instance_name=str(offer["id"]),
@@ -96,6 +104,22 @@ class VastAIProvider(AbstractProvider):
         if q.max_compute_capability is not None:
             filters["compute_capability"]["lte"] = compute_cap(q.max_compute_capability)
         return filters
+
+    @staticmethod
+    def satisfies_filters(offer: dict, filters: Dict[str, Dict[Operators, FilterValue]]) -> bool:
+        for key in filters:
+            for op, value in filters[key].items():
+                if op == "lt" and offer[key] >= value:
+                    return False
+                if op == "lte" and offer[key] > value:
+                    return False
+                if op == "eq" and offer[key] != value:
+                    return False
+                if op == "gte" and offer[key] < value:
+                    return False
+                if op == "gt" and offer[key] <= value:
+                    return False
+        return True
 
 
 def get_gpu_name(gpu_name: str) -> str:

@@ -153,7 +153,8 @@ class AzureProvider(AbstractProvider):
                     gpu_memory=None,
                 )
                 offers.append(offer)
-        return self.fill_details(offers)
+        offers = self.fill_details(offers)
+        return sorted(offers, key=lambda i: i.price)
 
     def fill_details(self, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
         logger.info("Fetching instance details")

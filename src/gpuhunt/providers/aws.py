@@ -99,7 +99,8 @@ class AWSProvider(AbstractProvider):
                 )
                 offers.append(offer)
         self.fill_gpu_details(offers)
-        return self.add_spots(offers)
+        offers = self.add_spots(offers)
+        return sorted(offers, key=lambda i: i.price)
 
     def skip(self, row: Dict[str, str]) -> bool:
         if any(row["Instance Type"].startswith(family) for family in previous_generation_families):

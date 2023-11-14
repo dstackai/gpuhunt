@@ -93,7 +93,7 @@ class GCPProvider(AbstractProvider):
                         spot=None,
                     )
                     instances.append(instance)
-        return instances
+        return sorted(instances, key=lambda i: i.price)
 
     def add_gpus(self, instances: List[RawCatalogItem]):
         n1_instances = defaultdict(list)

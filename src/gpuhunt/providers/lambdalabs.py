@@ -52,7 +52,8 @@ class LambdaLabsProvider(AbstractProvider):
                 location=None,
             )
             offers.append(offer)
-        return self.add_regions(offers)
+        offers = self.add_regions(offers)
+        return sorted(offers, key=lambda i: i.price)
 
     def add_regions(self, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
         # TODO: we don't know which regions are actually available for each instance type
