@@ -93,7 +93,7 @@ class GCPProvider(AbstractProvider):
                         spot=None,
                     )
                     instances.append(instance)
-        return sorted(instances, key=lambda i: i.price)
+        return instances
 
     def add_gpus(self, instances: List[RawCatalogItem]):
         n1_instances = defaultdict(list)
@@ -207,7 +207,8 @@ class GCPProvider(AbstractProvider):
     def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
         instances = self.list_preconfigured_instances()
         self.add_gpus(instances)
-        return self.fill_prices(instances)
+        offers = self.fill_prices(instances)
+        return sorted(offers, key=lambda i: i.price)
 
     @classmethod
     def filter(cls, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:

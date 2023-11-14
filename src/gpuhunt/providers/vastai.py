@@ -108,6 +108,8 @@ class VastAIProvider(AbstractProvider):
     @staticmethod
     def satisfies_filters(offer: dict, filters: Dict[str, Dict[Operators, FilterValue]]) -> bool:
         for key in filters:
+            if key not in offer:
+                continue
             for op, value in filters[key].items():
                 if op == "lt" and offer[key] >= value:
                     return False
