@@ -1,7 +1,7 @@
 import copy
 import logging
 from collections import defaultdict
-from typing import Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import requests
 
@@ -22,23 +22,20 @@ class VastAIProvider(AbstractProvider):
         self.extra_filters = extra_filters
 
     def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
-        filters = self.make_filters(query_filter or QueryFilter())
+        filters: Dict[str, Any] = self.make_filters(query_filter or QueryFilter())
         if self.extra_filters:
             for key, constraints in self.extra_filters.items():
                 for op, value in constraints.items():
                     filters[key][op] = value
         filters["rentable"]["eq"] = True
+        filters["rented"]["eq"] = False
+        filters["order"] = [["score", "desc"]]
         resp = requests.post(bundles_url, json=filters)
         resp.raise_for_status()
         data = resp.json()
-        raw_offers = sorted(
-            data["offers"],
-            key=lambda i: (i["reliability2"] ** 4) * i["dlperf_per_dphtotal"],
-            reverse=True,
-        )
 
         instance_offers = []
-        for offer in raw_offers:
+        for offer in data["offers"]:
             if not self.satisfies_filters(offer, filters):
                 logger.warning("Offer %s does not satisfy filters", offer["id"])
                 continue
