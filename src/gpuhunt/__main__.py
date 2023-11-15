@@ -11,7 +11,16 @@ def main():
     parser = argparse.ArgumentParser(prog="python3 -m gpuhunt")
     parser.add_argument(
         "provider",
-        choices=["aws", "azure", "datacrunch", "gcp", "lambdalabs", "nebius", "tensordock", "vastai"],
+        choices=[
+            "aws",
+            "azure",
+            "datacrunch",
+            "gcp",
+            "lambdalabs",
+            "nebius",
+            "tensordock",
+            "vastai",
+        ],
     )
     parser.add_argument("--output", required=True)
     parser.add_argument("--no-filter", action="store_true")
@@ -33,7 +42,9 @@ def main():
     elif args.provider == "datacrunch":
         from gpuhunt.providers.datacrunch import DataCrunchProvider
 
-        provider = DataCrunchProvider(os.getenv("DATACRUNCH_CLIENT_ID"), os.getenv("DATACRUNCH_CLIENT_SECRET"))
+        provider = DataCrunchProvider(
+            os.getenv("DATACRUNCH_CLIENT_ID"), os.getenv("DATACRUNCH_CLIENT_SECRET")
+        )
     elif args.provider == "gcp":
         from gpuhunt.providers.gcp import GCPProvider
 

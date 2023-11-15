@@ -63,7 +63,7 @@ jobs:
           path: azure.csv
           retention-days: 1
 
-  catalog-nebius:
+  catalog-datacrunch:
     name: Collect DataCrunch catalog
     runs-on: ubuntu-latest
     steps:
