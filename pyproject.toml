@@ -47,6 +47,13 @@ datacrunch = [
     "datacrunch"
 ]
 all = ["gpuhunt[aws,azure,datacrunch,gcp,nebius]"]
+dev = [
+    "pre-commit",
+    "isort~=5.0",
+    "black~=23.0",
+    "pytest~=7.0",
+    "pytest-mock",
+]
 
 [tool.setuptools.dynamic]
 version = {attr = "gpuhunt.version.__version__"}
