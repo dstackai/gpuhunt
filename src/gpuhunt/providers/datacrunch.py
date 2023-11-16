@@ -64,7 +64,10 @@ def _make_availability_list(spot: bool, availabilities: List[dict]) -> List[tupl
     return result
 
 
-def _make_list_available_instances(availability_list, instances: Dict[str, dict]) -> List[dict]:
+def _make_list_available_instances(
+    availability_list,
+    instances: Dict[str, dict],
+) -> List[dict]:
     result = []
     for location, spot, instance_type in availability_list:
         instance = instances[instance_type].copy()
@@ -74,14 +77,13 @@ def _make_list_available_instances(availability_list, instances: Dict[str, dict]
     return result
 
 
-def gpu_name(name: str) -> str | None:
+def gpu_name(name: str) -> Optional[str]:
     if not name:
         return None
 
     gpu_map = {
         "1x H100 SXM5 80GB": "H100",
         "2x H100 SXM5 80GB": "H100",
-        "4x H100 SXM5 80GB": "H100",
         "4x H100 SXM5 80GB": "H100",
         "8x H100 SXM5 80GB": "H100",
         "1x A100 SXM4 80GB": "A100",
@@ -109,6 +111,6 @@ def gpu_name(name: str) -> str | None:
     result = gpu_map.get(name)
 
     if result is None:
-        logging.warning(f"There is no {name!r} in gpu_map")
+        logging.warning("There is no '%s' in gpu_map", name)
 
     return result
