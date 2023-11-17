@@ -51,5 +51,8 @@ all = ["gpuhunt[aws,azure,datacrunch,gcp,nebius]"]
 [tool.setuptools.dynamic]
 version = {attr = "gpuhunt.version.__version__"}
 
+[tool.ruff]
+select = ["UP006", "UP007"]
+
 [tool.ruff.lint.pyupgrade]
 keep-runtime-typing = true
