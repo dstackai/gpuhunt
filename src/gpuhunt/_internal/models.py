@@ -5,7 +5,7 @@ from gpuhunt._internal.utils import empty_as_none
 
 
 def bool_loader(x: Union[bool, str]) -> bool:
-    if type(x) == bool:
+    if isinstance(x, bool):
         return x
     return x.lower() == "true"
 
