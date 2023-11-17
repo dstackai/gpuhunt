@@ -4,6 +4,12 @@ from typing import Dict, List, Optional, Tuple, Union
 from gpuhunt._internal.utils import empty_as_none
 
 
+def bool_loader(x: Union[bool, str]) -> bool:
+    if type(x) == bool:
+        return x
+    return x.lower() == "true"
+
+
 @dataclass
 class RawCatalogItem:
     instance_name: Optional[str]
@@ -27,7 +33,7 @@ class RawCatalogItem:
             gpu_count=empty_as_none(v.get("gpu_count"), loader=int),
             gpu_name=empty_as_none(v.get("gpu_name")),
             gpu_memory=empty_as_none(v.get("gpu_memory"), loader=float),
-            spot=empty_as_none(v.get("spot"), loader=lambda x: x.lower() == "true"),
+            spot=empty_as_none(v.get("spot"), loader=bool_loader),
         )
 
     def dict(self) -> Dict[str, Union[str, int, float, bool, None]]:
