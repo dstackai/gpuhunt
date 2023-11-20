@@ -1,5 +1,7 @@
+import copy
+import itertools
 import logging
-from typing import Dict, List, Optional
+from typing import Iterable, List, Optional
 
 from datacrunch import DataCrunchClient
 from datacrunch.instance_types.instance_types import InstanceType
@@ -16,18 +18,13 @@ class DataCrunchProvider(AbstractProvider):
 
     def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
         instance_types = self._get_instance_types()
-        instance_map = make_instance_map(instance_types)
+        locations = self._get_locations()
 
-        availabilities = []
-        for spot in [True, False]:
-            raw_availabilities = self._get_availabilities(spot)
-            spot_availabilities = _make_availability_list(spot, raw_availabilities)
-            availabilities.extend(spot_availabilities)
+        spots = (True, False)
+        location_codes = [loc["code"] for loc in locations]
+        instances = generate_instances(spots, location_codes, instance_types)
 
-        available_list = _make_list_available_instances(availabilities, instance_map)
-
-        items = [RawCatalogItem.from_dict(item) for item in available_list]
-        return items
+        return instances
 
     def _get_instance_types(self) -> List[InstanceType]:
         return self.datacrunch_client.instance_types.get()
@@ -35,18 +32,26 @@ class DataCrunchProvider(AbstractProvider):
     def _get_availabilities(self, spot: bool) -> List[dict]:
         return self.datacrunch_client.instances.get_availabilities(is_spot=spot)
 
-
-def make_instance_map(instance_types):
-    instance_map = {
-        instance.instance_type: transform_instance(instance) for instance in instance_types
-    }
-    return instance_map
+    def _get_locations(self) -> List[dict]:
+        return self.datacrunch_client.locations.get()
 
 
-def transform_instance(instance: InstanceType) -> dict:
+def generate_instances(
+    spots: Iterable[bool], location_codes: Iterable[str], instance_types: Iterable[InstanceType]
+) -> List[RawCatalogItem]:
+    instances = []
+    for spot, location, instance in itertools.product(spots, location_codes, instance_types):
+        item = _transform_instance(copy.copy(instance), spot, location)
+        instances.append(RawCatalogItem.from_dict(item))
+    return instances
+
+
+def _transform_instance(instance: InstanceType, spot: bool, location: str) -> dict:
     raw = dict(
         instance_name=instance.instance_type,
-        price=instance.price_per_hour,
+        location=location,
+        spot=spot,
+        price=instance.spot_price_per_hour if spot else instance.price_per_hour,
         cpu=instance.cpu["number_of_cores"],
         memory=instance.memory["size_in_gigabytes"],
         gpu_count=instance.gpu["number_of_gpus"],
@@ -54,27 +59,6 @@ def transform_instance(instance: InstanceType) -> dict:
         gpu_memory=instance.gpu_memory["size_in_gigabytes"],
     )
     return raw
-
-
-def _make_availability_list(spot: bool, availabilities: List[dict]) -> List[tuple]:
-    result = []
-    for location in availabilities:
-        for instance_type in location["availabilities"]:
-            result.append((location["location_code"], spot, instance_type))
-    return result
-
-
-def _make_list_available_instances(
-    availability_list,
-    instances: Dict[str, dict],
-) -> List[dict]:
-    result = []
-    for location, spot, instance_type in availability_list:
-        instance = instances[instance_type].copy()
-        instance["location"] = location
-        instance["spot"] = spot
-        result.append(instance)
-    return result
 
 
 def gpu_name(name: str) -> Optional[str]:

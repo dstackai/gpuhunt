@@ -9,10 +9,8 @@ from gpuhunt import Catalog, CatalogItem, RawCatalogItem
 from gpuhunt.providers.datacrunch import (
     DataCrunchProvider,
     InstanceType,
-    _make_availability_list,
-    _make_list_available_instances,
+    generate_instances,
     gpu_name,
-    make_instance_map,
 )
 
 
@@ -105,26 +103,15 @@ def instance_types(raw_instance_types):
     return instance
 
 
-def test_instance_map(instance_types):
-    result = make_instance_map([instance_types])
-    assert "location" not in result[instance_types.instance_type]
-    assert "spot" not in result[instance_types.instance_type]
-    assert result[instance_types.instance_type]["gpu_name"] == "H100"
+def list_available_instances(instance_types, locations):
+    spots = (True, False)
+    locations = [loc["loc"] for loc in locations]
+    instances = [instance_types]
+    list_instances = generate_instances(spots, locations, instances)
 
-
-def test_availability_list(availabilities):
-    spot = True
-    assert ("FIN-01", spot, "1A100.22V") in _make_availability_list(spot, availabilities)
-
-
-def list_available_instances(availabilities, instance_types):
-    spot = True
-    instance_map = make_instance_map([instance_types])
-    availability_list = _make_availability_list(spot=spot, availabilities=availabilities)
-
-    result = _make_list_available_instances(availability_list, instance_map)
-    assert len(result) == 1
-    assert result[0]["spot"] == spot
+    assert len(list_instances) == 4
+    assert [i.price for i in list_instances if i.spot] == [1, 70] * 2
+    assert [i.price for i in list_instances if not i.spot] == [3.95] * 2
 
 
 def test_gpu_name(caplog):
@@ -153,7 +140,7 @@ def test_available_query(mocker, instance_types):
     mocker.patch("datacrunch.DataCrunchClient.__init__", return_value=None)
     datacrunch = DataCrunchProvider("EXAMPLE", "EXAMPLE")
     datacrunch._get_instance_types = mocker.Mock(return_value=[instance_types])
-    datacrunch._get_availabilities = mocker.Mock(side_effect=(availabilities, []))
+    datacrunch._get_locations = mocker.Mock(return_value=[{"code": "FIN-01"}])
 
     internal_catalog.ONLINE_PROVIDERS = ["datacrunch"]
     internal_catalog.OFFLINE_PROVIDERS = []
@@ -161,10 +148,12 @@ def test_available_query(mocker, instance_types):
     catalog.add_provider(datacrunch)
     query_result = catalog.query(provider=["datacrunch"])
 
-    expected = CatalogItem(
+    assert len(query_result) == 2
+
+    expected_spot = CatalogItem(
         instance_name="1H100.80S.30V",
         location="FIN-01",
-        price=3.95,
+        price=1.7,
         cpu=30,
         memory=120.0,
         gpu_count=1,
@@ -173,4 +162,17 @@ def test_available_query(mocker, instance_types):
         spot=True,
         provider="datacrunch",
     )
-    assert query_result == [expected]
+    expected_non_spot = CatalogItem(
+        instance_name="1H100.80S.30V",
+        location="FIN-01",
+        price=3.95,
+        cpu=30,
+        memory=120.0,
+        gpu_count=1,
+        gpu_name="H100",
+        gpu_memory=80.0,
+        spot=False,
+        provider="datacrunch",
+    )
+    assert [r for r in query_result if r.spot] == [expected_spot]
+    assert [r for r in query_result if not r.spot] == [expected_non_spot]
