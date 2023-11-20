@@ -61,40 +61,41 @@ def _transform_instance(instance: InstanceType, spot: bool, location: str) -> di
     return raw
 
 
+GPU_MAP = {
+    "1x H100 SXM5 80GB": "H100",
+    "2x H100 SXM5 80GB": "H100",
+    "4x H100 SXM5 80GB": "H100",
+    "8x H100 SXM5 80GB": "H100",
+    "1x A100 SXM4 80GB": "A100",
+    "2x A100 SXM4 80GB": "A100",
+    "4x A100 SXM4 80GB": "A100",
+    "8x A100 SXM4 80GB": "A100",
+    "1x A100 SXM4 40GB": "A100",
+    "2x A100 SXM4 40GB": "A100",
+    "4x A100 SXM4 40GB": "A100",
+    "8x A100 SXM4 40GB": "A100",
+    "1x NVidia RTX6000 Ada 48GB": "RTX6000",
+    "2x NVidia RTX6000 Ada 48GB": "RTX6000",
+    "4x NVidia RTX6000 Ada 48GB": "RTX6000",
+    "8x NVidia RTX6000 Ada 48GB": "RTX6000",
+    "1x NVidia RTX A6000 48GB": "A6000",
+    "2x NVidia RTX A6000 48GB": "A6000",
+    "4x NVidia RTX A6000 48GB": "A6000",
+    "8x NVidia RTX A6000 48GB": "A6000",
+    "1x NVidia Tesla V100 16GB": "V100",
+    "2x NVidia Tesla V100 16GB": "V100",
+    "4x NVidia Tesla V100 16GB": "V100",
+    "8x NVidia Tesla V100 16GB": "V100",
+}
+
+
 def gpu_name(name: str) -> Optional[str]:
     if not name:
         return None
 
-    gpu_map = {
-        "1x H100 SXM5 80GB": "H100",
-        "2x H100 SXM5 80GB": "H100",
-        "4x H100 SXM5 80GB": "H100",
-        "8x H100 SXM5 80GB": "H100",
-        "1x A100 SXM4 80GB": "A100",
-        "2x A100 SXM4 80GB": "A100",
-        "4x A100 SXM4 80GB": "A100",
-        "8x A100 SXM4 80GB": "A100",
-        "1x A100 SXM4 40GB": "A100",
-        "2x A100 SXM4 40GB": "A100",
-        "4x A100 SXM4 40GB": "A100",
-        "8x A100 SXM4 40GB": "A100",
-        "1x NVidia RTX6000 Ada 48GB": "RTX6000",
-        "2x NVidia RTX6000 Ada 48GB": "RTX6000",
-        "4x NVidia RTX6000 Ada 48GB": "RTX6000",
-        "8x NVidia RTX6000 Ada 48GB": "RTX6000",
-        "1x NVidia RTX A6000 48GB": "A6000",
-        "2x NVidia RTX A6000 48GB": "A6000",
-        "4x NVidia RTX A6000 48GB": "A6000",
-        "8x NVidia RTX A6000 48GB": "A6000",
-        "1x NVidia Tesla V100 16GB": "V100",
-        "2x NVidia Tesla V100 16GB": "V100",
-        "4x NVidia Tesla V100 16GB": "V100",
-        "8x NVidia Tesla V100 16GB": "V100",
-    }
-
-    result = gpu_map.get(name)
+    result = GPU_MAP.get(name)
 
     if result is None:
-        logging.warning("There is no '%s' in gpu_map", name)
+        logging.warning("There is no '%s' in GPU_MAP", name)
 
     return result

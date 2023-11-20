@@ -1,10 +1,11 @@
 import csv
-import itertools
 from collections import Counter
 from pathlib import Path
 from typing import List
 
 import pytest
+
+from gpuhunt.providers.datacrunch import GPU_MAP
 
 
 @pytest.fixture
@@ -45,7 +46,6 @@ def test_price(data_rows):
 
 
 def test_gpu_present(data_rows):
-    refs = ("A100", "V100", "A6000", "RTX6000")
+    refs = GPU_MAP.values()
     gpus = select_row(data_rows, "gpu_name")
-    combinations = ((ref in gpu) for ref, gpu in itertools.product(refs, gpus))
-    assert len(list(filter(None, combinations))) > 0
+    assert set(gpus) != set(refs)

@@ -121,7 +121,7 @@ def test_gpu_name(caplog):
 
     with caplog.at_level(logging.WARNING):
         gpu_name("1x H200 SXM5 80GB")
-    assert "There is no '1x H200 SXM5 80GB' in gpu_map" in caplog.text
+    assert "There is no '1x H200 SXM5 80GB' in GPU_MAP" in caplog.text
 
 
 def transform(raw_catalog_items: List[RawCatalogItem]) -> List[CatalogItem]:
