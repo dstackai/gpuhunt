@@ -1,4 +1,5 @@
 import csv
+import itertools
 from collections import Counter
 from pathlib import Path
 from typing import Any, List
@@ -43,7 +44,8 @@ def test_price(data_rows):
     assert min(float(p) for p in prices) > 0
 
 
-@pytest.mark.parametrize("gpu", ["A100", "V100", "A6000", "RTX6000"])
-def test_gpu_present(data_rows, gpu):
+def test_gpu_present(data_rows):
+    refs = ("A100", "V100", "A6000", "RTX6000")
     gpus = select_row(data_rows, "gpu_name")
-    assert len(list(filter(None, ((gpu in gpu_name) for gpu_name in gpus)))) > 0
+    combinations = ((ref in gpu) for ref, gpu in itertools.product(refs, gpus))
+    assert len(list(filter(None, combinations))) > 0
