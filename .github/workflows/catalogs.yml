@@ -186,6 +186,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pip -U
+          pip install '.[all]'
           pip install pytest
       - uses: actions/download-artifact@v3
         with:
