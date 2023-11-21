@@ -107,6 +107,8 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
     if not is_between(i.gpu_count, q.min_gpu_count, q.max_gpu_count):
         return False
     if q.gpu_name is not None:
+        if i.gpu_name is None:
+            return False
         if i.gpu_name.lower() not in q.gpu_name:
             return False
     if q.min_compute_capability is not None or q.max_compute_capability is not None:

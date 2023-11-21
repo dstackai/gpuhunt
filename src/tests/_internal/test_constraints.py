@@ -1,3 +1,5 @@
+from typing import List
+
 import pytest
 
 from gpuhunt import CatalogItem, QueryFilter
@@ -18,6 +20,35 @@ def item() -> CatalogItem:
         spot=False,
         provider="aws",
     )
+
+
+@pytest.fixture
+def cpu_items() -> List[CatalogItem]:
+    datacrunch = CatalogItem(
+        instance_name="CPU.120V.480G",
+        location="ICE-01",
+        price=3.0,
+        cpu=120,
+        memory=480.0,
+        gpu_count=0,
+        gpu_name=None,
+        gpu_memory=0.0,
+        spot=False,
+        provider="datacrunch",
+    )
+    nebius = CatalogItem(
+        instance_name="standard-v2",
+        location="eu-north1-c",
+        price=1.4016,
+        cpu=48,
+        memory=288.0,
+        gpu_count=0,
+        gpu_name=None,
+        gpu_memory=None,
+        spot=False,
+        provider="nebius",
+    )
+    return [datacrunch, nebius]
 
 
 class TestMatches:
@@ -88,6 +119,10 @@ class TestMatches:
             provider="aws",
         )
         assert matches(item, QueryFilter(gpu_name=["RTX3060TI"]))
+
+    def test_provider(self, cpu_items):
+        assert matches(cpu_items[0], QueryFilter(provider=["datacrunch"]))
+        assert matches(cpu_items[1], QueryFilter(provider=["nebius"]))
 
 
 class TestFillMissing:
