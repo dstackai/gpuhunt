@@ -24,6 +24,52 @@ GPU_NAME_PLATFORM = {
     "L40": "standard-v3-l40",
     None: "standard-v2",
 }
+GPU_PLATFORMS = {
+    "gpu-standard-v3": [
+        [28, 119.0, 1, "A100", 80.0],
+        [56, 238.0, 2, "A100", 80.0],
+        [112, 476.0, 4, "A100", 80.0],
+        [224, 952.0, 8, "A100", 80.0],
+    ],
+    "gpu-h100": [
+        [20, 160.0, 1, "H100", 80.0],
+        [40, 320.0, 2, "H100", 80.0],
+        [80, 640.0, 4, "H100", 80.0],
+        [160, 1280.0, 8, "H100", 80.0],
+    ],
+    "gpu-h100-b": [
+        [20, 160.0, 1, "H100", 80.0],
+        [40, 320.0, 2, "H100", 80.0],
+        [80, 640.0, 4, "H100", 80.0],
+        [160, 1280.0, 8, "H100", 80.0],
+    ],
+    "standard-v3-h100-pcie": [
+        [24, 96.0, 1, "H100", 80.0],
+        [48, 192.0, 2, "H100", 80.0],
+    ],
+    "standard-v3-l4": [
+        [4, 16.0, 1, "L4", 24.0],
+        [8, 32.0, 1, "L4", 24.0],
+        [12, 48.0, 1, "L4", 24.0],
+        [16, 64.0, 1, "L4", 24.0],
+        [24, 96.0, 1, "L4", 24.0],
+        [24, 96.0, 2, "L4", 24.0],
+        [48, 192.0, 2, "L4", 24.0],
+    ],
+    "standard-v3-l40": [
+        [8, 32.0, 1, "L40", 48.0],
+        [12, 48.0, 1, "L40", 48.0],
+        [16, 64.0, 1, "L40", 48.0],
+        [24, 96.0, 1, "L40", 48.0],
+        [48, 192.0, 2, "L40", 48.0],
+    ],
+}
+CPU_PLATFORMS = {
+    "standard-v2": {
+        "cpus": [2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60],
+        "ratios": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+    }
+}
 
 
 class NebiusProvider(AbstractProvider):
@@ -50,24 +96,14 @@ class NebiusProvider(AbstractProvider):
         offers += self.get_cpu_platforms(zone, platform_resources)
         return sorted(offers, key=lambda i: i.price)
 
+    @staticmethod
     def get_gpu_platforms(
-        self, zone: str, platform_resources: "PlatformResourcePrice"
+        zone: str, platform_resources: "PlatformResourcePrice"
     ) -> List[RawCatalogItem]:
-        logger.info("Fetching GPU platforms")
-        resp = requests.get("https://nebius.ai/docs/compute/concepts/gpus")
-        resp.raise_for_status()
-        soup = bs4.BeautifulSoup(resp.text, "html.parser")
-        configs = soup.find("h2", id="config").find_next_sibling("ul").find_all("li")
         items = []
-        for li in configs:
-            platform = li.find("p").find("code").text
+        for platform, presets in GPU_PLATFORMS.items():
             prices = platform_resources[platform]
-            gpu_name = re.search(r" ([A-Z]+\d+) ", li.find("p").text).group(1)
-            for tr in li.find("tbody").find_all("tr"):
-                tds = tr.find_all("td")
-                gpu_count = int(tds[0].text.strip(" *"))
-                cpu = int(tds[2].text)
-                memory = float(tds[3].text)
+            for cpu, memory, gpu_count, gpu_name, gpu_memory in presets:
                 items.append(
                     RawCatalogItem(
                         instance_name=platform,
@@ -78,42 +114,25 @@ class NebiusProvider(AbstractProvider):
                             + gpu_count * prices["gpu"],
                             5,
                         ),
-                        cpu=int(tds[2].text),
-                        memory=float(tds[3].text),
+                        cpu=cpu,
+                        memory=memory,
                         gpu_count=gpu_count,
                         gpu_name=gpu_name,
-                        gpu_memory=int(tds[1].text) / gpu_count,
+                        gpu_memory=gpu_memory,
                         spot=False,
                     )
                 )
         return items
 
+    @staticmethod
     def get_cpu_platforms(
-        self, zone: str, platform_resources: "PlatformResourcePrice"
+        zone: str, platform_resources: "PlatformResourcePrice"
     ) -> List[RawCatalogItem]:
-        logger.info("Fetching CPU platforms")
-        resp = requests.get("https://nebius.ai/docs/compute/concepts/performance-levels")
-        resp.raise_for_status()
-        soup = bs4.BeautifulSoup(resp.text, "html.parser")
-        configs = (
-            soup.find(
-                "p",
-                string=re.compile(
-                    r"The computing resources may have the following configurations:"
-                ),
-            )
-            .find_next_sibling("ul")
-            .find_all("li")
-        )
         items = []
-        for li in configs:
-            platform = li.find("p").find("code").text
+        for platform, limits in CPU_PLATFORMS.items():
             prices = platform_resources[platform]
-            tds = li.find("tbody").find("td", string="100%").find_next_siblings("td")
-            cpus = [int(i) for i in tds[0].text.translate({"\n": "", " ": ""}).split(",")]
-            ratios = [float(i) for i in tds[1].text.translate({"\n": "", " ": ""}).split(",")]
-            for ratio in ratios:
-                for cpu in cpus:
+            for ratio in limits["ratios"]:
+                for cpu in limits["cpus"]:
                     items.append(
                         RawCatalogItem(
                             instance_name=platform,
@@ -128,6 +147,66 @@ class NebiusProvider(AbstractProvider):
                         )
                     )
         return items
+
+    @staticmethod
+    def parse_gpu_platforms(raw_html: str) -> Dict[str, List[List]]:
+        """Parse GPU platforms from Nebius docs.
+
+        Returns:
+            Dict of platform name to a list of presets.
+            Each preset contains: [cpu, memory, gpu_count, gpu_name, gpu_memory]
+        """
+        soup = bs4.BeautifulSoup(raw_html, "html.parser")
+        configs = soup.find("h2", id="config").find_next_sibling("ul").find_all("li")
+        platforms = {}
+        for li in configs:
+            platform = li.find("p").find("code").text
+            gpu_name = re.search(r" ([A-Z]+\d+)[ \n]", li.find("p").text).group(1)
+            items = []
+            for tr in li.find("tbody").find_all("tr"):
+                tds = tr.find_all("td")
+                gpu_count = int(tds[0].text.strip(" *"))
+                items.append(
+                    [
+                        int(tds[2].text),
+                        float(tds[3].text),
+                        gpu_count,
+                        gpu_name,
+                        int(tds[1].text) / gpu_count,
+                    ]
+                )
+            platforms[platform] = items
+        return platforms
+
+    @staticmethod
+    def parse_cpu_platforms(raw_html: str) -> Dict[str, Dict[str, List]]:
+        """Parse CPU platforms from Nebius docs.
+
+        Returns:
+            Dict of platform name to Dict of resource name to a list of values.
+        """
+        soup = bs4.BeautifulSoup(raw_html, "html.parser")
+        configs = (
+            soup.find(
+                "p",
+                string=re.compile(
+                    r"The computing resources may have the following configurations:"
+                ),
+            )
+            .find_next_sibling("ul")
+            .find_all("li")
+        )
+        platforms = {}
+        for li in configs:
+            platform = li.find("p").find("code").text
+            tds = li.find("tbody").find("td", string="100%").find_next_siblings("td")
+            platforms[platform] = {
+                "cpus": [int(i) for i in tds[0].text.translate({"\n": "", " ": ""}).split(",")],
+                "ratios": [
+                    float(i) for i in tds[1].text.translate({"\n": "", " ": ""}).split(",")
+                ],
+            }
+        return platforms
 
     def aggregate_skus(self, skus: List[dict]) -> "PlatformResourcePrice":
         vm_resources = {
@@ -155,7 +234,8 @@ class NebiusProvider(AbstractProvider):
 
         return platform_resources
 
-    def get_sku_price(self, pricing_versions: List[dict]) -> Optional[float]:
+    @staticmethod
+    def get_sku_price(pricing_versions: List[dict]) -> Optional[float]:
         now = datetime.datetime.now(datetime.timezone.utc)
         price = None
         for version in sorted(pricing_versions, key=lambda p: p["effectiveTime"]):
