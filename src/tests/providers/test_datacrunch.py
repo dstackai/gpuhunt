@@ -11,13 +11,14 @@ from gpuhunt.providers.datacrunch import (
     InstanceType,
     generate_instances,
     gpu_name,
+    transform_instance,
 )
 
 
 @pytest.fixture
 def raw_instance_types() -> List[dict]:
     # datacrunch.instance_types.get()
-    item = {
+    one_gpu = {
         "best_for": ["Gargantuan ML models", "Multi-GPU training", "FP64 HPC", "NVLINK"],
         "cpu": {"description": "30 CPU", "number_of_cores": 30},
         "deploy_warning": "H100: Use Nvidia driver 535 or higher for best performance",
@@ -34,7 +35,41 @@ def raw_instance_types() -> List[dict]:
         "spot_price": "1.70",
         "storage": {"description": "dynamic"},
     }
-    return [item]
+    two_gpu = {
+        "best_for": ["Large ML models", "FP32 calculations", "Single-GPU training"],
+        "cpu": {"description": "20 CPU", "number_of_cores": 20},
+        "deploy_warning": None,
+        "description": "Dedicated Hardware Instance",
+        "gpu": {"description": "2x NVidia RTX A6000 48GB", "number_of_gpus": 2},
+        "gpu_memory": {"description": "96GB GPU RAM", "size_in_gigabytes": 96},
+        "id": "07cf5dc1-a5d2-4972-ae4e-d429115d055b",
+        "instance_type": "2A6000.20V",
+        "memory": {"description": "120GB RAM", "size_in_gigabytes": 120},
+        "model": "RTX A6000",
+        "name": "NVidia RTX A6000 48GB",
+        "p2p": "",
+        "price_per_hour": "1.98",
+        "spot_price": "0.70",
+        "storage": {"description": "dynamic"},
+    }
+    cpu_instance = {
+        "best_for": ["Running services", "API server", "Data transfers"],
+        "cpu": {"description": "120 CPU", "number_of_cores": 120},
+        "deploy_warning": None,
+        "description": "Dedicated Hardware Instance",
+        "gpu": {"description": "", "number_of_gpus": 0},
+        "gpu_memory": {"description": "", "size_in_gigabytes": 0},
+        "id": "ccc00007-a5d2-4972-ae4e-d429115d055b",
+        "instance_type": "CPU.120V.480G",
+        "memory": {"description": "480GB RAM", "size_in_gigabytes": 480},
+        "model": "CPU Node",
+        "name": "AMD EPYC",
+        "p2p": "",
+        "price_per_hour": "3.00",
+        "spot_price": "1.50",
+        "storage": {"description": "dynamic"},
+    }
+    return [one_gpu, two_gpu, cpu_instance]
 
 
 @pytest.fixture
@@ -85,28 +120,26 @@ def locations():
     ]
 
 
-@pytest.fixture
-def instance_types(raw_instance_types):
-    item = raw_instance_types.pop()
+def instance_types(raw_instance_type: dict) -> InstanceType:
     instance = InstanceType(
-        id=item["id"],
-        instance_type=item["instance_type"],
-        price_per_hour=item["price_per_hour"],
-        spot_price_per_hour=item["spot_price"],
-        description=item["description"],
-        cpu=item["cpu"],
-        gpu=item["gpu"],
-        memory=item["memory"],
-        gpu_memory=item["gpu_memory"],
-        storage=item["storage"],
+        id=raw_instance_type["id"],
+        instance_type=raw_instance_type["instance_type"],
+        price_per_hour=raw_instance_type["price_per_hour"],
+        spot_price_per_hour=raw_instance_type["spot_price"],
+        description=raw_instance_type["description"],
+        cpu=raw_instance_type["cpu"],
+        gpu=raw_instance_type["gpu"],
+        memory=raw_instance_type["memory"],
+        gpu_memory=raw_instance_type["gpu_memory"],
+        storage=raw_instance_type["storage"],
     )
     return instance
 
 
-def list_available_instances(instance_types, locations):
+def list_available_instances(raw_instance_types, locations):
     spots = (True, False)
     locations = [loc["loc"] for loc in locations]
-    instances = [instance_types]
+    instances = [instance_types(raw_instance_types[0])]
     list_instances = generate_instances(spots, locations, instances)
 
     assert len(list_instances) == 4
@@ -132,14 +165,14 @@ def transform(raw_catalog_items: List[RawCatalogItem]) -> List[CatalogItem]:
     return items
 
 
-def test_available_query(mocker, instance_types):
+def test_available_query(mocker, raw_instance_types):
     catalog = Catalog(fill_missing=False, auto_reload=False)
 
-    availabilities = [{"location_code": "FIN-01", "availabilities": ["1H100.80S.30V"]}]
+    instance_type = instance_types(raw_instance_types[0])
 
     mocker.patch("datacrunch.DataCrunchClient.__init__", return_value=None)
     datacrunch = DataCrunchProvider("EXAMPLE", "EXAMPLE")
-    datacrunch._get_instance_types = mocker.Mock(return_value=[instance_types])
+    datacrunch._get_instance_types = mocker.Mock(return_value=[instance_type])
     datacrunch._get_locations = mocker.Mock(return_value=[{"code": "FIN-01"}])
 
     internal_catalog.ONLINE_PROVIDERS = ["datacrunch"]
@@ -176,3 +209,43 @@ def test_available_query(mocker, instance_types):
     )
     assert [r for r in query_result if r.spot] == [expected_spot]
     assert [r for r in query_result if not r.spot] == [expected_non_spot]
+
+
+def test_transform_instance(raw_instance_types):
+    location = "ICE-01"
+    is_spot = True
+    item = transform_instance(instance_types(raw_instance_types[1]), is_spot, location)
+
+    expected = RawCatalogItem(
+        instance_name="2A6000.20V",
+        location="ICE-01",
+        price=0.7,
+        cpu=20,
+        memory=120,
+        gpu_count=2,
+        gpu_name="A6000",
+        gpu_memory=96 / 2,
+        spot=True,
+    )
+
+    assert RawCatalogItem.from_dict(item) == expected
+
+
+def test_cpu_instance(raw_instance_types):
+    location = "ICE-01"
+    is_spot = False
+    item = transform_instance(instance_types(raw_instance_types[2]), is_spot, location)
+
+    expected = RawCatalogItem(
+        instance_name="CPU.120V.480G",
+        location="ICE-01",
+        price=3,
+        cpu=120,
+        memory=480,
+        gpu_count=0,
+        gpu_name=None,
+        gpu_memory=0,
+        spot=False,
+    )
+
+    assert RawCatalogItem.from_dict(item) == expected

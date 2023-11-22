@@ -41,12 +41,15 @@ def generate_instances(
 ) -> List[RawCatalogItem]:
     instances = []
     for spot, location, instance in itertools.product(spots, location_codes, instance_types):
-        item = _transform_instance(copy.copy(instance), spot, location)
+        item = transform_instance(copy.copy(instance), spot, location)
         instances.append(RawCatalogItem.from_dict(item))
     return instances
 
 
-def _transform_instance(instance: InstanceType, spot: bool, location: str) -> dict:
+def transform_instance(instance: InstanceType, spot: bool, location: str) -> dict:
+    gpu_memory = 0
+    if instance.gpu["number_of_gpus"]:
+        gpu_memory = instance.gpu_memory["size_in_gigabytes"] / instance.gpu["number_of_gpus"]
     raw = dict(
         instance_name=instance.instance_type,
         location=location,
@@ -56,7 +59,7 @@ def _transform_instance(instance: InstanceType, spot: bool, location: str) -> di
         memory=instance.memory["size_in_gigabytes"],
         gpu_count=instance.gpu["number_of_gpus"],
         gpu_name=gpu_name(instance.gpu["description"]),
-        gpu_memory=instance.gpu_memory["size_in_gigabytes"],
+        gpu_memory=gpu_memory,
     )
     return raw
 
