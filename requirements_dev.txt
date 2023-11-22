@@ -1,5 +1,0 @@
-pre-commit
-isort~=5.0
-black~=23.0
-pytest~=7.0
-pytest-mock
