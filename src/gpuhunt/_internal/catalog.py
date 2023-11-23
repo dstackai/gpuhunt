@@ -114,23 +114,28 @@ class Catalog:
         if self.fill_missing:
             query_filter = constraints.fill_missing(query_filter)
             logger.debug("Effective query filter: %s", query_filter)
-        # validate providers
-        for p in query_filter.provider or []:
-            if p not in OFFLINE_PROVIDERS + ONLINE_PROVIDERS:
-                raise ValueError(f"Unknown provider: {p}")
+        if query_filter.provider is not None:
+            # validate providers
+            for p in query_filter.provider:
+                if p not in OFFLINE_PROVIDERS + ONLINE_PROVIDERS:
+                    raise ValueError(f"Unknown provider: {p}")
+        else:
+            query_filter.provider = OFFLINE_PROVIDERS + list(
+                set(p.NAME for p in self.providers if p.NAME in ONLINE_PROVIDERS)
+            )
 
         # fetch providers
         with ThreadPoolExecutor(max_workers=8) as executor:
             futures = []
             for provider_name in ONLINE_PROVIDERS:
-                if query_filter.provider is None or provider_name in query_filter.provider:
+                if provider_name in query_filter.provider:
                     futures.append(
                         executor.submit(
                             self._get_online_provider_items, provider_name, query_filter
                         )
                     )
             for provider_name in OFFLINE_PROVIDERS:
-                if query_filter.provider is None or provider_name in query_filter.provider:
+                if provider_name in query_filter.provider:
                     futures.append(
                         executor.submit(
                             self._get_offline_provider_items, provider_name, query_filter
