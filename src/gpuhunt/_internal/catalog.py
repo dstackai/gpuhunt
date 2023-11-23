@@ -111,9 +111,10 @@ class Catalog:
             max_compute_capability=parse_compute_capability(max_compute_capability),
             spot=spot,
         )
-        if self.fill_missing:
-            query_filter = constraints.fill_missing(query_filter)
-            logger.debug("Effective query filter: %s", query_filter)
+        FILL_MISSING_MAP = {None: constraints.dummy_fill_missing}
+        FILL_MISSING_MAP.update({key: constraints.dummy_fill_missing for key in OFFLINE_PROVIDERS})
+        FILL_MISSING_MAP.update({key: constraints.fill_missing for key in ONLINE_PROVIDERS})
+
         if query_filter.provider is not None:
             # validate providers
             for p in query_filter.provider:
@@ -127,20 +128,37 @@ class Catalog:
         # fetch providers
         with ThreadPoolExecutor(max_workers=8) as executor:
             futures = []
+
             for provider_name in ONLINE_PROVIDERS:
                 if provider_name in query_filter.provider:
+                    online_query_filter = constraints.dummy_fill_missing(query_filter)
+
+                    if self.fill_missing:
+                        provider_fill_missing = FILL_MISSING_MAP[provider_name]
+                        online_query_filter = provider_fill_missing(query_filter)
+                        logger.debug("Effective query filter: %s", online_query_filter)
+
                     futures.append(
                         executor.submit(
-                            self._get_online_provider_items, provider_name, query_filter
+                            self._get_online_provider_items, provider_name, online_query_filter
                         )
                     )
+
             for provider_name in OFFLINE_PROVIDERS:
                 if provider_name in query_filter.provider:
+                    offline_query_filter = constraints.dummy_fill_missing(query_filter)
+
+                    if self.fill_missing:
+                        provider_fill_missing = FILL_MISSING_MAP[provider_name]
+                        offline_query_filter = provider_fill_missing(query_filter)
+                        logger.debug("Effective query filter: %s", offline_query_filter)
+
                     futures.append(
                         executor.submit(
-                            self._get_offline_provider_items, provider_name, query_filter
+                            self._get_offline_provider_items, provider_name, offline_query_filter
                         )
                     )
+
             completed, _ = wait(futures)
             # The merge preserves provider-specific order, picking the cheapest offer at each step.
             # The final list is not strictly sorted by the price.

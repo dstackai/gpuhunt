@@ -35,6 +35,7 @@ def raw_instance_types() -> List[dict]:
         "spot_price": "1.70",
         "storage": {"description": "dynamic"},
     }
+
     two_gpu = {
         "best_for": ["Large ML models", "FP32 calculations", "Single-GPU training"],
         "cpu": {"description": "20 CPU", "number_of_cores": 20},
@@ -52,6 +53,7 @@ def raw_instance_types() -> List[dict]:
         "spot_price": "0.70",
         "storage": {"description": "dynamic"},
     }
+
     cpu_instance = {
         "best_for": ["Running services", "API server", "Data transfers"],
         "cpu": {"description": "120 CPU", "number_of_cores": 120},
@@ -69,7 +71,26 @@ def raw_instance_types() -> List[dict]:
         "spot_price": "1.50",
         "storage": {"description": "dynamic"},
     }
-    return [one_gpu, two_gpu, cpu_instance]
+
+    minimal = {
+        "best_for": ["Small ML models", "Multi-GPU training", "FP64 calculations", "NVLINK"],
+        "cpu": {"description": "6 CPU", "number_of_cores": 6},
+        "deploy_warning": None,
+        "description": "Dedicated Hardware Instance",
+        "gpu": {"description": "1x NVidia Tesla V100 16GB", "number_of_gpus": 1},
+        "gpu_memory": {"description": "16GB GPU RAM", "size_in_gigabytes": 16},
+        "id": "04cf5dc1-a5d2-4972-ae4e-d429115d055b",
+        "instance_type": "1V100.6V",
+        "memory": {"description": "23GB RAM", "size_in_gigabytes": 23},
+        "model": "Tesla V100",
+        "name": "NVidia Tesla V100 16GB",
+        "p2p": "",
+        "price_per_hour": "0.89",
+        "spot_price": "0.25",
+        "storage": {"description": "225GB NVME", "size_in_gigabytes": 225},
+    }
+
+    return [one_gpu, two_gpu, cpu_instance, minimal]
 
 
 @pytest.fixture
@@ -207,6 +228,56 @@ def test_available_query(mocker, raw_instance_types):
         spot=False,
         provider="datacrunch",
     )
+    assert [r for r in query_result if r.spot] == [expected_spot]
+    assert [r for r in query_result if not r.spot] == [expected_non_spot]
+
+
+def test_available_query_with_instance(mocker, raw_instance_types):
+    catalog = Catalog(fill_missing=False, auto_reload=False)
+
+    instance_type = instance_types(raw_instance_types[-1])
+    print(instance_type)
+
+    mocker.patch("datacrunch.DataCrunchClient.__init__", return_value=None)
+    datacrunch = DataCrunchProvider("EXAMPLE", "EXAMPLE")
+    datacrunch._get_instance_types = mocker.Mock(return_value=[instance_type])
+    datacrunch._get_locations = mocker.Mock(return_value=[{"code": "FIN-01"}])
+
+    internal_catalog.ONLINE_PROVIDERS = ["datacrunch"]
+    internal_catalog.OFFLINE_PROVIDERS = []
+
+    catalog.add_provider(datacrunch)
+    query_result = catalog.query(provider=["datacrunch"])
+
+    print(query_result)
+
+    assert len(query_result) == 2
+
+    expected_spot = CatalogItem(
+        instance_name="1V100.6V",
+        location="FIN-01",
+        price=0.25,
+        cpu=6,
+        memory=23.0,
+        gpu_count=1,
+        gpu_name="V100",
+        gpu_memory=16.0,
+        spot=True,
+        provider="datacrunch",
+    )
+    expected_non_spot = CatalogItem(
+        instance_name="1V100.6V",
+        location="FIN-01",
+        price=0.89,
+        cpu=6,
+        memory=23.0,
+        gpu_count=1,
+        gpu_name="V100",
+        gpu_memory=16.0,
+        spot=False,
+        provider="datacrunch",
+    )
+
     assert [r for r in query_result if r.spot] == [expected_spot]
     assert [r for r in query_result if not r.spot] == [expected_non_spot]
 
