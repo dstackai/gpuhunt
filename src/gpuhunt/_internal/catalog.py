@@ -118,12 +118,15 @@ class Catalog:
         for p in query_filter.provider or []:
             if p not in OFFLINE_PROVIDERS + ONLINE_PROVIDERS:
                 raise ValueError(f"Unknown provider: {p}")
+        loaded_online_providers = {p.NAME for p in self.providers if p.NAME in ONLINE_PROVIDERS}
 
         # fetch providers
         with ThreadPoolExecutor(max_workers=8) as executor:
             futures = []
             for provider_name in ONLINE_PROVIDERS:
-                if query_filter.provider is None or provider_name in query_filter.provider:
+                if (
+                    query_filter.provider is not None and provider_name in query_filter.provider
+                ) or (query_filter.provider is None and provider_name in loaded_online_providers):
                     futures.append(
                         executor.submit(
                             self._get_online_provider_items, provider_name, query_filter

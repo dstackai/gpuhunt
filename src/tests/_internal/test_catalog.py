@@ -1,6 +1,7 @@
 from typing import Union
 from unittest.mock import Mock
 
+import gpuhunt._internal.catalog as internal_catalog
 from gpuhunt import Catalog, CatalogItem, RawCatalogItem
 from gpuhunt.providers.tensordock import TensorDockProvider
 from gpuhunt.providers.vastai import VastAIProvider
@@ -23,6 +24,18 @@ class TestQuery:
             catalog_item(provider="vastai", price=2),
             catalog_item(provider="vastai", price=1),
             catalog_item(provider="tensordock", price=3),
+        ]
+
+    def test_no_providers_some_not_loaded(self):
+        catalog = Catalog(fill_missing=False, auto_reload=False)
+
+        tensordock = TensorDockProvider()
+        tensordock.get = Mock(return_value=[catalog_item(price=1)])
+        catalog.add_provider(tensordock)
+
+        internal_catalog.OFFLINE_PROVIDERS = []
+        assert catalog.query() == [
+            catalog_item(provider="tensordock", price=1),
         ]
 
 
