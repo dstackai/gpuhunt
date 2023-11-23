@@ -59,7 +59,10 @@ dev = [
 version = {attr = "gpuhunt.version.__version__"}
 
 [tool.ruff]
-select = ["UP006", "UP007"]
+select = ["UP006", "UP007", "F401", "F402", "F841"]
 
 [tool.ruff.lint.pyupgrade]
 keep-runtime-typing = true
+
+[tool.ruff.per-file-ignores]
+"src/gpuhunt/__init__.py" = ["F401"]
