@@ -8,7 +8,9 @@ class AbstractProvider(ABC):
     NAME: str = "abstract"
 
     @abstractmethod
-    def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
+    def get(
+        self, query_filter: Optional[QueryFilter] = None, fill_missing: bool = True
+    ) -> List[RawCatalogItem]:
         pass
 
     @classmethod

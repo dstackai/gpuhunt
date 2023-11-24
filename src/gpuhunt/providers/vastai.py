@@ -21,7 +21,9 @@ class VastAIProvider(AbstractProvider):
     def __init__(self, extra_filters: Optional[Dict[str, Dict[Operators, FilterValue]]] = None):
         self.extra_filters = extra_filters
 
-    def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
+    def get(
+        self, query_filter: Optional[QueryFilter] = None, fill_missing: bool = True
+    ) -> List[RawCatalogItem]:
         filters: Dict[str, Any] = self.make_filters(query_filter or QueryFilter())
         if self.extra_filters:
             for key, constraints in self.extra_filters.items():

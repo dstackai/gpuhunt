@@ -133,7 +133,9 @@ class AzureProvider(AbstractProvider):
         finally:
             q.put(None)
 
-    def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
+    def get(
+        self, query_filter: Optional[QueryFilter] = None, fill_missing: bool = True
+    ) -> List[RawCatalogItem]:
         offers = []
         for page in self.get_pages():
             for item in page:

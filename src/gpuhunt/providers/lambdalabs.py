@@ -31,7 +31,9 @@ class LambdaLabsProvider(AbstractProvider):
     def __init__(self, token: str):
         self.token = token
 
-    def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
+    def get(
+        self, query_filter: Optional[QueryFilter] = None, fill_missing: bool = True
+    ) -> List[RawCatalogItem]:
         offers = []
         data = requests.get(
             instance_types_url, headers={"Authorization": f"Bearer {self.token}"}

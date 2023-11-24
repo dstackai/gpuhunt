@@ -16,7 +16,9 @@ class DataCrunchProvider(AbstractProvider):
     def __init__(self, client_id: str, client_secret: str) -> None:
         self.datacrunch_client = DataCrunchClient(client_id, client_secret)
 
-    def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
+    def get(
+        self, query_filter: Optional[QueryFilter] = None, fill_missing: bool = True
+    ) -> List[RawCatalogItem]:
         instance_types = self._get_instance_types()
         locations = self._get_locations()
 
