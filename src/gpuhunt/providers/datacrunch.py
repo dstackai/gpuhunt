@@ -24,7 +24,7 @@ class DataCrunchProvider(AbstractProvider):
         location_codes = [loc["code"] for loc in locations]
         instances = generate_instances(spots, location_codes, instance_types)
 
-        return instances
+        return sorted(instances, key=lambda x: x.price)
 
     def _get_instance_types(self) -> List[InstanceType]:
         return self.datacrunch_client.instance_types.get()
