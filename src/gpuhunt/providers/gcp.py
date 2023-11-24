@@ -204,7 +204,9 @@ class GCPProvider(AbstractProvider):
                 offers.append(offer)
         return offers
 
-    def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
+    def get(
+        self, query_filter: Optional[QueryFilter] = None, fill_missing: bool = True
+    ) -> List[RawCatalogItem]:
         instances = self.list_preconfigured_instances()
         self.add_gpus(instances)
         offers = self.fill_prices(instances)

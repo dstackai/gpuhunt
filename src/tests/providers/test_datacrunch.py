@@ -338,6 +338,6 @@ def test_order(mocker, raw_instance_types):
     catalog.add_provider(datacrunch)
     query_result = catalog.query(provider=["datacrunch"])
 
-    assert len(query_result) == 6
+    assert len(query_result) == 8
 
     assert [r.price for r in query_result] == sorted(r.price for r in query_result)

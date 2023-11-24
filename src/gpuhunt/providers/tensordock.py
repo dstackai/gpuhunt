@@ -3,6 +3,7 @@ from typing import List, Optional, Union
 
 import requests
 
+from gpuhunt._internal.constraints import fill_missing as constraints_fill_missing
 from gpuhunt._internal.constraints import get_compute_capability, is_between, optimize
 from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
@@ -34,8 +35,15 @@ marketplace_gpus = {
 class TensorDockProvider(AbstractProvider):
     NAME = "tensordock"
 
-    def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
+    def get(
+        self, query_filter: Optional[QueryFilter] = None, fill_missing: bool = True
+    ) -> List[RawCatalogItem]:
         logger.info("Fetching TensorDock offers")
+
+        if self.fill_missing:
+            query_filter = constraints_fill_missing(query_filter)
+            logger.debug("Effective query filter: %s", query_filter)
+
         hostnodes = requests.get(marketplace_hostnodes_url).json()["hostnodes"]
         offers = []
         for hostnode, details in hostnodes.items():

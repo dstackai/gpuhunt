@@ -111,9 +111,6 @@ class Catalog:
             max_compute_capability=parse_compute_capability(max_compute_capability),
             spot=spot,
         )
-        FILL_MISSING_MAP = {None: constraints.dummy_fill_missing}
-        FILL_MISSING_MAP.update({key: constraints.dummy_fill_missing for key in OFFLINE_PROVIDERS})
-        FILL_MISSING_MAP.update({key: constraints.fill_missing for key in ONLINE_PROVIDERS})
 
         if query_filter.provider is not None:
             # validate providers
@@ -131,31 +128,23 @@ class Catalog:
 
             for provider_name in ONLINE_PROVIDERS:
                 if provider_name in query_filter.provider:
-                    online_query_filter = constraints.dummy_fill_missing(query_filter)
-
-                    if self.fill_missing:
-                        provider_fill_missing = FILL_MISSING_MAP[provider_name]
-                        online_query_filter = provider_fill_missing(query_filter)
-                        logger.debug("Effective query filter: %s", online_query_filter)
-
                     futures.append(
                         executor.submit(
-                            self._get_online_provider_items, provider_name, online_query_filter
+                            self._get_online_provider_items,
+                            provider_name,
+                            query_filter,
+                            self.fill_missing,
                         )
                     )
 
             for provider_name in OFFLINE_PROVIDERS:
                 if provider_name in query_filter.provider:
-                    offline_query_filter = constraints.dummy_fill_missing(query_filter)
-
-                    if self.fill_missing:
-                        provider_fill_missing = FILL_MISSING_MAP[provider_name]
-                        offline_query_filter = provider_fill_missing(query_filter)
-                        logger.debug("Effective query filter: %s", offline_query_filter)
-
                     futures.append(
                         executor.submit(
-                            self._get_offline_provider_items, provider_name, offline_query_filter
+                            self._get_offline_provider_items,
+                            provider_name,
+                            query_filter,
+                            self.fill_missing,
                         )
                     )
 
@@ -197,7 +186,7 @@ class Catalog:
         self.providers.append(provider)
 
     def _get_offline_provider_items(
-        self, provider_name: str, query_filter: QueryFilter
+        self, provider_name: str, query_filter: QueryFilter, fill_missing: bool
     ) -> List[CatalogItem]:
         logger.debug("Loading items for offline provider %s", provider_name)
 
@@ -219,7 +208,7 @@ class Catalog:
         return items
 
     def _get_online_provider_items(
-        self, provider_name: str, query_filter: QueryFilter
+        self, provider_name: str, query_filter: QueryFilter, fill_missing: bool
     ) -> List[CatalogItem]:
         logger.debug("Loading items for online provider %s", provider_name)
         items = []
@@ -228,7 +217,7 @@ class Catalog:
             if provider.NAME != provider_name:
                 continue
             found = True
-            for i in provider.get(query_filter=query_filter):
+            for i in provider.get(query_filter=query_filter, fill_missing=fill_missing):
                 item = CatalogItem(provider=provider_name, **dataclasses.asdict(i))
                 if constraints.matches(item, query_filter):
                     items.append(item)

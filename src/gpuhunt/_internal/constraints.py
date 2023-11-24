@@ -4,11 +4,6 @@ from typing import Optional, Tuple, TypeVar, Union
 from gpuhunt._internal.models import CatalogItem, GPUInfo, QueryFilter
 
 
-def dummy_fill_missing(query_filter: QueryFilter, *, memory_per_core: int = 6) -> QueryFilter:
-    query_filter = copy.deepcopy(query_filter)
-    return query_filter
-
-
 def fill_missing(q: QueryFilter, *, memory_per_core: int = 6) -> QueryFilter:
     q = copy.deepcopy(q)
 
