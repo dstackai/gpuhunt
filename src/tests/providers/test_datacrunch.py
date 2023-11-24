@@ -249,3 +249,24 @@ def test_cpu_instance(raw_instance_types):
     )
 
     assert RawCatalogItem.from_dict(item) == expected
+
+
+def test_order(mocker, raw_instance_types):
+    catalog = Catalog(fill_missing=False, auto_reload=False)
+
+    types = map(instance_types, raw_instance_types)
+
+    mocker.patch("datacrunch.DataCrunchClient.__init__", return_value=None)
+    datacrunch = DataCrunchProvider("EXAMPLE", "EXAMPLE")
+    datacrunch._get_instance_types = mocker.Mock(return_value=list(types))
+    datacrunch._get_locations = mocker.Mock(return_value=[{"code": "FIN-01"}])
+
+    internal_catalog.ONLINE_PROVIDERS = ["datacrunch"]
+    internal_catalog.OFFLINE_PROVIDERS = []
+
+    catalog.add_provider(datacrunch)
+    query_result = catalog.query(provider=["datacrunch"])
+
+    assert len(query_result) == 6
+
+    assert [r.price for r in query_result] == sorted(r.price for r in query_result)
