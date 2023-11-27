@@ -29,7 +29,7 @@ def specs() -> dict:
 class TestTensorDockMinimalConfiguration:
     def test_no_requirements(self, specs: dict):
         offers = TensorDockProvider.optimize_offers(QueryFilter(), specs, "", "")
-        assert offers == make_offers(specs, cpu=1, memory=2, disk_size=30, gpu_count=1)
+        assert offers == make_offers(specs, cpu=2, memory=2, disk_size=30, gpu_count=1)
 
     def test_min_cpu(self, specs: dict):
         offers = TensorDockProvider.optimize_offers(QueryFilter(min_cpu=4), specs, "", "")
@@ -41,7 +41,7 @@ class TestTensorDockMinimalConfiguration:
 
     def test_min_memory(self, specs: dict):
         offers = TensorDockProvider.optimize_offers(QueryFilter(min_memory=3), specs, "", "")
-        assert offers == make_offers(specs, cpu=1, memory=4, disk_size=30, gpu_count=1)
+        assert offers == make_offers(specs, cpu=2, memory=4, disk_size=30, gpu_count=1)
 
     def test_too_large_min_memory(self, specs: dict):
         offers = TensorDockProvider.optimize_offers(QueryFilter(min_memory=2000), specs, "", "")
@@ -55,7 +55,7 @@ class TestTensorDockMinimalConfiguration:
 
     def test_min_gpu_count(self, specs: dict):
         offers = TensorDockProvider.optimize_offers(QueryFilter(min_gpu_count=2), specs, "", "")
-        assert offers == make_offers(specs, cpu=1, memory=2, disk_size=30, gpu_count=2)
+        assert offers == make_offers(specs, cpu=2, memory=2, disk_size=30, gpu_count=2)
 
     def test_min_no_gpu(self, specs: dict):
         offers = TensorDockProvider.optimize_offers(QueryFilter(max_gpu_count=0), specs, "", "")
@@ -65,7 +65,7 @@ class TestTensorDockMinimalConfiguration:
         offers = TensorDockProvider.optimize_offers(
             QueryFilter(min_total_gpu_memory=100), specs, "", ""
         )
-        assert offers == make_offers(specs, cpu=1, memory=2, disk_size=30, gpu_count=3)
+        assert offers == make_offers(specs, cpu=2, memory=2, disk_size=30, gpu_count=3)
 
     def test_controversial_gpu(self, specs: dict):
         offers = TensorDockProvider.optimize_offers(
