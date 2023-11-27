@@ -40,7 +40,7 @@ class TensorDockProvider(AbstractProvider):
     ) -> List[RawCatalogItem]:
         logger.info("Fetching TensorDock offers")
 
-        if self.fill_missing:
+        if fill_missing:
             query_filter = constraints_fill_missing(query_filter)
             logger.debug("Effective query filter: %s", query_filter)
 
@@ -67,7 +67,7 @@ class TensorDockProvider(AbstractProvider):
                                 + gpu["amount"] * gpu["price"],
                                 5,
                             ),
-                            cpu=details["specs"]["cpu"]["amount"],
+                            cpu=round_down(details["specs"]["cpu"]["amount"], 2),
                             memory=float(round_down(details["specs"]["ram"]["amount"], 2)),
                             gpu_count=gpu["amount"],
                             gpu_name=convert_gpu_name(gpu_name),
@@ -75,7 +75,7 @@ class TensorDockProvider(AbstractProvider):
                             spot=False,
                         )
                     )
-        return offers
+        return sorted(offers, key=lambda i: i.price)
 
     @staticmethod
     def optimize_offers(
@@ -105,10 +105,10 @@ class TensorDockProvider(AbstractProvider):
                     continue
                 # we can't take 100% of CPU/RAM/storage if we don't take all GPUs
                 multiplier = 0.75 if gpu_count < gpu_info["amount"] else 1
-                cpu = optimize(
-                    int(multiplier * specs["cpu"]["amount"]),
-                    q.min_cpu or 1,
-                    q.max_cpu,
+                cpu = optimize(  # has to be even
+                    round_down(int(multiplier * specs["cpu"]["amount"]), 2),
+                    round_up(q.min_cpu or 1, 2),
+                    round_down(q.max_cpu, 2) if q.max_memory is not None else None,
                 )
                 memory = optimize(  # has to be even
                     round_down(int(multiplier * specs["ram"]["amount"]), 2),
@@ -142,7 +142,7 @@ class TensorDockProvider(AbstractProvider):
                 )
                 offers.append(offer)
                 break  # stop increasing gpu count
-        return sorted(offers, key=lambda i: i.price)
+        return offers
 
 
 def round_up(value: Union[int, float], step: int) -> int:
