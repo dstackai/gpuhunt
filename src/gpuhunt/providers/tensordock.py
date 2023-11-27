@@ -108,7 +108,7 @@ class TensorDockProvider(AbstractProvider):
                 cpu = optimize(  # has to be even
                     round_down(int(multiplier * specs["cpu"]["amount"]), 2),
                     round_up(q.min_cpu or 1, 2),
-                    round_down(q.max_cpu, 2) if q.max_memory is not None else None,
+                    round_down(q.max_cpu, 2) if q.max_cpu is not None else None,
                 )
                 memory = optimize(  # has to be even
                     round_down(int(multiplier * specs["ram"]["amount"]), 2),
