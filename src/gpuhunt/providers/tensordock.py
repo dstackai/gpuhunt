@@ -219,7 +219,7 @@ def round_down(value: Optional[Union[int, float]], step: int) -> Optional[int]:
     return value // step * step
 
 
-T = TypeVar("T", bound=[int, float])
+T = TypeVar("T", bound=Union[int, float])
 
 
 def min_none(*args: Optional[T]) -> T:
