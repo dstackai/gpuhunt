@@ -3,7 +3,7 @@ from typing import List
 import pytest
 
 from gpuhunt import CatalogItem, QueryFilter
-from gpuhunt._internal.constraints import fill_missing, matches
+from gpuhunt._internal.constraints import matches
 
 
 @pytest.fixture
@@ -123,75 +123,3 @@ class TestMatches:
     def test_provider(self, cpu_items):
         assert matches(cpu_items[0], QueryFilter(provider=["datacrunch"]))
         assert matches(cpu_items[1], QueryFilter(provider=["nebius"]))
-
-
-class TestFillMissing:
-    def test_empty(self):
-        assert fill_missing(QueryFilter(), memory_per_core=4) == QueryFilter()
-
-    def test_from_cpu(self):
-        assert fill_missing(QueryFilter(min_cpu=2), memory_per_core=4) == QueryFilter(
-            min_cpu=2,
-            min_memory=8,
-        )
-
-    def test_from_memory(self):
-        assert fill_missing(QueryFilter(min_memory=6), memory_per_core=4) == QueryFilter(
-            min_memory=6,
-            min_cpu=2,
-        )
-
-    def test_from_total_gpu_memory(self):
-        assert fill_missing(
-            QueryFilter(min_total_gpu_memory=24), memory_per_core=4
-        ) == QueryFilter(
-            min_total_gpu_memory=24,
-            min_memory=48,
-            min_disk_size=54,
-            min_cpu=12,
-        )
-
-    def test_from_gpu_memory(self):
-        assert fill_missing(QueryFilter(min_gpu_memory=16), memory_per_core=4) == QueryFilter(
-            min_gpu_memory=16,
-            min_memory=32,
-            min_disk_size=46,
-            min_cpu=8,
-        )
-
-    def test_from_gpu_count(self):
-        assert fill_missing(QueryFilter(min_gpu_count=2), memory_per_core=4) == QueryFilter(
-            min_gpu_count=2,
-            min_memory=32,  # minimal GPU has 8 GB of memory
-            min_disk_size=46,
-            min_cpu=8,
-        )
-
-    def test_from_gpu_name(self):
-        assert fill_missing(QueryFilter(gpu_name=["A100"]), memory_per_core=4) == QueryFilter(
-            gpu_name=["A100"],
-            min_memory=80,
-            min_disk_size=70,
-            min_cpu=20,
-        )
-
-    def test_from_compute_capability(self):
-        assert fill_missing(
-            QueryFilter(min_compute_capability=(9, 0)), memory_per_core=4
-        ) == QueryFilter(
-            min_compute_capability=(9, 0),
-            min_memory=160,
-            min_disk_size=110,
-            min_cpu=40,
-        )
-
-    def test_from_gpu_name_and_gpu_memory(self):
-        assert fill_missing(
-            QueryFilter(gpu_name=["A100"], min_gpu_memory=80), memory_per_core=4
-        ) == QueryFilter(
-            gpu_name=["A100"],
-            min_gpu_memory=80,
-            min_memory=160,
-            min_disk_size=110,
-            min_cpu=40,
-        )

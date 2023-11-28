@@ -187,7 +187,7 @@ def transform(raw_catalog_items: List[RawCatalogItem]) -> List[CatalogItem]:
 
 
 def test_available_query(mocker, raw_instance_types):
-    catalog = Catalog(fill_missing=False, auto_reload=False)
+    catalog = Catalog(balance_resources=False, auto_reload=False)
 
     instance_type = instance_types(raw_instance_types[0])
 
@@ -233,7 +233,7 @@ def test_available_query(mocker, raw_instance_types):
 
 
 def test_available_query_with_instance(mocker, raw_instance_types):
-    catalog = Catalog(fill_missing=False, auto_reload=False)
+    catalog = Catalog(balance_resources=False, auto_reload=False)
 
     instance_type = instance_types(raw_instance_types[-1])
     print(instance_type)
@@ -323,7 +323,7 @@ def test_cpu_instance(raw_instance_types):
 
 
 def test_order(mocker, raw_instance_types):
-    catalog = Catalog(fill_missing=False, auto_reload=False)
+    catalog = Catalog(balance_resources=False, auto_reload=False)
 
     types = map(instance_types, raw_instance_types)
 

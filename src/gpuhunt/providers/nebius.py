@@ -79,7 +79,7 @@ class NebiusProvider(AbstractProvider):
         self.api_client = NebiusAPIClient(service_account)
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, fill_missing: bool = True
+        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
     ) -> List[RawCatalogItem]:
         zone = self.api_client.compute_zones_list()[0]["id"]
         skus = []

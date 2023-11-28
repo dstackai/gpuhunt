@@ -9,7 +9,7 @@ from gpuhunt.providers.vastai import VastAIProvider
 
 class TestQuery:
     def test_query_merge(self):
-        catalog = Catalog(fill_missing=False, auto_reload=False)
+        catalog = Catalog(balance_resources=False, auto_reload=False)
 
         tensordock = TensorDockProvider()
         tensordock.get = Mock(return_value=[catalog_item(price=1), catalog_item(price=3)])
@@ -27,7 +27,7 @@ class TestQuery:
         ]
 
     def test_no_providers_some_not_loaded(self):
-        catalog = Catalog(fill_missing=False, auto_reload=False)
+        catalog = Catalog(balance_resources=False, auto_reload=False)
 
         tensordock = TensorDockProvider()
         tensordock.get = Mock(return_value=[catalog_item(price=1)])
