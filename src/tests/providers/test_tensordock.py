@@ -31,17 +31,29 @@ class TestTensorDockMinimalConfiguration:
         offers = TensorDockProvider.optimize_offers(QueryFilter(), specs, "", "")
         assert offers == make_offers(specs, cpu=16, memory=96, disk_size=96, gpu_count=1)
 
+    def test_min_cpu_no_balance(self, specs: dict):
+        offers = TensorDockProvider.optimize_offers(
+            QueryFilter(min_cpu=4), specs, "", "", balance_resources=False
+        )
+        assert offers == make_offers(specs, cpu=4, memory=96, disk_size=96, gpu_count=1)
+
     def test_min_cpu(self, specs: dict):
         offers = TensorDockProvider.optimize_offers(QueryFilter(min_cpu=4), specs, "", "")
-        assert offers == make_offers(specs, cpu=4, memory=96, disk_size=96, gpu_count=1)
+        assert offers == make_offers(specs, cpu=16, memory=96, disk_size=96, gpu_count=1)
 
     def test_too_many_min_cpu(self, specs: dict):
         offers = TensorDockProvider.optimize_offers(QueryFilter(min_cpu=1000), specs, "", "")
         assert offers == []
 
+    def test_min_memory_no_balance(self, specs: dict):
+        offers = TensorDockProvider.optimize_offers(
+            QueryFilter(min_memory=3), specs, "", "", balance_resources=False
+        )
+        assert offers == make_offers(specs, cpu=2, memory=4, disk_size=48, gpu_count=1)
+
     def test_min_memory(self, specs: dict):
         offers = TensorDockProvider.optimize_offers(QueryFilter(min_memory=3), specs, "", "")
-        assert offers == make_offers(specs, cpu=2, memory=4, disk_size=48, gpu_count=1)
+        assert offers == make_offers(specs, cpu=16, memory=96, disk_size=96, gpu_count=1)
 
     def test_too_large_min_memory(self, specs: dict):
         offers = TensorDockProvider.optimize_offers(QueryFilter(min_memory=2000), specs, "", "")

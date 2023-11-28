@@ -1,6 +1,6 @@
 import logging
 from math import ceil
-from typing import List, Optional, Union
+from typing import List, Optional, TypeVar, Union
 
 import requests
 
@@ -43,7 +43,6 @@ class TensorDockProvider(AbstractProvider):
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
     ) -> List[RawCatalogItem]:
-        # TODO(egor-s) use balance_resources
         logger.info("Fetching TensorDock offers")
 
         hostnodes = requests.get(marketplace_hostnodes_url).json()["hostnodes"]
@@ -51,7 +50,13 @@ class TensorDockProvider(AbstractProvider):
         for hostnode, details in hostnodes.items():
             location = details["location"]["country"].lower().replace(" ", "")
             if query_filter is not None:
-                offers += self.optimize_offers(query_filter, details["specs"], hostnode, location)
+                offers += self.optimize_offers(
+                    query_filter,
+                    details["specs"],
+                    hostnode,
+                    location,
+                    balance_resources=balance_resources,
+                )
             else:  # pick maximum possible configuration
                 for gpu_name, gpu in details["specs"]["gpu"].items():
                     if gpu["amount"] == 0:
@@ -81,11 +86,22 @@ class TensorDockProvider(AbstractProvider):
 
     @staticmethod
     def optimize_offers(
-        q: QueryFilter, specs: dict, instance_name: str, location: str
+        q: QueryFilter,
+        specs: dict,
+        instance_name: str,
+        location: str,
+        balance_resources: bool = True,
     ) -> List[RawCatalogItem]:
         """
         Picks the best offer for the given query filter
         Doesn't respect max values, additional filtering is required
+
+        Args:
+            q: query filter
+            specs: hostnode specs
+            instance_name: hostnode `instance_name`
+            location: hostnode `location`
+            balance_resources: if True, will override query filter min values
         """
         offers = []
         for gpu_model, gpu_info in specs["gpu"].items():
@@ -114,47 +130,58 @@ class TensorDockProvider(AbstractProvider):
                 available_cpu = round_down(multiplier * specs["cpu"]["amount"], CPU_DIV)
                 available_disk = int(multiplier * specs["storage"]["amount"])
 
+                memory = None
                 if q.min_memory is not None:
                     if q.min_memory > available_memory:
                         continue
-                    values = [
-                        q.min_memory,
-                        gpu_count,  # 1 GB per GPU at least
-                        q.min_cpu,  # 1 GB per CPU at least
-                    ]
-                    memory = round_up(max(v for v in values if v is not None), RAM_DIV)
-                else:
-                    values = [
-                        available_memory,
-                        round_up(RAM_PER_VRAM * total_gpu_memory, RAM_DIV),
-                        round_down(q.max_memory, RAM_DIV),  # can be None
-                    ]
-                    memory = min(v for v in values if v is not None)
+                    memory = round_up(
+                        max_none(
+                            q.min_memory,
+                            gpu_count,  # 1 GB per GPU at least
+                            q.min_cpu,  # 1 GB per CPU at least
+                        ),
+                        RAM_DIV,
+                    )
+                if memory is None or balance_resources:
+                    memory = max_none(
+                        memory,
+                        min_none(
+                            available_memory,
+                            round_up(RAM_PER_VRAM * total_gpu_memory, RAM_DIV),
+                            round_down(q.max_memory, RAM_DIV),  # can be None
+                        ),
+                    )
 
+                cpu = None
                 if q.min_cpu is not None:
                     if q.min_cpu > available_cpu:
                         continue
                     # 1 CPU per GPU at least
                     cpu = round_up(max(q.min_cpu, gpu_count), CPU_DIV)
-                else:
-                    values = [
-                        available_cpu,
-                        round_up(ceil(memory / RAM_PER_CORE), CPU_DIV),
-                        round_down(q.max_cpu, CPU_DIV),  # can be None
-                    ]
-                    cpu = min(v for v in values if v is not None)
+                if cpu is None or balance_resources:
+                    cpu = max_none(
+                        cpu,
+                        min_none(
+                            available_cpu,
+                            round_up(ceil(memory / RAM_PER_CORE), CPU_DIV),
+                            round_down(q.max_cpu, CPU_DIV),  # can be None
+                        ),
+                    )
 
+                disk_size = None
                 if q.min_disk_size is not None:
                     if q.min_disk_size > available_disk:
                         continue
                     disk_size = q.min_disk_size
-                else:
-                    values = [
-                        available_disk,
-                        max(memory, total_gpu_memory),
-                        q.max_disk_size,  # can be None
-                    ]
-                    disk_size = min(v for v in values if v is not None)
+                if disk_size is None or balance_resources:
+                    disk_size = max_none(
+                        disk_size,
+                        min_none(
+                            available_disk,
+                            max(memory, total_gpu_memory),
+                            q.max_disk_size,  # can be None
+                        ),
+                    )
 
                 price = round(
                     memory * specs["ram"]["price"]
@@ -190,6 +217,17 @@ def round_down(value: Optional[Union[int, float]], step: int) -> Optional[int]:
     if value is None:
         return None
     return value // step * step
+
+
+T = TypeVar("T", bound=[int, float])
+
+
+def min_none(*args: Optional[T]) -> T:
+    return min(v for v in args if v is not None)
+
+
+def max_none(*args: Optional[T]) -> T:
+    return max(v for v in args if v is not None)
 
 
 def convert_gpu_name(model: str) -> str:
