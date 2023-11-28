@@ -32,7 +32,7 @@ marketplace_gpus = {
 }
 
 RAM_PER_VRAM = 2
-RAM_PER_CORE = 6
+RAM_PER_CORE = 4
 CPU_DIV = 2  # has to be even
 RAM_DIV = 2  # has to be even
 
