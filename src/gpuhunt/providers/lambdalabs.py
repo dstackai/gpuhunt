@@ -32,7 +32,7 @@ class LambdaLabsProvider(AbstractProvider):
         self.token = token
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, fill_missing: bool = True
+        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
     ) -> List[RawCatalogItem]:
         offers = []
         data = requests.get(

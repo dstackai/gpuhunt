@@ -22,7 +22,7 @@ class VastAIProvider(AbstractProvider):
         self.extra_filters = extra_filters
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, fill_missing: bool = True
+        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
     ) -> List[RawCatalogItem]:
         filters: Dict[str, Any] = self.make_filters(query_filter or QueryFilter())
         if self.extra_filters:

@@ -1,10 +1,10 @@
 import logging
+from math import ceil
 from typing import List, Optional, Union
 
 import requests
 
-from gpuhunt._internal.constraints import fill_missing as constraints_fill_missing
-from gpuhunt._internal.constraints import get_compute_capability, is_between, optimize
+from gpuhunt._internal.constraints import get_compute_capability, is_between
 from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
@@ -31,18 +31,20 @@ marketplace_gpus = {
     "v100-pcie-16gb": "V100",
 }
 
+RAM_PER_VRAM = 2
+RAM_PER_CORE = 6
+CPU_DIV = 2  # has to be even
+RAM_DIV = 2  # has to be even
+
 
 class TensorDockProvider(AbstractProvider):
     NAME = "tensordock"
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, fill_missing: bool = True
+        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
     ) -> List[RawCatalogItem]:
+        # TODO(egor-s) use balance_resources
         logger.info("Fetching TensorDock offers")
-
-        if fill_missing:
-            query_filter = constraints_fill_missing(query_filter)
-            logger.debug("Effective query filter: %s", query_filter)
 
         hostnodes = requests.get(marketplace_hostnodes_url).json()["hostnodes"]
         offers = []
@@ -50,7 +52,7 @@ class TensorDockProvider(AbstractProvider):
             location = details["location"]["country"].lower().replace(" ", "")
             if query_filter is not None:
                 offers += self.optimize_offers(query_filter, details["specs"], hostnode, location)
-            else:
+            else:  # pick maximum possible configuration
                 for gpu_name, gpu in details["specs"]["gpu"].items():
                     if gpu["amount"] == 0:
                         continue
@@ -81,6 +83,10 @@ class TensorDockProvider(AbstractProvider):
     def optimize_offers(
         q: QueryFilter, specs: dict, instance_name: str, location: str
     ) -> List[RawCatalogItem]:
+        """
+        Picks the best offer for the given query filter
+        Doesn't respect max values, additional filtering is required
+        """
         offers = []
         for gpu_model, gpu_info in specs["gpu"].items():
             # filter by single gpu characteristics
@@ -89,46 +95,75 @@ class TensorDockProvider(AbstractProvider):
             gpu_name = convert_gpu_name(gpu_model)
             if q.gpu_name is not None and gpu_name.lower() not in q.gpu_name:
                 continue
-            if q.min_compute_capability is not None or q.max_compute_capability is not None:
-                cc = get_compute_capability(gpu_name)
-                if not cc or not is_between(
-                    cc, q.min_compute_capability, q.max_compute_capability
-                ):
-                    continue
+            cc = get_compute_capability(gpu_name)
+            if not cc or not is_between(cc, q.min_compute_capability, q.max_compute_capability):
+                continue
 
             for gpu_count in range(1, gpu_info["amount"] + 1):  # try all possible gpu counts
                 if not is_between(gpu_count, q.min_gpu_count, q.max_gpu_count):
                     continue
+                total_gpu_memory = gpu_count * gpu_info["vram"]
                 if not is_between(
-                    gpu_count * gpu_info["vram"], q.min_total_gpu_memory, q.max_total_gpu_memory
+                    total_gpu_memory, q.min_total_gpu_memory, q.max_total_gpu_memory
                 ):
                     continue
+
                 # we can't take 100% of CPU/RAM/storage if we don't take all GPUs
                 multiplier = 0.75 if gpu_count < gpu_info["amount"] else 1
-                cpu = optimize(  # has to be even
-                    round_down(int(multiplier * specs["cpu"]["amount"]), 2),
-                    round_up(q.min_cpu or 1, 2),
-                    round_down(q.max_cpu, 2) if q.max_cpu is not None else None,
-                )
-                memory = optimize(  # has to be even
-                    round_down(int(multiplier * specs["ram"]["amount"]), 2),
-                    round_up(q.min_memory or 1, 2),
-                    round_down(q.max_memory, 2) if q.max_memory is not None else None,
-                )
-                disk_size = optimize(  # 30 GB at least for Ubuntu
-                    int(multiplier * specs["storage"]["amount"]),
-                    q.min_disk_size or 30,
-                    q.max_disk_size,
-                )
-                if cpu is None or memory is None or disk_size is None:
-                    continue
+                available_memory = round_down(multiplier * specs["ram"]["amount"], RAM_DIV)
+                available_cpu = round_down(multiplier * specs["cpu"]["amount"], CPU_DIV)
+                available_disk = int(multiplier * specs["storage"]["amount"])
+
+                if q.min_memory is not None:
+                    if q.min_memory > available_memory:
+                        continue
+                    values = [
+                        q.min_memory,
+                        gpu_count,  # 1 GB per GPU at least
+                        q.min_cpu,  # 1 GB per CPU at least
+                    ]
+                    memory = round_up(max(v for v in values if v is not None), RAM_DIV)
+                else:
+                    values = [
+                        available_memory,
+                        round_up(RAM_PER_VRAM * total_gpu_memory, RAM_DIV),
+                        round_down(q.max_memory, RAM_DIV),  # can be None
+                    ]
+                    memory = min(v for v in values if v is not None)
+
+                if q.min_cpu is not None:
+                    if q.min_cpu > available_cpu:
+                        continue
+                    # 1 CPU per GPU at least
+                    cpu = round_up(max(q.min_cpu, gpu_count), CPU_DIV)
+                else:
+                    values = [
+                        available_cpu,
+                        round_up(ceil(memory / RAM_PER_CORE), CPU_DIV),
+                        round_down(q.max_cpu, CPU_DIV),  # can be None
+                    ]
+                    cpu = min(v for v in values if v is not None)
+
+                if q.min_disk_size is not None:
+                    if q.min_disk_size > available_disk:
+                        continue
+                    disk_size = q.min_disk_size
+                else:
+                    values = [
+                        available_disk,
+                        max(memory, total_gpu_memory),
+                        q.max_disk_size,  # can be None
+                    ]
+                    disk_size = min(v for v in values if v is not None)
+
                 price = round(
-                    cpu * specs["cpu"]["price"]
-                    + memory * specs["ram"]["price"]
+                    memory * specs["ram"]["price"]
+                    + cpu * specs["cpu"]["price"]
                     + disk_size * specs["storage"]["price"]
                     + gpu_count * gpu_info["price"],
                     5,
                 )
+
                 offer = RawCatalogItem(
                     instance_name=instance_name,
                     location=location,
@@ -145,11 +180,15 @@ class TensorDockProvider(AbstractProvider):
         return offers
 
 
-def round_up(value: Union[int, float], step: int) -> int:
+def round_up(value: Optional[Union[int, float]], step: int) -> Optional[int]:
+    if value is None:
+        return None
     return round_down(value + step - 1, step)
 
 
-def round_down(value: Union[int, float], step: int) -> int:
+def round_down(value: Optional[Union[int, float]], step: int) -> Optional[int]:
+    if value is None:
+        return None
     return value // step * step
 
 

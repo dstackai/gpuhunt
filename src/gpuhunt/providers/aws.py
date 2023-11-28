@@ -69,7 +69,9 @@ class AWSProvider(AbstractProvider):
             "p4de.24xlarge": ("A100", 80.0),
         }
 
-    def get(self, query_filter: Optional[QueryFilter] = None) -> List[RawCatalogItem]:
+    def get(
+        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+    ) -> List[RawCatalogItem]:
         if not os.path.exists(self.cache_path):
             logger.info("Downloading EC2 prices to %s", self.cache_path)
             with requests.get(ec2_pricing_url, stream=True) as r:

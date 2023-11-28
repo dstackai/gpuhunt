@@ -23,16 +23,16 @@ RELOAD_INTERVAL = 4 * 60 * 60  # 4 hours
 
 
 class Catalog:
-    def __init__(self, fill_missing: bool = True, auto_reload: bool = True):
+    def __init__(self, balance_resources: bool = True, auto_reload: bool = True):
         """
         Args:
-            fill_missing: derive missing constraints from other constraints
+            balance_resources: increase min resources to better match the chosen GPU
             auto_reload: if `True`, the catalog will be automatically loaded from the S3 bucket every 4 hours
         """
         self.catalog = None
         self.loaded_at = None
         self.providers: List[AbstractProvider] = []
-        self.fill_missing = fill_missing
+        self.balance_resources = balance_resources
         self.auto_reload = auto_reload
 
     def query(
@@ -133,7 +133,6 @@ class Catalog:
                             self._get_online_provider_items,
                             provider_name,
                             query_filter,
-                            self.fill_missing,
                         )
                     )
 
@@ -144,7 +143,6 @@ class Catalog:
                             self._get_offline_provider_items,
                             provider_name,
                             query_filter,
-                            self.fill_missing,
                         )
                     )
 
@@ -186,7 +184,7 @@ class Catalog:
         self.providers.append(provider)
 
     def _get_offline_provider_items(
-        self, provider_name: str, query_filter: QueryFilter, fill_missing: bool
+        self, provider_name: str, query_filter: QueryFilter
     ) -> List[CatalogItem]:
         logger.debug("Loading items for offline provider %s", provider_name)
 
@@ -208,7 +206,7 @@ class Catalog:
         return items
 
     def _get_online_provider_items(
-        self, provider_name: str, query_filter: QueryFilter, fill_missing: bool
+        self, provider_name: str, query_filter: QueryFilter
     ) -> List[CatalogItem]:
         logger.debug("Loading items for online provider %s", provider_name)
         items = []
@@ -217,7 +215,9 @@ class Catalog:
             if provider.NAME != provider_name:
                 continue
             found = True
-            for i in provider.get(query_filter=query_filter, fill_missing=fill_missing):
+            for i in provider.get(
+                query_filter=query_filter, balance_resources=self.balance_resources
+            ):
                 item = CatalogItem(provider=provider_name, **dataclasses.asdict(i))
                 if constraints.matches(item, query_filter):
                     items.append(item)
