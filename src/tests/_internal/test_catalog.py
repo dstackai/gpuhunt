@@ -50,6 +50,7 @@ def catalog_item(**kwargs) -> Union[CatalogItem, RawCatalogItem]:
         location="location",
         price=1,
         spot=False,
+        disk_size=None,
     )
     values.update(kwargs)
     if "provider" in values:

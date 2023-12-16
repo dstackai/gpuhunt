@@ -19,7 +19,12 @@ from gpuhunt.providers.datacrunch import (
 def raw_instance_types() -> List[dict]:
     # datacrunch.instance_types.get()
     one_gpu = {
-        "best_for": ["Gargantuan ML models", "Multi-GPU training", "FP64 HPC", "NVLINK"],
+        "best_for": [
+            "Gargantuan ML models",
+            "Multi-GPU training",
+            "FP64 HPC",
+            "NVLINK",
+        ],
         "cpu": {"description": "30 CPU", "number_of_cores": 30},
         "deploy_warning": "H100: Use Nvidia driver 535 or higher for best performance",
         "description": "Dedicated Hardware Instance",
@@ -73,7 +78,12 @@ def raw_instance_types() -> List[dict]:
     }
 
     minimal = {
-        "best_for": ["Small ML models", "Multi-GPU training", "FP64 calculations", "NVLINK"],
+        "best_for": [
+            "Small ML models",
+            "Multi-GPU training",
+            "FP64 calculations",
+            "NVLINK",
+        ],
         "cpu": {"description": "6 CPU", "number_of_cores": 6},
         "deploy_warning": None,
         "description": "Dedicated Hardware Instance",
@@ -215,6 +225,7 @@ def test_available_query(mocker, raw_instance_types):
         gpu_memory=80.0,
         spot=True,
         provider="datacrunch",
+        disk_size=None,
     )
     expected_non_spot = CatalogItem(
         instance_name="1H100.80S.30V",
@@ -227,6 +238,7 @@ def test_available_query(mocker, raw_instance_types):
         gpu_memory=80.0,
         spot=False,
         provider="datacrunch",
+        disk_size=None,
     )
     assert [r for r in query_result if r.spot] == [expected_spot]
     assert [r for r in query_result if not r.spot] == [expected_non_spot]
@@ -264,6 +276,7 @@ def test_available_query_with_instance(mocker, raw_instance_types):
         gpu_memory=16.0,
         spot=True,
         provider="datacrunch",
+        disk_size=None,
     )
     expected_non_spot = CatalogItem(
         instance_name="1V100.6V",
@@ -276,6 +289,7 @@ def test_available_query_with_instance(mocker, raw_instance_types):
         gpu_memory=16.0,
         spot=False,
         provider="datacrunch",
+        disk_size=None,
     )
 
     assert [r for r in query_result if r.spot] == [expected_spot]
@@ -297,6 +311,7 @@ def test_transform_instance(raw_instance_types):
         gpu_name="A6000",
         gpu_memory=96 / 2,
         spot=True,
+        disk_size=None,
     )
 
     assert RawCatalogItem.from_dict(item) == expected
@@ -317,6 +332,7 @@ def test_cpu_instance(raw_instance_types):
         gpu_name=None,
         gpu_memory=0,
         spot=False,
+        disk_size=None,
     )
 
     assert RawCatalogItem.from_dict(item) == expected

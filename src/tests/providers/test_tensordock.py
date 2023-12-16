@@ -105,5 +105,6 @@ def make_offers(
             gpu_name="L40",
             gpu_memory=gpu["vram"],
             spot=False,
+            disk_size=None,
         )
     ]
