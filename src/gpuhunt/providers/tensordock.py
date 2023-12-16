@@ -201,6 +201,7 @@ class TensorDockProvider(AbstractProvider):
                     gpu_count=gpu_count,
                     gpu_memory=float(gpu_info["vram"]),
                     spot=False,
+                    disk_size=disk_size,
                 )
                 offers.append(offer)
                 break  # stop increasing gpu count

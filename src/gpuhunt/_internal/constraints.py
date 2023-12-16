@@ -66,6 +66,11 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
         return False
     if q.spot is not None and i.spot != q.spot:
         return False
+    if i.disk_size is not None:
+        if q.min_disk_size and i.disk_size < q.min_disk_size:
+            return False
+        if q.max_disk_size and i.disk_size > q.max_disk_size:
+            return False
     return True
 
 

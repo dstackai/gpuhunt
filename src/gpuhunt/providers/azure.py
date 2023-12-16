@@ -153,6 +153,7 @@ class AzureProvider(AbstractProvider):
                     gpu_count=None,
                     gpu_name=None,
                     gpu_memory=None,
+                    disk_size=None,
                 )
                 offers.append(offer)
         offers = self.fill_details(offers)
@@ -182,6 +183,7 @@ class AzureProvider(AbstractProvider):
                 location=None,
                 price=None,
                 spot=None,
+                disk_size=None,
             )
         with_details = []
         without_details = []

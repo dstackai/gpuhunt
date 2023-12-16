@@ -52,6 +52,7 @@ class LambdaLabsProvider(AbstractProvider):
                 gpu_memory=gpu_memory,
                 spot=False,
                 location=None,
+                disk_size=None,
             )
             offers.append(offer)
         offers = self.add_regions(offers)

@@ -98,6 +98,7 @@ class AWSProvider(AbstractProvider):
                     spot=False,
                     gpu_name=None,
                     gpu_memory=None,
+                    disk_size=None,
                 )
                 offers.append(offer)
         self.fill_gpu_details(offers)
