@@ -87,7 +87,7 @@ class TestTensorDockMinimalConfiguration:
 
 
 def make_offers(
-    specs: dict, cpu: int, memory: int, disk_size: int, gpu_count: int
+    specs: dict, cpu: int, memory: float, disk_size: float, gpu_count: int
 ) -> List[RawCatalogItem]:
     gpu = list(specs["gpu"].values())[0]
     price = cpu * specs["cpu"]["price"]
@@ -105,6 +105,6 @@ def make_offers(
             gpu_name="L40",
             gpu_memory=gpu["vram"],
             spot=False,
-            disk_size=None,
+            disk_size=disk_size,
         )
     ]
