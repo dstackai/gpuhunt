@@ -46,13 +46,13 @@ class LambdaLabsProvider(AbstractProvider):
                 instance_name=instance["name"],
                 price=instance["price_cents_per_hour"] / 100,
                 cpu=instance["specs"]["vcpus"],
-                memory=float(instance["specs"]["memory_gib"]),
+                memory=float(instance["specs"]["memory_gib"]) * 1.074,
                 gpu_count=gpu_count,
                 gpu_name=gpu_name,
                 gpu_memory=gpu_memory,
                 spot=False,
                 location=None,
-                disk_size=None,
+                disk_size=float(instance["specs"]["storage_gib"]) * 1.074,
             )
             offers.append(offer)
         offers = self.add_regions(offers)
