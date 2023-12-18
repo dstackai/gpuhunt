@@ -24,7 +24,7 @@ class DataCrunchProvider(AbstractProvider):
 
         spots = (True, False)
         location_codes = [loc["code"] for loc in locations]
-        instances = generate_instances(spots, location_codes, instance_types)
+        instances = generate_instances(query_filter, spots, location_codes, instance_types)
 
         return sorted(instances, key=lambda x: x.price)
 
@@ -39,16 +39,24 @@ class DataCrunchProvider(AbstractProvider):
 
 
 def generate_instances(
-    spots: Iterable[bool], location_codes: Iterable[str], instance_types: Iterable[InstanceType]
+    query_filter: Optional[QueryFilter],
+    spots: Iterable[bool],
+    location_codes: Iterable[str],
+    instance_types: Iterable[InstanceType],
 ) -> List[RawCatalogItem]:
     instances = []
     for spot, location, instance in itertools.product(spots, location_codes, instance_types):
-        item = transform_instance(copy.copy(instance), spot, location)
+        item = transform_instance(query_filter, copy.copy(instance), spot, location)
         instances.append(RawCatalogItem.from_dict(item))
     return instances
 
 
-def transform_instance(instance: InstanceType, spot: bool, location: str) -> dict:
+def transform_instance(
+    query_filter: Optional[QueryFilter],
+    instance: InstanceType,
+    spot: bool,
+    location: str,
+) -> dict:
     gpu_memory = 0
     if instance.gpu["number_of_gpus"]:
         gpu_memory = instance.gpu_memory["size_in_gigabytes"] / instance.gpu["number_of_gpus"]
@@ -62,6 +70,7 @@ def transform_instance(instance: InstanceType, spot: bool, location: str) -> dic
         gpu_count=instance.gpu["number_of_gpus"],
         gpu_name=gpu_name(instance.gpu["description"]),
         gpu_memory=gpu_memory,
+        disk_size=query_filter.min_disk_size or 100.0 if query_filter else 100.0,
     )
     return raw
 

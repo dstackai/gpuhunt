@@ -5,7 +5,7 @@ from typing import List
 import pytest
 
 import gpuhunt._internal.catalog as internal_catalog
-from gpuhunt import Catalog, CatalogItem, RawCatalogItem
+from gpuhunt import Catalog, CatalogItem, QueryFilter, RawCatalogItem
 from gpuhunt.providers.datacrunch import (
     DataCrunchProvider,
     InstanceType,
@@ -171,7 +171,7 @@ def list_available_instances(raw_instance_types, locations):
     spots = (True, False)
     locations = [loc["loc"] for loc in locations]
     instances = [instance_types(raw_instance_types[0])]
-    list_instances = generate_instances(spots, locations, instances)
+    list_instances = generate_instances(None, spots, locations, instances)
 
     assert len(list_instances) == 4
     assert [i.price for i in list_instances if i.spot] == [1, 70] * 2
@@ -225,7 +225,7 @@ def test_available_query(mocker, raw_instance_types):
         gpu_memory=80.0,
         spot=True,
         provider="datacrunch",
-        disk_size=None,
+        disk_size=100.0,
     )
     expected_non_spot = CatalogItem(
         instance_name="1H100.80S.30V",
@@ -238,7 +238,7 @@ def test_available_query(mocker, raw_instance_types):
         gpu_memory=80.0,
         spot=False,
         provider="datacrunch",
-        disk_size=None,
+        disk_size=100.0,
     )
     assert [r for r in query_result if r.spot] == [expected_spot]
     assert [r for r in query_result if not r.spot] == [expected_non_spot]
@@ -276,7 +276,7 @@ def test_available_query_with_instance(mocker, raw_instance_types):
         gpu_memory=16.0,
         spot=True,
         provider="datacrunch",
-        disk_size=None,
+        disk_size=100.0,
     )
     expected_non_spot = CatalogItem(
         instance_name="1V100.6V",
@@ -289,7 +289,7 @@ def test_available_query_with_instance(mocker, raw_instance_types):
         gpu_memory=16.0,
         spot=False,
         provider="datacrunch",
-        disk_size=None,
+        disk_size=100.0,
     )
 
     assert [r for r in query_result if r.spot] == [expected_spot]
@@ -299,7 +299,12 @@ def test_available_query_with_instance(mocker, raw_instance_types):
 def test_transform_instance(raw_instance_types):
     location = "ICE-01"
     is_spot = True
-    item = transform_instance(instance_types(raw_instance_types[1]), is_spot, location)
+    item = transform_instance(
+        QueryFilter(min_disk_size=150.0),
+        instance_types(raw_instance_types[1]),
+        is_spot,
+        location,
+    )
 
     expected = RawCatalogItem(
         instance_name="2A6000.20V",
@@ -311,7 +316,7 @@ def test_transform_instance(raw_instance_types):
         gpu_name="A6000",
         gpu_memory=96 / 2,
         spot=True,
-        disk_size=None,
+        disk_size=150.0,
     )
 
     assert RawCatalogItem.from_dict(item) == expected
@@ -320,7 +325,7 @@ def test_transform_instance(raw_instance_types):
 def test_cpu_instance(raw_instance_types):
     location = "ICE-01"
     is_spot = False
-    item = transform_instance(instance_types(raw_instance_types[2]), is_spot, location)
+    item = transform_instance(None, instance_types(raw_instance_types[2]), is_spot, location)
 
     expected = RawCatalogItem(
         instance_name="CPU.120V.480G",
@@ -332,7 +337,7 @@ def test_cpu_instance(raw_instance_types):
         gpu_name=None,
         gpu_memory=0,
         spot=False,
-        disk_size=None,
+        disk_size=100.0,
     )
 
     assert RawCatalogItem.from_dict(item) == expected

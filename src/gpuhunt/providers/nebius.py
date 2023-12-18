@@ -114,13 +114,15 @@ class NebiusProvider(AbstractProvider):
             if page_token is None:
                 break
         platform_resources = self.aggregate_skus(skus)
-        offers = self.get_gpu_platforms(zone, platform_resources)
-        offers += self.get_cpu_platforms(zone, platform_resources)
+        offers = self.get_gpu_platforms(query_filter, zone, platform_resources)
+        offers += self.get_cpu_platforms(query_filter, zone, platform_resources)
         return sorted(offers, key=lambda i: i.price)
 
     @staticmethod
     def get_gpu_platforms(
-        zone: str, platform_resources: "PlatformResourcePrice"
+        query_filter: Optional[QueryFilter],
+        zone: str,
+        platform_resources: "PlatformResourcePrice",
     ) -> List[RawCatalogItem]:
         items = []
         for platform, presets in GPU_PLATFORMS.items():
@@ -142,14 +144,16 @@ class NebiusProvider(AbstractProvider):
                         gpu_name=gpu_name,
                         gpu_memory=gpu_memory,
                         spot=False,
-                        disk_size=None,
+                        disk_size=query_filter.min_disk_size or 100.0 if query_filter else 100.0,
                     )
                 )
         return items
 
     @staticmethod
     def get_cpu_platforms(
-        zone: str, platform_resources: "PlatformResourcePrice"
+        query_filter: Optional[QueryFilter],
+        zone: str,
+        platform_resources: "PlatformResourcePrice",
     ) -> List[RawCatalogItem]:
         items = []
         for platform, limits in CPU_PLATFORMS.items():
@@ -167,7 +171,9 @@ class NebiusProvider(AbstractProvider):
                             gpu_name=None,
                             gpu_memory=None,
                             spot=False,
-                            disk_size=None,
+                            disk_size=query_filter.min_disk_size or 100.0
+                            if query_filter
+                            else 100.0,
                         )
                     )
         return items

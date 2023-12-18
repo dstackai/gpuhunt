@@ -153,13 +153,15 @@ class AzureProvider(AbstractProvider):
                     gpu_count=None,
                     gpu_name=None,
                     gpu_memory=None,
-                    disk_size=None,
+                    disk_size=query_filter.min_disk_size or 100.0 if query_filter else 100.0,
                 )
                 offers.append(offer)
-        offers = self.fill_details(offers)
+        offers = self.fill_details(query_filter, offers)
         return sorted(offers, key=lambda i: i.price)
 
-    def fill_details(self, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
+    def fill_details(
+        self, query_filter: Optional[QueryFilter], offers: List[RawCatalogItem]
+    ) -> List[RawCatalogItem]:
         logger.info("Fetching instance details")
         instances = {}
         resources = self.client.resource_skus.list()
@@ -183,7 +185,7 @@ class AzureProvider(AbstractProvider):
                 location=None,
                 price=None,
                 spot=None,
-                disk_size=None,
+                disk_size=query_filter.min_disk_size or 100.0 if query_filter else 100.0,
             )
         with_details = []
         without_details = []

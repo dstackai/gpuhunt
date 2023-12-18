@@ -55,7 +55,9 @@ class GCPProvider(AbstractProvider):
         self.regions_client = compute_v1.RegionsClient()
         self.cloud_catalog_client = billing_v1.CloudCatalogClient()
 
-    def list_preconfigured_instances(self) -> List[RawCatalogItem]:
+    def list_preconfigured_instances(
+        self, query_filter: Optional[QueryFilter]
+    ) -> List[RawCatalogItem]:
         instances = []
         for region in self.regions_client.list(project=self.project):
             for zone_url in region.zones:
@@ -91,7 +93,7 @@ class GCPProvider(AbstractProvider):
                         gpu_memory=gpu.memory if gpu else None,
                         price=None,
                         spot=None,
-                        disk_size=None,
+                        disk_size=query_filter.min_disk_size or 100.0 if query_filter else 100.0,
                     )
                     instances.append(instance)
         return instances
@@ -208,7 +210,7 @@ class GCPProvider(AbstractProvider):
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
     ) -> List[RawCatalogItem]:
-        instances = self.list_preconfigured_instances()
+        instances = self.list_preconfigured_instances(query_filter)
         self.add_gpus(instances)
         offers = self.fill_prices(instances)
         return sorted(offers, key=lambda i: i.price)
