@@ -73,7 +73,10 @@ class CatalogItem(RawCatalogItem):
 
     @staticmethod
     def from_dict(v: dict, *, provider: Optional[str] = None) -> "CatalogItem":
-        return CatalogItem(provider=provider, **asdict(RawCatalogItem.from_dict(v)))
+        raw = asdict(RawCatalogItem.from_dict(v))
+        if not raw.disk_size:
+            raw.disk_size = 100.0  # the default value for backward compatibility
+        return CatalogItem(provider=provider, **raw)
 
 
 @dataclass
