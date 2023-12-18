@@ -10,7 +10,7 @@ def bool_loader(x: Union[bool, str]) -> bool:
     return x.lower() == "true"
 
 
-@dataclass(kw_only=True)
+@dataclass
 class RawCatalogItem:
     instance_name: Optional[str]
     location: Optional[str]
@@ -42,7 +42,7 @@ class RawCatalogItem:
         return asdict(self)
 
 
-@dataclass(kw_only=True)
+@dataclass
 class CatalogItem(RawCatalogItem):
     """
     Attributes:
@@ -69,7 +69,7 @@ class CatalogItem(RawCatalogItem):
     gpu_memory: Optional[float]
     spot: bool
     provider: str
-    disk_size: float = 100.0  # the default value for backward compatibility
+    disk_size: Optional[float]
 
     @staticmethod
     def from_dict(v: dict, *, provider: Optional[str] = None) -> "CatalogItem":

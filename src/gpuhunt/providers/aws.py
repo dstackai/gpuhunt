@@ -98,7 +98,7 @@ class AWSProvider(AbstractProvider):
                     spot=False,
                     gpu_name=None,
                     gpu_memory=None,
-                    disk_size=query_filter.min_disk_size or 100.0 if query_filter else 100.0,
+                    disk_size=None,
                 )
                 offers.append(offer)
         self.fill_gpu_details(offers)
