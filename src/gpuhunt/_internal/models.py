@@ -21,6 +21,7 @@ class RawCatalogItem:
     gpu_name: Optional[str]
     gpu_memory: Optional[float]
     spot: Optional[bool]
+    disk_size: Optional[float]
 
     @staticmethod
     def from_dict(v: dict) -> "RawCatalogItem":
@@ -34,6 +35,7 @@ class RawCatalogItem:
             gpu_name=empty_as_none(v.get("gpu_name")),
             gpu_memory=empty_as_none(v.get("gpu_memory"), loader=float),
             spot=empty_as_none(v.get("spot"), loader=bool_loader),
+            disk_size=empty_as_none(v.get("disk_size"), loader=float),
         )
 
     def dict(self) -> Dict[str, Union[str, int, float, bool, None]]:
@@ -54,6 +56,7 @@ class CatalogItem(RawCatalogItem):
         gpu_memory: amount of GPU VRAM in GB for each GPU
         spot: whether the instance is a spot instance
         provider: name of the provider
+        disk_size: size of disk in GB
     """
 
     instance_name: str
@@ -66,6 +69,7 @@ class CatalogItem(RawCatalogItem):
     gpu_memory: Optional[float]
     spot: bool
     provider: str
+    disk_size: Optional[float]
 
     @staticmethod
     def from_dict(v: dict, *, provider: Optional[str] = None) -> "CatalogItem":

@@ -19,6 +19,7 @@ def item() -> CatalogItem:
         gpu_memory=40.0,
         spot=False,
         provider="aws",
+        disk_size=None,
     )
 
 
@@ -35,6 +36,7 @@ def cpu_items() -> List[CatalogItem]:
         gpu_memory=0.0,
         spot=False,
         provider="datacrunch",
+        disk_size=None,
     )
     nebius = CatalogItem(
         instance_name="standard-v2",
@@ -47,6 +49,7 @@ def cpu_items() -> List[CatalogItem]:
         gpu_memory=None,
         spot=False,
         provider="nebius",
+        disk_size=None,
     )
     return [datacrunch, nebius]
 
@@ -117,6 +120,7 @@ class TestMatches:
             gpu_memory=8.0,
             spot=False,
             provider="aws",
+            disk_size=None,
         )
         assert matches(item, QueryFilter(gpu_name=["RTX3060TI"]))
 

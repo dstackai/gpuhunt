@@ -61,6 +61,7 @@ class VastAIProvider(AbstractProvider):
                 gpu_name=gpu_name,
                 gpu_memory=float(int(offer["gpu_ram"] / kilo)),
                 spot=False,
+                disk_size=offer["disk_space"],
             )
             instance_offers.append(ondemand_offer)
 

@@ -91,6 +91,7 @@ class GCPProvider(AbstractProvider):
                         gpu_memory=gpu.memory if gpu else None,
                         price=None,
                         spot=None,
+                        disk_size=None,
                     )
                     instances.append(instance)
         return instances

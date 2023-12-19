@@ -66,7 +66,27 @@ GPU_PLATFORMS = {
 }
 CPU_PLATFORMS = {
     "standard-v2": {
-        "cpus": [2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60],
+        "cpus": [
+            2,
+            4,
+            6,
+            8,
+            10,
+            12,
+            14,
+            16,
+            20,
+            24,
+            28,
+            32,
+            36,
+            40,
+            44,
+            48,
+            52,
+            56,
+            60,
+        ],
         "ratios": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
     }
 }
@@ -122,6 +142,7 @@ class NebiusProvider(AbstractProvider):
                         gpu_name=gpu_name,
                         gpu_memory=gpu_memory,
                         spot=False,
+                        disk_size=None,
                     )
                 )
         return items
@@ -146,6 +167,7 @@ class NebiusProvider(AbstractProvider):
                             gpu_name=None,
                             gpu_memory=None,
                             spot=False,
+                            disk_size=None,
                         )
                     )
         return items
