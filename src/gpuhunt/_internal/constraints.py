@@ -59,18 +59,13 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
         q.max_total_gpu_memory,
     ):
         return False
-    # TODO(egor-s): add disk_size to CatalogItem
-    # if not is_between(i.disk_size, q.min_disk_size, q.max_disk_size):
-    #     return False
+    if i.disk_size is not None:
+        if not is_between(i.disk_size, q.min_disk_size, q.max_disk_size):
+            return False
     if not is_between(i.price, q.min_price, q.max_price):
         return False
     if q.spot is not None and i.spot != q.spot:
         return False
-    if i.disk_size is not None:
-        if q.min_disk_size and i.disk_size < q.min_disk_size:
-            return False
-        if q.max_disk_size and i.disk_size > q.max_disk_size:
-            return False
     return True
 
 
