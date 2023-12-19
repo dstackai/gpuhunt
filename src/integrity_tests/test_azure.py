@@ -74,10 +74,10 @@ class TestAzureCatalog:
         assert all(f"\nStandard_D2s_v3,{i}," in data for i in locations)
 
     def test_spots_presented(self, data: str):
-        assert ",True\n" in data
+        assert ",True," in data
 
     def test_ondemand_presented(self, data: str):
-        assert ",False\n" in data
+        assert ",False," in data
 
     def test_gpu_presented(self, data: str):
         gpus = [
