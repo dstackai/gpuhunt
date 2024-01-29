@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import requests
 
+from gpuhunt._internal.constraints import KNOWN_GPUS
 from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
@@ -42,6 +43,7 @@ class VastAIProvider(AbstractProvider):
                 logger.warning("Offer %s does not satisfy filters", offer["id"])
                 continue
             gpu_name = get_gpu_name(offer["gpu_name"])
+            gpu_memory = normalize_gpu_memory(gpu_name, offer["gpu_ram"])
             ondemand_offer = RawCatalogItem(
                 instance_name=str(offer["id"]),
                 location=get_location(offer["geolocation"]),
@@ -59,7 +61,7 @@ class VastAIProvider(AbstractProvider):
                 ),
                 gpu_count=offer["num_gpus"],
                 gpu_name=gpu_name,
-                gpu_memory=float(int(offer["gpu_ram"] / kilo)),
+                gpu_memory=float(gpu_memory),
                 spot=False,
                 disk_size=offer["disk_space"],
             )
@@ -86,10 +88,7 @@ class VastAIProvider(AbstractProvider):
             filters["num_gpus"]["gte"] = q.min_gpu_count
         if q.max_gpu_count is not None:
             filters["num_gpus"]["lte"] = q.max_gpu_count
-        if q.min_gpu_memory is not None:
-            filters["gpu_ram"]["gte"] = q.min_gpu_memory * kilo
-        if q.max_gpu_memory is not None:
-            filters["gpu_ram"]["lte"] = q.max_gpu_memory * kilo
+        # We cannot reliably filter by GPU memory, because it is not the same for a specific GPU model
         if q.min_disk_size is not None:
             filters["disk_space"]["gte"] = q.min_disk_size
         if q.max_disk_size is not None:
@@ -129,6 +128,14 @@ def get_gpu_name(gpu_name: str) -> str:
     if gpu_name.startswith("A100 "):
         return "A100"
     return gpu_name.replace(" ", "")
+
+
+def normalize_gpu_memory(gpu_name: str, memory_mib: float) -> int:
+    known_memory = [gpu.memory for gpu in KNOWN_GPUS if gpu.name == gpu_name]
+    if known_memory:
+        # return the closest known value
+        return min(known_memory, key=lambda x: abs(x - memory_mib / kilo))
+    return int(memory_mib / kilo)
 
 
 def get_location(location: Optional[str]) -> str:
