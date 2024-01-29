@@ -80,6 +80,7 @@ class TensorDockProvider(AbstractProvider):
                             gpu_name=convert_gpu_name(gpu_name),
                             gpu_memory=float(gpu["vram"]),
                             spot=False,
+                            disk_size=float(details["specs"]["storage"]["amount"]),
                         )
                     )
         return sorted(offers, key=lambda i: i.price)
