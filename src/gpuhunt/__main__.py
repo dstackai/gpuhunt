@@ -20,6 +20,7 @@ def main():
             "nebius",
             "tensordock",
             "vastai",
+            "cudocompute"
         ],
     )
     parser.add_argument("--output", required=True)
@@ -65,6 +66,10 @@ def main():
         from gpuhunt.providers.vastai import VastAIProvider
 
         provider = VastAIProvider()
+    elif args.provider == "cudocompute":
+        from gpuhunt.providers.cudocompute import CudoComputeProvider
+
+        provider = CudoComputeProvider()
     else:
         exit(f"Unknown provider {args.provider}")
 

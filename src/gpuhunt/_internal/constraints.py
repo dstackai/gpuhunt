@@ -78,10 +78,12 @@ def get_compute_capability(gpu_name: str) -> Optional[Tuple[int, int]]:
 
 KNOWN_GPUS = [
     GPUInfo(name="A10", memory=24, compute_capability=(8, 6)),
+    GPUInfo(name="A40", memory=48, compute_capability=(8, 6)),
     GPUInfo(name="A100", memory=40, compute_capability=(8, 0)),
     GPUInfo(name="A100", memory=80, compute_capability=(8, 0)),
     GPUInfo(name="A10G", memory=24, compute_capability=(8, 6)),
     GPUInfo(name="A4000", memory=16, compute_capability=(8, 6)),
+    GPUInfo(name="A4500", memory=20, compute_capability=(8, 6)),
     GPUInfo(name="A5000", memory=24, compute_capability=(8, 6)),
     GPUInfo(name="A6000", memory=48, compute_capability=(8, 6)),
     GPUInfo(name="H100", memory=80, compute_capability=(9, 0)),

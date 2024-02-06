@@ -168,6 +168,27 @@ jobs:
           path: nebius.csv
           retention-days: 1
 
+  catalog-cudocompute:
+    name: Collect CudoCompute catalog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install dependencies
+        run: |
+          pip install pip -U
+          pip install -e '.[cudocompute]'
+      - name: Collect catalog
+        working-directory: src
+        run: python -m gpuhunt cudocompute --output ../cudocompute.csv
+      - uses: actions/upload-artifact@v3
+        with:
+          name: catalogs
+          path: cudocompute.csv
+          retention-days: 1
+
   test-catalog:
     name: Test catalogs integrity
     needs:
