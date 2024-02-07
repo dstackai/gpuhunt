@@ -30,7 +30,7 @@ jobs:
         run: python -m gpuhunt aws --output ../aws.csv
       - uses: actions/upload-artifact@v4
         with:
-          name: catalogs
+          name: catalogs-aws
           path: aws.csv
           retention-days: 1
 
@@ -59,7 +59,7 @@ jobs:
         run: python -m gpuhunt azure --output ../azure.csv
       - uses: actions/upload-artifact@v4
         with:
-          name: catalogs
+          name: catalogs-azure
           path: azure.csv
           retention-days: 1
 
@@ -83,7 +83,7 @@ jobs:
         run: python -m gpuhunt datacrunch --output ../datacrunch.csv
       - uses: actions/upload-artifact@v4
         with:
-          name: catalogs
+          name: catalogs-datacrunch
           path: datacrunch.csv
           retention-days: 1
 
@@ -115,7 +115,7 @@ jobs:
         run: python -m gpuhunt gcp --output ../gcp.csv
       - uses: actions/upload-artifact@v4
         with:
-          name: catalogs
+          name: catalogs-gcp
           path: gcp.csv
           retention-days: 1
 
@@ -141,7 +141,7 @@ jobs:
         run: python -m gpuhunt lambdalabs --output ../lambdalabs.csv
       - uses: actions/upload-artifact@v4
         with:
-          name: catalogs
+          name: catalogs-lambdalabs
           path: lambdalabs.csv
           retention-days: 1
 
@@ -164,7 +164,7 @@ jobs:
         run: python -m gpuhunt nebius --output ../nebius.csv
       - uses: actions/upload-artifact@v4
         with:
-          name: catalogs
+          name: catalogs-nebius
           path: nebius.csv
           retention-days: 1
 
@@ -190,7 +190,8 @@ jobs:
           pip install pytest
       - uses: actions/download-artifact@v4
         with:
-          name: catalogs
+          pattern: catalogs-*
+          merge-multiple: true
       - name: Run integrity tests
         env:
           CATALOG_DIR: .
@@ -205,7 +206,8 @@ jobs:
         run: pip install awscli
       - uses: actions/download-artifact@v4
         with:
-          name: catalogs
+          pattern: catalogs-*
+          merge-multiple: true
       - name: Write version
         run: date +%Y%m%d > version
       - name: Package catalogs
