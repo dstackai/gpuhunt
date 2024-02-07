@@ -44,6 +44,7 @@ pricing_filters = {
     "Unit": ["Hrs"],
     "Currency": ["USD"],
     "Pre Installed S/W": ["", "NA"],
+    "MarketOption": ["OnDemand"],
 }
 describe_instances_limit = 100
 
