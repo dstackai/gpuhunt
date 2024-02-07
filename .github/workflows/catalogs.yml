@@ -14,8 +14,8 @@ jobs:
     name: Collect AWS catalog
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.11
       - name: Install dependencies
@@ -28,9 +28,9 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: python -m gpuhunt aws --output ../aws.csv
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: catalogs
+          name: catalogs-aws
           path: aws.csv
           retention-days: 1
 
@@ -41,11 +41,11 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: azure/login@v1
         with:
           creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.11
       - name: Install dependencies
@@ -57,9 +57,9 @@ jobs:
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: python -m gpuhunt azure --output ../azure.csv
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: catalogs
+          name: catalogs-azure
           path: azure.csv
           retention-days: 1
 
@@ -67,8 +67,8 @@ jobs:
     name: Collect DataCrunch catalog
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.11
       - name: Install dependencies
@@ -81,9 +81,9 @@ jobs:
           DATACRUNCH_CLIENT_ID: ${{ secrets.DATACRUNCH_CLIENT_ID }}
           DATACRUNCH_CLIENT_SECRET: ${{ secrets.DATACRUNCH_CLIENT_SECRET }}
         run: python -m gpuhunt datacrunch --output ../datacrunch.csv
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: catalogs
+          name: catalogs-datacrunch
           path: datacrunch.csv
           retention-days: 1
 
@@ -95,13 +95,13 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v3
-      - uses: google-github-actions/auth@v1
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: 'projects/531508670106/locations/global/workloadIdentityPools/github-identity-pool/providers/github-id-provider'
           service_account: 'dstack-gpu-pricing-ci@dstack.iam.gserviceaccount.com'
           create_credentials_file: true
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.11
       - name: Install dependencies
@@ -113,9 +113,9 @@ jobs:
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         run: python -m gpuhunt gcp --output ../gcp.csv
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: catalogs
+          name: catalogs-gcp
           path: gcp.csv
           retention-days: 1
 
@@ -126,8 +126,8 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.11
       - name: Install dependencies
@@ -139,9 +139,9 @@ jobs:
         env:
           LAMBDALABS_TOKEN: ${{ secrets.LAMBDALABS_TOKEN }}
         run: python -m gpuhunt lambdalabs --output ../lambdalabs.csv
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: catalogs
+          name: catalogs-lambdalabs
           path: lambdalabs.csv
           retention-days: 1
 
@@ -149,8 +149,8 @@ jobs:
     name: Collect Nebius catalog
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.11
       - name: Install dependencies
@@ -162,9 +162,9 @@ jobs:
         env:
           NEBIUS_SERVICE_ACCOUNT: ${{ secrets.NEBIUS_SERVICE_ACCOUNT }}
         run: python -m gpuhunt nebius --output ../nebius.csv
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: catalogs
+          name: catalogs-nebius
           path: nebius.csv
           retention-days: 1
 
@@ -179,8 +179,8 @@ jobs:
       - catalog-nebius
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.11
       - name: Install dependencies
@@ -188,9 +188,10 @@ jobs:
           pip install pip -U
           pip install '.[all]'
           pip install pytest
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: catalogs
+          pattern: catalogs-*
+          merge-multiple: true
       - name: Run integrity tests
         env:
           CATALOG_DIR: .
@@ -203,9 +204,10 @@ jobs:
     steps:
       - name: Install AWS CLI
         run: pip install awscli
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: catalogs
+          pattern: catalogs-*
+          merge-multiple: true
       - name: Write version
         run: date +%Y%m%d > version
       - name: Package catalogs
