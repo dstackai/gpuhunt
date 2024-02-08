@@ -9,6 +9,7 @@ from threading import Thread
 from typing import Iterable, List, Optional, Tuple
 
 import requests
+import requests.adapters
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.compute import ComputeManagementClient
@@ -96,6 +97,8 @@ class AzureProvider(AbstractProvider):
 
     def _get_pages_worker(self, q: Queue, stride: int, worker_id: int):
         page_id = worker_id
+        session = requests.Session()
+        session.mount("https://", requests.adapters.HTTPAdapter(max_retries=3))
         try:
             while True:
                 cached_page = None
@@ -106,7 +109,7 @@ class AzureProvider(AbstractProvider):
                         data = json.load(f)
                 else:
                     logger.info("Worker %s fetches pricing page %s", worker_id, page_id)
-                    res = requests.get(
+                    res = session.get(
                         prices_url,
                         params={
                             "api-version": "2023-01-01-preview",
