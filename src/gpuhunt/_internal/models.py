@@ -92,8 +92,8 @@ class QueryFilter:
         max_gpu_memory: maximum amount of GPU VRAM in GB for each GPU
         min_total_gpu_memory: minimum amount of GPU VRAM in GB for all GPUs combined
         max_total_gpu_memory: maximum amount of GPU VRAM in GB for all GPUs combined
-        min_disk_size: *currently not in use*
-        max_disk_size: *currently not in use*
+        min_disk_size: minimum disk size in GB
+        max_disk_size: maximum disk size in GB
         min_price: minimum price per hour in USD
         max_price: maximum price per hour in USD
         min_compute_capability: minimum compute capability of the GPU
