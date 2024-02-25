@@ -5,7 +5,11 @@ from typing import List
 
 import pytest
 
+<<<<<<< HEAD
 from gpuhunt.providers.cudo import GPU_MAP
+=======
+from src.gpuhunt.providers.cudo import GPU_MAP
+>>>>>>> 4bb5915 (Fixed Review Issues and Added Integrity Tests for Cudo)
 
 
 @pytest.fixture

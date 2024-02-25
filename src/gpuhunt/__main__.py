@@ -21,7 +21,6 @@ def main():
             "nebius",
             "tensordock",
             "vastai",
-            "cudocompute"
         ],
     )
     parser.add_argument("--output", required=True)
