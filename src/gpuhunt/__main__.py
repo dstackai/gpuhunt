@@ -14,13 +14,13 @@ def main():
         choices=[
             "aws",
             "azure",
+            "cudo",
             "datacrunch",
             "gcp",
             "lambdalabs",
             "nebius",
             "tensordock",
             "vastai",
-            "cudocompute"
         ],
     )
     parser.add_argument("--output", required=True)
@@ -66,10 +66,10 @@ def main():
         from gpuhunt.providers.vastai import VastAIProvider
 
         provider = VastAIProvider()
-    elif args.provider == "cudocompute":
-        from gpuhunt.providers.cudocompute import CudoComputeProvider
+    elif args.provider == "cudo":
+        from gpuhunt.providers.cudo import CudoProvider
 
-        provider = CudoComputeProvider()
+        provider = CudoProvider()
     else:
         exit(f"Unknown provider {args.provider}")
 

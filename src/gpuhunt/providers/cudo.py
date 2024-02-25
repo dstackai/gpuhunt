@@ -1,6 +1,5 @@
-import asyncio
 from collections import namedtuple
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import chain
 from typing import Optional, List
 from cudo_compute import cudo_api
@@ -10,27 +9,29 @@ from gpuhunt.providers import AbstractProvider
 import logging
 
 CpuMemoryGpu = namedtuple("CpuMemoryGpu", ["cpu", "memory", "gpu"])
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class CudoComputeProvider(AbstractProvider):
-    NAME = "cudocompute"
+class CudoProvider(AbstractProvider):
+    NAME = "cudo"
 
     def get(
             self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
     ) -> List[RawCatalogItem]:
-        offers = asyncio.run(self.fetch_all_vm_types())
+        offers = self.fetch_all_vm_types()
         return sorted(offers, key=lambda i: i.price)
 
-    async def fetch_all_vm_types(self):
-        executor = ThreadPoolExecutor(max_workers=10)
-        tasks = []
-        for cmg in GPU_MACHINES:
-            task = asyncio.create_task(self.fetch_vm_type(cmg.cpu, cmg.memory, cmg.gpu, executor))
-            tasks.append(task)
-        results = await asyncio.gather(*tasks)
-        executor.shutdown(wait=True)
+    def fetch_all_vm_types(self):
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(self.fetch_vm_type, cmg.cpu, cmg.memory, cmg.gpu) for cmg in GPU_MACHINES]
+            results = []
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    results.append(result)
+                except Exception as e:
+                    logger.info(
+                        f"Unable to find VM type with vCPU: {e.vcpu}, Memory: {e.memory_gib} GiB, GPU: {e.gpu}.")
         return list(chain.from_iterable(results))
 
     def get_raw_catalog_list(self, vm_machine_type_list, vcpu, memory, gpu):
@@ -51,24 +52,31 @@ class CudoComputeProvider(AbstractProvider):
             raw_list.append(raw)
         return raw_list
 
-    async def fetch_vm_type(self, vcpu, memory_gib, gpu, executor):
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            executor,
-            lambda: cudo_api.virtual_machines().list_vm_machine_types(vcpu=vcpu, memory_gib=memory_gib, gpu=gpu)
-        )
-        return self.get_raw_catalog_list(result, vcpu, memory_gib, gpu)
+    def fetch_vm_type(self, vcpu, memory_gib, gpu):
+        try:
+            result = cudo_api.virtual_machines().list_vm_machine_types(vcpu=vcpu, memory_gib=memory_gib, gpu=gpu)
+            return self.get_raw_catalog_list(result, vcpu, memory_gib, gpu)
+        except Exception as e:
+            raise VMTypeFetchError(f"Failed to fetch VM type: {e}", vcpu, memory_gib, gpu)
+
+
+class VMTypeFetchError(Exception):
+    def __init__(self, message, vcpu, memory_gib, gpu):
+        super().__init__(message)
+        self.vcpu = vcpu
+        self.memory_gib = memory_gib
+        self.gpu = gpu
+
+    def __str__(self):
+        return f"{super().__str__()} - [vCPU: {self.vcpu}, Memory: {self.memory_gib} GiB, GPU: {self.gpu}]"
 
 
 def gpu_name(name: str) -> Optional[str]:
     if not name:
         return None
-
     result = GPU_MAP.get(name)
-
     if result is None:
-        logging.warning("There is no '%s' in GPU_MAP", name)
-
+        raise Exception("There is no '%s' in GPU_MAP", name)
     return result
 
 
@@ -76,7 +84,7 @@ def get_memory(gpu_name: str) -> Optional[int]:
     for gpu in KNOWN_GPUS:
         if gpu.name.lower() == gpu_name.lower():
             return gpu.memory
-    return None
+    raise Exception("There is no '%s' in KNOWN_GPUS", gpu_name)
 
 
 GPU_MAP = {
