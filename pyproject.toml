@@ -47,11 +47,11 @@ datacrunch = [
     "datacrunch"
 ]
 
-cudocompute = [
+cudo = [
     "cudo_compute"
 ]
+all = ["gpuhunt[aws,azure,cudo,datacrunch,gcp,nebius]"]
 
-all = ["gpuhunt[aws,azure,datacrunch,gcp,nebius, cudocompute]"]
 dev = [
     "pre-commit",
     "isort~=5.0",

@@ -168,25 +168,25 @@ jobs:
           path: nebius.csv
           retention-days: 1
 
-  catalog-cudocompute:
-    name: Collect CudoCompute catalog
+  catalog-cudo:
+    name: Collect Cudo catalog
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.11
       - name: Install dependencies
         run: |
           pip install pip -U
-          pip install -e '.[cudocompute]'
+          pip install -e '.[cudo]'
       - name: Collect catalog
         working-directory: src
-        run: python -m gpuhunt cudocompute --output ../cudocompute.csv
-      - uses: actions/upload-artifact@v3
+        run: python -m gpuhunt cudo --output ../cudo.csv
+      - uses: actions/upload-artifact@v4
         with:
-          name: catalogs
-          path: cudocompute.csv
+          name: catalogs-cudo
+          path: cudo.csv
           retention-days: 1
 
   test-catalog:
@@ -198,6 +198,7 @@ jobs:
       - catalog-gcp
       - catalog-lambdalabs
       - catalog-nebius
+      - catalog-cudo
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
