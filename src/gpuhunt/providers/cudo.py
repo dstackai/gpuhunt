@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import chain
 from typing import List, Optional
 
-from cudo_compute import cudo_api
+import requests
 
 from gpuhunt import QueryFilter, RawCatalogItem
 from gpuhunt._internal.constraints import KNOWN_GPUS
@@ -12,6 +12,8 @@ from gpuhunt.providers import AbstractProvider
 
 CpuMemoryGpu = namedtuple("CpuMemoryGpu", ["cpu", "memory", "gpu"])
 logger = logging.getLogger(__name__)
+
+API_URL = "https://rest.compute.cudo.org/v1"
 
 
 class CudoProvider(AbstractProvider):
@@ -42,19 +44,17 @@ class CudoProvider(AbstractProvider):
 
     def get_raw_catalog_list(self, vm_machine_type_list, vcpu, memory, gpu):
         raw_list = []
-        for vm in vm_machine_type_list.host_configs:
+        for vm in vm_machine_type_list:
             raw = RawCatalogItem(
-                instance_name=vm.machine_type,
-                location=vm.data_center_id,
+                instance_name=vm["machineType"],
+                location=vm["dataCenterId"],
                 spot=False,
-                price=round(
-                    (float(vm.total_price_hr.value) + float(vm.storage_gib_price_hr.value)), 5
-                ),
+                price=round(float(vm["totalPriceHr"]["value"]), 5),
                 cpu=vcpu,
                 memory=memory,
                 gpu_count=gpu,
-                gpu_name=gpu_name(vm.gpu_model),
-                gpu_memory=get_memory(gpu_name(vm.gpu_model)),
+                gpu_name=vm["gpuModel"],
+                gpu_memory=get_memory(gpu_name(vm["gpuModel"])),
                 disk_size=None,
             )
             raw_list.append(raw)
@@ -62,12 +62,20 @@ class CudoProvider(AbstractProvider):
 
     def fetch_vm_type(self, vcpu, memory_gib, gpu):
         try:
-            result = cudo_api.virtual_machines().list_vm_machine_types(
-                vcpu=vcpu, memory_gib=memory_gib, gpu=gpu
-            )
+            result = self._list_vm_machine_types(vcpu, memory_gib, gpu)
             return self.get_raw_catalog_list(result, vcpu, memory_gib, gpu)
-        except Exception as e:
+        except requests.HTTPError as e:
             raise VMTypeFetchError(f"Failed to fetch VM type: {e}", vcpu, memory_gib, gpu)
+
+    def _list_vm_machine_types(self, vcpu, memory_gib, gpu):
+        resp = requests.request(
+            method="GET",
+            url=f"{API_URL}/vms/machine-types?vcpu={vcpu}&memory_gib={memory_gib}&gpu={gpu}",
+        )
+        if resp.ok:
+            data = resp.json()
+            return data["hostConfigs"]
+        resp.raise_for_status()
 
 
 class VMTypeFetchError(Exception):

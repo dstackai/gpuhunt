@@ -63,6 +63,23 @@ jobs:
           path: azure.csv
           retention-days: 1
 
+  catalog-cudo:
+    name: Collect Cudo catalog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+      - name: Collect catalog
+        working-directory: src
+        run: python -m gpuhunt cudo --output ../cudo.csv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: catalogs-cudo
+          path: cudo.csv
+          retention-days: 1
+
   catalog-datacrunch:
     name: Collect DataCrunch catalog
     runs-on: ubuntu-latest
@@ -86,7 +103,6 @@ jobs:
           name: catalogs-datacrunch
           path: datacrunch.csv
           retention-days: 1
-
 
   catalog-gcp:
     name: Collect GCP catalog
@@ -168,37 +184,16 @@ jobs:
           path: nebius.csv
           retention-days: 1
 
-  catalog-cudo:
-    name: Collect Cudo catalog
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.11
-      - name: Install dependencies
-        run: |
-          pip install pip -U
-          pip install -e '.[cudo]'
-      - name: Collect catalog
-        working-directory: src
-        run: python -m gpuhunt cudo --output ../cudo.csv
-      - uses: actions/upload-artifact@v4
-        with:
-          name: catalogs-cudo
-          path: cudo.csv
-          retention-days: 1
-
   test-catalog:
     name: Test catalogs integrity
     needs:
       - catalog-aws
       - catalog-azure
+      - catalog-cudo
       - catalog-datacrunch
       - catalog-gcp
       - catalog-lambdalabs
       - catalog-nebius
-      - catalog-cudo
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
