@@ -198,6 +198,7 @@ jobs:
       - catalog-gcp
       - catalog-lambdalabs
       - catalog-nebius
+      - catalog-cudo
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
