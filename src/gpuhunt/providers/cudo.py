@@ -1,12 +1,14 @@
+import logging
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import chain
-from typing import Optional, List
+from typing import List, Optional
+
 from cudo_compute import cudo_api
+
 from gpuhunt import QueryFilter, RawCatalogItem
 from gpuhunt._internal.constraints import KNOWN_GPUS
 from gpuhunt.providers import AbstractProvider
-import logging
 
 CpuMemoryGpu = namedtuple("CpuMemoryGpu", ["cpu", "memory", "gpu"])
 logger = logging.getLogger(__name__)
@@ -16,14 +18,17 @@ class CudoProvider(AbstractProvider):
     NAME = "cudo"
 
     def get(
-            self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
     ) -> List[RawCatalogItem]:
         offers = self.fetch_all_vm_types()
         return sorted(offers, key=lambda i: i.price)
 
     def fetch_all_vm_types(self):
         with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [executor.submit(self.fetch_vm_type, cmg.cpu, cmg.memory, cmg.gpu) for cmg in GPU_MACHINES]
+            futures = [
+                executor.submit(self.fetch_vm_type, cmg.cpu, cmg.memory, cmg.gpu)
+                for cmg in GPU_MACHINES
+            ]
             results = []
             for future in as_completed(futures):
                 try:
@@ -31,7 +36,8 @@ class CudoProvider(AbstractProvider):
                     results.append(result)
                 except Exception as e:
                     logger.info(
-                        f"Unable to find VM type with vCPU: {e.vcpu}, Memory: {e.memory_gib} GiB, GPU: {e.gpu}.")
+                        f"Unable to find VM type with vCPU: {e.vcpu}, Memory: {e.memory_gib} GiB, GPU: {e.gpu}."
+                    )
         return list(chain.from_iterable(results))
 
     def get_raw_catalog_list(self, vm_machine_type_list, vcpu, memory, gpu):
@@ -41,20 +47,24 @@ class CudoProvider(AbstractProvider):
                 instance_name=vm.machine_type,
                 location=vm.data_center_id,
                 spot=False,
-                price=round((float(vm.total_price_hr.value) + float(vm.storage_gib_price_hr.value)), 5),
+                price=round(
+                    (float(vm.total_price_hr.value) + float(vm.storage_gib_price_hr.value)), 5
+                ),
                 cpu=vcpu,
                 memory=memory,
                 gpu_count=gpu,
                 gpu_name=gpu_name(vm.gpu_model),
                 gpu_memory=get_memory(gpu_name(vm.gpu_model)),
-                disk_size=None
+                disk_size=None,
             )
             raw_list.append(raw)
         return raw_list
 
     def fetch_vm_type(self, vcpu, memory_gib, gpu):
         try:
-            result = cudo_api.virtual_machines().list_vm_machine_types(vcpu=vcpu, memory_gib=memory_gib, gpu=gpu)
+            result = cudo_api.virtual_machines().list_vm_machine_types(
+                vcpu=vcpu, memory_gib=memory_gib, gpu=gpu
+            )
             return self.get_raw_catalog_list(result, vcpu, memory_gib, gpu)
         except Exception as e:
             raise VMTypeFetchError(f"Failed to fetch VM type: {e}", vcpu, memory_gib, gpu)
@@ -462,5 +472,5 @@ GPU_MACHINES = [
     CpuMemoryGpu(128, 128, 8),
     CpuMemoryGpu(128, 192, 8),
     CpuMemoryGpu(128, 256, 8),
-    CpuMemoryGpu(128, 384, 8)
+    CpuMemoryGpu(128, 384, 8),
 ]
