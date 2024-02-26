@@ -183,9 +183,9 @@ jobs:
       - name: Collect catalog
         working-directory: src
         run: python -m gpuhunt cudo --output ../cudo.csv
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: catalogs
+          name: catalogs-cudo
           path: cudo.csv
           retention-days: 1
 
