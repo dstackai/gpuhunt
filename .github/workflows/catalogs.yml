@@ -189,6 +189,7 @@ jobs:
     needs:
       - catalog-aws
       - catalog-azure
+      - catalog-cudo
       - catalog-datacrunch
       - catalog-gcp
       - catalog-lambdalabs
