@@ -53,7 +53,7 @@ class CudoProvider(AbstractProvider):
                 cpu=vcpu,
                 memory=memory,
                 gpu_count=gpu,
-                gpu_name=vm["gpuModel"],
+                gpu_name=gpu_name(vm["gpuModel"]),
                 gpu_memory=get_memory(gpu_name(vm["gpuModel"])),
                 disk_size=None,
             )

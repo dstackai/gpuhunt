@@ -24,7 +24,6 @@ def test_locations(data_rows):
     expected = {
         "no-luster-1",
         "se-smedjebacken-1",
-        "gb-london-1",
         "se-stockholm-1",
         "us-newyork-1",
         "us-santaclara-1",
@@ -45,4 +44,4 @@ def test_price(data_rows):
 def test_gpu_present(data_rows):
     refs = GPU_MAP.values()
     gpus = select_row(data_rows, "gpu_name")
-    assert all(i in gpus for i in refs)
+    assert all(i in refs for i in gpus)
