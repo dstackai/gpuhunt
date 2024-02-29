@@ -176,6 +176,9 @@ class AzureProvider(AbstractProvider):
             if "GPUs" in capabilities:
                 gpu_count = int(capabilities["GPUs"])
                 gpu_name, gpu_memory = get_gpu_name_memory(resource.name)
+                if gpu_name is None and gpu_count:
+                    logger.warning("Can't parse VM name: %s", resource.name)
+                    continue
             instances[resource.name] = RawCatalogItem(
                 instance_name=resource.name,
                 cpu=capabilities["vCPUs"],

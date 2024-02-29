@@ -42,9 +42,16 @@ class CudoProvider(AbstractProvider):
                     )
         return list(chain.from_iterable(results))
 
-    def get_raw_catalog_list(self, vm_machine_type_list, vcpu, memory, gpu):
+    def get_raw_catalog_list(self, vm_machine_type_list, vcpu, memory, gpu: int):
         raw_list = []
         for vm in vm_machine_type_list:
+            memory = None
+            name = gpu_name(vm["gpuModel"])
+            if name is not None:
+                memory = get_memory(name)
+            if gpu and name is None:
+                logger.warning("Skip. Unknown GPU name: %s", vm["gpuModel"])
+                continue
             raw = RawCatalogItem(
                 instance_name=vm["machineType"],
                 location=vm["dataCenterId"],
@@ -53,8 +60,8 @@ class CudoProvider(AbstractProvider):
                 cpu=vcpu,
                 memory=memory,
                 gpu_count=gpu,
-                gpu_name=gpu_name(vm["gpuModel"]),
-                gpu_memory=get_memory(gpu_name(vm["gpuModel"])),
+                gpu_name=name,
+                gpu_memory=memory,
                 disk_size=None,
             )
             raw_list.append(raw)

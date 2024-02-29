@@ -5,7 +5,7 @@ from typing import List
 
 import pytest
 
-from gpuhunt.providers.datacrunch import GPU_MAP
+from gpuhunt.providers.datacrunch import ALL_AMD_GPUS, GPU_MAP
 
 
 @pytest.fixture
@@ -16,7 +16,7 @@ def data_rows(catalog_dir: Path) -> List[dict]:
 
 
 def select_row(rows, name: str) -> List[str]:
-    return [r[name] for r in rows]
+    return [r[name] for r in rows if r[name]]
 
 
 def test_locations(data_rows):
@@ -46,6 +46,6 @@ def test_price(data_rows):
 
 
 def test_gpu_present(data_rows):
-    refs = GPU_MAP.values()
+    refs = [name for name in GPU_MAP.values() if name not in ALL_AMD_GPUS]
     gpus = select_row(data_rows, "gpu_name")
-    assert set(gpus) != set(refs)
+    assert set(gpus) == set(refs)
