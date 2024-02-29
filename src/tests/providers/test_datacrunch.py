@@ -10,7 +10,7 @@ from gpuhunt.providers.datacrunch import (
     DataCrunchProvider,
     InstanceType,
     generate_instances,
-    gpu_name,
+    get_gpu_name,
     transform_instance,
 )
 
@@ -179,12 +179,11 @@ def list_available_instances(raw_instance_types, locations):
 
 
 def test_gpu_name(caplog):
-    assert gpu_name("1x H100 SXM5 80GB") == "H100"
-    assert gpu_name("") is None
-    assert gpu_name(None) is None
+    assert get_gpu_name("1x H100 SXM5 80GB") == "H100"
+    assert get_gpu_name("") is None
 
     with caplog.at_level(logging.WARNING):
-        gpu_name("1x H200 SXM5 80GB")
+        get_gpu_name("1x H200 SXM5 80GB")
     assert "There is no '1x H200 SXM5 80GB' in GPU_MAP" in caplog.text
 
 

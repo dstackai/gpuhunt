@@ -9,6 +9,13 @@ from datacrunch.instance_types.instance_types import InstanceType
 from gpuhunt import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
+logger = logging.getLogger(__name__)
+
+AMD_RX7900XTX = "RX7900XTX"
+ALL_AMD_GPUS = [
+    AMD_RX7900XTX,
+]
+
 
 class DataCrunchProvider(AbstractProvider):
     NAME = "datacrunch"
@@ -37,6 +44,10 @@ class DataCrunchProvider(AbstractProvider):
     def _get_locations(self) -> List[dict]:
         return self.datacrunch_client.locations.get()
 
+    @classmethod
+    def filter(cls, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
+        return [o for o in offers if o.gpu_name not in ALL_AMD_GPUS]  # skip AMD GPU
+
 
 def generate_instances(
     spots: Iterable[bool], location_codes: Iterable[str], instance_types: Iterable[InstanceType]
@@ -44,14 +55,25 @@ def generate_instances(
     instances = []
     for spot, location, instance in itertools.product(spots, location_codes, instance_types):
         item = transform_instance(copy.copy(instance), spot, location)
+        if item is None:
+            continue
         instances.append(RawCatalogItem.from_dict(item))
     return instances
 
 
-def transform_instance(instance: InstanceType, spot: bool, location: str) -> dict:
+def transform_instance(instance: InstanceType, spot: bool, location: str) -> Optional[dict]:
     gpu_memory = 0
+    gpu_count = instance.gpu["number_of_gpus"]
+    gpu_name = None
+
     if instance.gpu["number_of_gpus"]:
         gpu_memory = instance.gpu_memory["size_in_gigabytes"] / instance.gpu["number_of_gpus"]
+        gpu_name = get_gpu_name(instance.gpu["description"])
+
+    if gpu_count and gpu_name is None:
+        logger.warning("Can't get GPU name from description: '%s'", instance.gpu["description"])
+        return None
+
     raw = dict(
         instance_name=instance.instance_type,
         location=location,
@@ -59,8 +81,8 @@ def transform_instance(instance: InstanceType, spot: bool, location: str) -> dic
         price=instance.spot_price_per_hour if spot else instance.price_per_hour,
         cpu=instance.cpu["number_of_cores"],
         memory=instance.memory["size_in_gigabytes"],
-        gpu_count=instance.gpu["number_of_gpus"],
-        gpu_name=gpu_name(instance.gpu["description"]),
+        gpu_count=gpu_count,
+        gpu_name=gpu_name,
         gpu_memory=gpu_memory,
     )
     return raw
@@ -91,16 +113,25 @@ GPU_MAP = {
     "2x NVidia Tesla V100 16GB": "V100",
     "4x NVidia Tesla V100 16GB": "V100",
     "8x NVidia Tesla V100 16GB": "V100",
+    "1x NVidia L40S": "L40S",
+    "2x NVidia L40S": "L40S",
+    "4x NVidia L40S": "L40S",
+    "8x NVidia L40S": "L40S",
+    "1x AMD 7900XTX": AMD_RX7900XTX,
+    "2x AMD 7900XTX": AMD_RX7900XTX,
+    "4x AMD 7900XTX": AMD_RX7900XTX,
+    "8x AMD 7900XTX": AMD_RX7900XTX,
+    "12x AMD 7900XTX": AMD_RX7900XTX,
 }
 
 
-def gpu_name(name: str) -> Optional[str]:
+def get_gpu_name(name: str) -> Optional[str]:
     if not name:
         return None
 
     result = GPU_MAP.get(name)
 
     if result is None:
-        logging.warning("There is no '%s' in GPU_MAP", name)
+        logger.warning("There is no '%s' in GPU_MAP", name)
 
     return result

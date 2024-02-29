@@ -41,7 +41,12 @@ class LambdaLabsProvider(AbstractProvider):
         for instance in data.values():
             instance = instance["instance_type"]
             logger.info(instance["name"])
-            gpu_count, gpu_name, gpu_memory = parse_description(instance["description"])
+            description = instance["description"]
+            result = parse_description(description)
+            if result is None:
+                logger.warning("Can't parse GPU info from description: %s", description)
+                continue
+            gpu_count, gpu_name, gpu_memory = result
             offer = RawCatalogItem(
                 instance_name=instance["name"],
                 price=instance["price_cents_per_hour"] / 100,
@@ -69,8 +74,10 @@ class LambdaLabsProvider(AbstractProvider):
         return region_offers
 
 
-def parse_description(v: str) -> Tuple[int, str, float]:
+def parse_description(v: str) -> Optional[Tuple[int, str, float]]:
     """Returns gpus count, gpu name, and GPU memory"""
     r = re.match(r"^(\d)x (?:Tesla )?(.+) \((\d+) GB", v)
+    if r is None:
+        return None
     count, gpu_name, gpu_memory = r.groups()
     return int(count), gpu_name.replace(" ", ""), float(gpu_memory)
