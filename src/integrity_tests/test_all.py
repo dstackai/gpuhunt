@@ -1,19 +1,22 @@
 import csv
+import os
 from pathlib import Path
-from typing import List
 
 import pytest
 
+files = sorted(Path(os.environ["CATALOG_DIR"]).glob("*.csv"))
 
-@pytest.fixture
-def catalog_files(catalog_dir: Path) -> List[Path]:
-    return list(catalog_dir.glob("*.csv"))
+
+def catalog_name(catalog) -> str:
+    return catalog.name
 
 
 class TestAllCatalogs:
-    def test_non_zero_cost(self, catalog_files: List[Path]):
-        for file in catalog_files:
-            with open(file, "r") as f:
-                reader = csv.DictReader(f)
-                prices = [float(row["price"]) for row in reader]
-            assert 0 not in prices
+    @pytest.fixture(params=files, ids=catalog_name)
+    def catalog(self, request):
+        yield request.param
+
+    def test_non_zero_cost(self, catalog):
+        reader = csv.DictReader(catalog.open())
+        for row in reader:
+            assert float(row["price"]) != pytest.approx(0), str(row)

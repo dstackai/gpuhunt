@@ -9,6 +9,11 @@ on:
   schedule:
     - cron: '0 1 * * *'  # 01:00 UTC every day
 
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: on
+  PIP_DEFAULT_TIMEOUT: 10
+  PIP_PROGRESS_BAR: off
+
 jobs:
   catalog-aws:
     name: Collect AWS catalog
