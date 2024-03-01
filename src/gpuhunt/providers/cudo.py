@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 
 API_URL = "https://rest.compute.cudo.org/v1"
 
+SKIP_DC = [
+    "se-smedjebacken-1",  # sometimes there are no available VMs
+]
+
 
 class CudoProvider(AbstractProvider):
     NAME = "cudo"
@@ -52,9 +56,12 @@ class CudoProvider(AbstractProvider):
             if gpu and name is None:
                 logger.warning("Skip. Unknown GPU name: %s", vm["gpuModel"])
                 continue
+            data_center = vm["dataCenterId"]
+            if data_center in SKIP_DC:
+                continue
             raw = RawCatalogItem(
                 instance_name=vm["machineType"],
-                location=vm["dataCenterId"],
+                location=data_center,
                 spot=False,
                 price=round(float(vm["totalPriceHr"]["value"]), 5),
                 cpu=vcpu,
