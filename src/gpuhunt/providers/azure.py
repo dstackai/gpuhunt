@@ -1,5 +1,6 @@
 import json
 import logging
+import math
 import os
 import re
 import time
@@ -146,10 +147,13 @@ class AzureProvider(AbstractProvider):
                     continue
                 if not item["armSkuName"]:
                     continue
+                price = float(item["retailPrice"])
+                if math.isclose(price, 0):
+                    continue
                 offer = RawCatalogItem(
                     instance_name=item["armSkuName"],
                     location=item["armRegionName"],
-                    price=item["retailPrice"],
+                    price=price,
                     spot="Spot" in item["meterName"],
                     cpu=None,
                     memory=None,
