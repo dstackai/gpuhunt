@@ -147,6 +147,7 @@ def locations():
     # datacrunch.locations.get()
     return [
         {"code": "FIN-01", "name": "Finland 1", "country_code": "FI"},
+        {"code": "FIN-02", "name": "Finland 2", "country_code": "FI"},
         {"code": "ICE-01", "name": "Iceland 1", "country_code": "IS"},
     ]
 
