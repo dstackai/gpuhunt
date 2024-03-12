@@ -2,12 +2,12 @@ import logging
 from collections import namedtuple
 from itertools import chain
 from math import ceil
-from typing import List, Optional, Union, TypeVar
+from typing import List, Optional, TypeVar, Union
 
 import requests
-
 from gpuhunt import QueryFilter, RawCatalogItem
-from gpuhunt._internal.constraints import KNOWN_GPUS, is_between, get_compute_capability
+from gpuhunt._internal.constraints import (KNOWN_GPUS, get_compute_capability,
+                                           is_between)
 from gpuhunt.providers import AbstractProvider
 
 CpuMemoryGpu = namedtuple("CpuMemoryGpu", ["cpu", "memory", "gpu"])
