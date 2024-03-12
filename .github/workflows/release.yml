@@ -5,6 +5,11 @@ on:
     tags:
       - '*'
 
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: on
+  PIP_DEFAULT_TIMEOUT: 10
+  PIP_PROGRESS_BAR: off
+
 jobs:
   python-lint:
     runs-on: ubuntu-latest
