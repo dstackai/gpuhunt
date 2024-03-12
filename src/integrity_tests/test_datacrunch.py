@@ -20,7 +20,11 @@ def select_row(rows, name: str) -> List[str]:
 
 
 def test_locations(data_rows):
-    expected = set(("FIN-01", "ICE-01"))
+    expected = {
+        "FIN-01",
+        "FIN-02",
+        "ICE-01",
+    }
     locations = select_row(data_rows, "location")
     assert set(locations) == expected
 

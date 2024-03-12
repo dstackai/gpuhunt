@@ -46,7 +46,7 @@ List of all available filters:
 from gpuhunt import Catalog
 
 catalog = Catalog()
-catalog.load(version="20230831")
+catalog.load(version="20240310")
 items = catalog.query()
 
 print(*items, sep="\n")
