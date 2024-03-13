@@ -2,10 +2,17 @@ from itertools import chain
 from typing import List
 
 import pytest
+
+from src.gpuhunt.providers.cudo import (
+    CudoProvider,
+    get_balanced_disk_size,
+    get_balanced_memory,
+    get_memory,
+    gpu_name,
+    optimize_offers_with_gpu,
+)
+
 from gpuhunt import QueryFilter
-from src.gpuhunt.providers.cudo import (CudoProvider, get_balanced_disk_size,
-                                        get_balanced_memory, get_memory,
-                                        gpu_name, optimize_offers_with_gpu)
 
 
 @pytest.fixture
