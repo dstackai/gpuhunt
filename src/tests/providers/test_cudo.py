@@ -2,14 +2,14 @@ from typing import List
 
 import pytest
 
-from gpuhunt import QueryFilter
+import gpuhunt._internal.catalog as internal_catalog
+from gpuhunt import Catalog
 from gpuhunt.providers.cudo import (
     CudoProvider,
     get_balanced_disk_size,
     get_balanced_memory,
     get_memory,
     gpu_name,
-    optimize_offers_with_gpu,
 )
 
 
@@ -39,93 +39,142 @@ def machine_types() -> List[dict]:
             "totalGpuFree": 24,
             "maxStorageGibFree": 42420,
             "totalStorageGibFree": 42420,
-        }
+        },
+        {
+            "dataCenterId": "no-luster-1",
+            "machineType": "epyc-rome-rtx-a5000",
+            "cpuModel": "EPYC-Rome",
+            "gpuModel": "RTX A5000",
+            "gpuModelId": "nvidia-rtx-a5000",
+            "minVcpuPerMemoryGib": 0.259109,
+            "maxVcpuPerMemoryGib": 1.036437,
+            "minVcpuPerGpu": 1,
+            "maxVcpuPerGpu": 16,
+            "vcpuPriceHr": {"value": "0.002100"},
+            "memoryGibPriceHr": {"value": "0.003400"},
+            "gpuPriceHr": {"value": "0.520000"},
+            "minStorageGibPriceHr": {"value": "0.000107"},
+            "ipv4PriceHr": {"value": "0.003500"},
+            "renewableEnergy": False,
+            "maxVcpuFree": 116,
+            "totalVcpuFree": 208,
+            "maxMemoryGibFree": 219,
+            "totalMemoryGibFree": 390,
+            "maxGpuFree": 4,
+            "totalGpuFree": 7,
+            "maxStorageGibFree": 1170,
+            "totalStorageGibFree": 1170,
+        },
     ]
 
 
-def test_get_offers_with_query_filter():
+def test_get_offers_with_query_filter(mocker, machine_types):
+    catalog = Catalog(balance_resources=False, auto_reload=False)
     cudo = CudoProvider()
-    offers = cudo.get(QueryFilter(min_gpu_count=1, max_gpu_count=1), balance_resources=True)
-    print(f"{len(offers)} offers found")
-    assert len(offers) >= 1, "No offers found"
+    cudo.list_vm_machine_types = mocker.Mock(return_value=machine_types)
+    internal_catalog.ONLINE_PROVIDERS = ["cudo"]
+    internal_catalog.OFFLINE_PROVIDERS = []
+    catalog.add_provider(cudo)
+    query_result = catalog.query(provider=["cudo"], min_gpu_count=1, max_gpu_count=1)
+    assert len(query_result) >= 1, "No offers found"
 
 
-def test_get_offers_for_gpu_name():
+def test_get_offers_for_gpu_name(mocker, machine_types):
+    catalog = Catalog(balance_resources=True, auto_reload=False)
     cudo = CudoProvider()
-    offers = cudo.get(QueryFilter(min_gpu_count=1, gpu_name=["A4000"]), balance_resources=True)
-    print(f"{len(offers)} offers found")
-    assert len(offers) >= 1, "No offers found"
+    cudo.list_vm_machine_types = mocker.Mock(return_value=machine_types)
+    internal_catalog.ONLINE_PROVIDERS = ["cudo"]
+    internal_catalog.OFFLINE_PROVIDERS = []
+    catalog.add_provider(cudo)
+    query_result = catalog.query(provider=["cudo"], min_gpu_count=1, gpu_name=["A5000"])
+    assert len(query_result) >= 1, "No offers found"
 
 
-def test_get_offers_for_gpu_memory():
+def test_get_offers_for_gpu_memory(mocker, machine_types):
+    catalog = Catalog(balance_resources=True, auto_reload=False)
     cudo = CudoProvider()
-    offers = cudo.get(QueryFilter(min_gpu_count=1, min_gpu_memory=16), balance_resources=True)
-    print(f"{len(offers)} offers found")
-    assert len(offers) >= 1, "No offers found"
+    cudo.list_vm_machine_types = mocker.Mock(return_value=machine_types)
+    internal_catalog.ONLINE_PROVIDERS = ["cudo"]
+    internal_catalog.OFFLINE_PROVIDERS = []
+    catalog.add_provider(cudo)
+    query_result = catalog.query(provider=["cudo"], min_gpu_count=1, min_gpu_memory=16)
+    assert len(query_result) >= 1, "No offers found"
 
 
-def test_get_offers_for_compute_capability():
+def test_get_offers_for_compute_capability(mocker, machine_types):
+    catalog = Catalog(balance_resources=True, auto_reload=False)
     cudo = CudoProvider()
-    offers = cudo.get(
-        QueryFilter(min_gpu_count=1, min_compute_capability=(8, 6)), balance_resources=True
+    cudo.list_vm_machine_types = mocker.Mock(return_value=machine_types)
+    internal_catalog.ONLINE_PROVIDERS = ["cudo"]
+    internal_catalog.OFFLINE_PROVIDERS = []
+    catalog.add_provider(cudo)
+    query_result = catalog.query(provider=["cudo"], min_gpu_count=1, min_compute_capability=(8, 6))
+    assert len(query_result) >= 1, "No offers found"
+
+
+def test_get_offers_no_query_filter(mocker, machine_types):
+    catalog = Catalog(balance_resources=True, auto_reload=False)
+    cudo = CudoProvider()
+    cudo.list_vm_machine_types = mocker.Mock(return_value=machine_types)
+    internal_catalog.ONLINE_PROVIDERS = ["cudo"]
+    internal_catalog.OFFLINE_PROVIDERS = []
+    catalog.add_provider(cudo)
+    query_result = catalog.query(provider=["cudo"])
+    assert len(query_result) >= 1, "No offers found"
+
+
+def test_optimize_offers_2(mocker, machine_types):
+    catalog = Catalog(balance_resources=True, auto_reload=False)
+    cudo = CudoProvider()
+    cudo.list_vm_machine_types = mocker.Mock(return_value=machine_types[0:1])
+    internal_catalog.ONLINE_PROVIDERS = ["cudo"]
+    internal_catalog.OFFLINE_PROVIDERS = []
+    catalog.add_provider(cudo)
+    query_result = catalog.query(
+        provider=["cudo"], min_cpu=2, min_gpu_count=1, max_gpu_count=1, min_memory=8
     )
-    print(f"{len(offers)} offers found")
-    assert len(offers) >= 1, "No offers found"
-
-
-def test_get_offers_no_query_filter():
-    cudo = CudoProvider()
-    offers = cudo.get(balance_resources=True)
-    print(f"{len(offers)} offers found")
-    assert len(offers) >= 1, "No offers found"
-
-
-def test_optimize_offers(machine_types):
     machine_type = machine_types[0]
-    machine_type["gpu_memory"] = get_memory(gpu_name(machine_type["gpuModel"]))
-    q = QueryFilter(min_cpu=2, min_gpu_count=1, max_gpu_count=1, min_memory=8)
     balance_resource = True
     available_disk = machine_type["maxStorageGibFree"]
     gpu_memory = get_memory(gpu_name(machine_type["gpuModel"]))
-    max_memory = q.max_memory
-    max_disk_size = q.max_disk_size
-    min_disk_size = q.min_disk_size
-    vm_configs = optimize_offers_with_gpu(q, machine_type, balance_resources=balance_resource)
+    max_memory = None
+    max_disk_size = None
+    min_disk_size = None
 
-    assert len(vm_configs) >= 1
+    assert len(query_result) >= 1
 
-    for config in vm_configs:
-        min_cpus_for_memory = machine_type["minVcpuPerMemoryGib"] * config["memory"]
-        max_cpus_for_memory = machine_type["maxVcpuPerMemoryGib"] * config["memory"]
-        min_cpus_for_gpu = machine_type["minVcpuPerGpu"] * config["gpu"]
-        assert config["cpu"] >= min_cpus_for_memory, (
+    for config in query_result:
+        min_cpus_for_memory = machine_type["minVcpuPerMemoryGib"] * config.cpu
+        max_cpus_for_memory = machine_type["maxVcpuPerMemoryGib"] * config.memory
+        min_cpus_for_gpu = machine_type["minVcpuPerGpu"] * config.gpu_count
+        assert config.cpu >= min_cpus_for_memory, (
             f"VM config does not meet the minimum CPU:Memory requirement. Required minimum CPUs: "
-            f"{min_cpus_for_memory}, Found: {config['cpu']}"
+            f"{min_cpus_for_memory}, Found: {config.cpu}"
         )
-        assert config["cpu"] <= max_cpus_for_memory, (
+        assert config.cpu <= max_cpus_for_memory, (
             f"VM config exceeds the maximum CPU:Memory allowance. Allowed maximum CPUs: "
-            f"{max_cpus_for_memory}, Found: {config['cpu']}"
+            f"{max_cpus_for_memory}, Found: {config.cpu}"
         )
-        assert config["cpu"] >= min_cpus_for_gpu, (
+        assert config.cpu >= min_cpus_for_gpu, (
             f"VM config does not meet the minimum CPU:GPU requirement. "
-            f"Required minimum CPUs: {min_cpus_for_gpu}, Found: {config['cpu']}"
+            f"Required minimum CPUs: {min_cpus_for_gpu}, Found: {config.cpu}"
         )
         # Perform the balance resource checks if balance_resource is True
         if balance_resource:
-            expected_memory = get_balanced_memory(config["gpu"], gpu_memory, max_memory)
+            expected_memory = get_balanced_memory(config.gpu_count, gpu_memory, max_memory)
             expected_disk_size = get_balanced_disk_size(
                 available_disk,
-                config["memory"],
-                config["gpu"] * gpu_memory,
+                config.memory,
+                config.gpu_count * gpu_memory,
                 max_disk_size,
                 min_disk_size,
             )
 
-            assert config["memory"] == expected_memory, (
+            assert config.memory == expected_memory, (
                 f"Memory allocation does not match the expected balanced memory. "
-                f"Expected: {expected_memory}, Found: {config['memory']} in config {config}"
+                f"Expected: {expected_memory}, Found: {config.memory}"
             )
-            assert config["disk_size"] == expected_disk_size, (
+            assert config.disk_size == expected_disk_size, (
                 f"Disk size allocation does not match the expected balanced disk size. "
-                f"Expected: {expected_disk_size}, Found: {config['disk_size']}"
+                f"Expected: {expected_disk_size}, Found: {config.disk_size}"
             )

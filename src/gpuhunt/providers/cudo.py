@@ -100,7 +100,7 @@ class CudoProvider(AbstractProvider):
                 raw_catalogs = [get_raw_catalog(machine_type, spec) for spec in optimized_specs]
                 offers.append(raw_catalogs)
         else:
-            cpu_only_machine_types = [vm for vm in machine_types if vm["maxGpuFree"] == 0]
+            cpu_only_machine_types = [vm for vm in machine_types if vm["maxVcpuFree"] != 0]
             for machine_type in cpu_only_machine_types:
                 optimized_specs = optimize_offers_no_gpu(q, machine_type, balance_resource)
                 raw_catalogs = [get_raw_catalog(machine_type, spec) for spec in optimized_specs]
