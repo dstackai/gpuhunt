@@ -320,7 +320,7 @@ def round_up(value: Optional[Union[int, float]], step: int) -> Optional[int]:
 def round_down(value: Optional[Union[int, float]], step: int) -> Optional[int]:
     if value is None:
         return None
-    return value // step * step
+    return int(value // step * step)
 
 
 T = TypeVar("T", bound=Union[int, float])
