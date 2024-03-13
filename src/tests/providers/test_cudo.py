@@ -2,7 +2,8 @@ from typing import List
 
 import pytest
 
-from src.gpuhunt.providers.cudo import (
+from gpuhunt import QueryFilter
+from gpuhunt.providers.cudo import (
     CudoProvider,
     get_balanced_disk_size,
     get_balanced_memory,
@@ -10,8 +11,6 @@ from src.gpuhunt.providers.cudo import (
     gpu_name,
     optimize_offers_with_gpu,
 )
-
-from gpuhunt import QueryFilter
 
 
 @pytest.fixture
