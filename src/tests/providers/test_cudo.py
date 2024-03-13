@@ -50,6 +50,29 @@ def test_get_offers_with_query_filter():
     assert len(offers) >= 1, "No offers found"
 
 
+def test_get_offers_for_gpu_name():
+    cudo = CudoProvider()
+    offers = cudo.get(QueryFilter(min_gpu_count=1, gpu_name=["A4000"]), balance_resources=True)
+    print(f"{len(offers)} offers found")
+    assert len(offers) >= 1, "No offers found"
+
+
+def test_get_offers_for_gpu_memory():
+    cudo = CudoProvider()
+    offers = cudo.get(QueryFilter(min_gpu_count=1, min_gpu_memory=16), balance_resources=True)
+    print(f"{len(offers)} offers found")
+    assert len(offers) >= 1, "No offers found"
+
+
+def test_get_offers_for_compute_capability():
+    cudo = CudoProvider()
+    offers = cudo.get(
+        QueryFilter(min_gpu_count=1, min_compute_capability=(8, 6)), balance_resources=True
+    )
+    print(f"{len(offers)} offers found")
+    assert len(offers) >= 1, "No offers found"
+
+
 def test_get_offers_no_query_filter():
     cudo = CudoProvider()
     offers = cudo.get(balance_resources=True)

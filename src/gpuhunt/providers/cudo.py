@@ -77,8 +77,14 @@ class CudoProvider(AbstractProvider):
             # filter offers with gpus
             gpu_machine_types = [vm for vm in machine_types if vm["maxGpuFree"] != 0]
             for machine_type in gpu_machine_types:
-                machine_type["gpu_name"] = gpu_name(machine_type["gpuModel"])
-                machine_type["gpu_memory"] = get_memory(machine_type["gpu_name"])
+                gpu_model_name = gpu_name(machine_type["gpuModel"])
+                if gpu_model_name is None:
+                    continue
+                gpu_memory_size = get_memory(gpu_model_name)
+                if gpu_memory_size is None:
+                    continue
+                machine_type["gpu_name"] = gpu_model_name
+                machine_type["gpu_memory"] = gpu_memory_size
                 if not is_between(
                     machine_type["gpu_memory"], q.min_gpu_memory, q.max_total_gpu_memory
                 ):
@@ -101,17 +107,6 @@ class CudoProvider(AbstractProvider):
                 offers.append(raw_catalogs)
 
         return list(chain.from_iterable(offers))
-
-
-class VMTypeFetchError(Exception):
-    def __init__(self, message, vcpu, memory_gib, gpu):
-        super().__init__(message)
-        self.vcpu = vcpu
-        self.memory_gib = memory_gib
-        self.gpu = gpu
-
-    def __str__(self):
-        return f"{super().__str__()} - [vCPU: {self.vcpu}, Memory: {self.memory_gib} GiB, GPU: {self.gpu}]"
 
 
 def get_raw_catalog(machine_type, spec):
@@ -305,16 +300,15 @@ def gpu_name(name: str) -> Optional[str]:
     if not name:
         return None
     result = GPU_MAP.get(name)
-    if result is None:
-        raise Exception("There is no '%s' in GPU_MAP", name)
     return result
 
 
 def get_memory(gpu_name: str) -> Optional[int]:
+    if not gpu_name:
+        return None
     for gpu in KNOWN_GPUS:
         if gpu.name.lower() == gpu_name.lower():
             return gpu.memory
-    raise Exception("There is no '%s' in KNOWN_GPUS", gpu_name)
 
 
 def round_up(value: Optional[Union[int, float]], step: int) -> Optional[int]:
