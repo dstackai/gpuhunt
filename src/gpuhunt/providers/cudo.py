@@ -49,7 +49,7 @@ class CudoProvider(AbstractProvider):
             return list(chain.from_iterable(offers))
 
     @staticmethod
-    def list_vm_machine_types() -> list[dict]:
+    def list_vm_machine_types():
         resp = requests.request(
             method="GET",
             url=f"{API_URL}/vms/machine-types-2",
@@ -60,9 +60,7 @@ class CudoProvider(AbstractProvider):
         resp.raise_for_status()
 
     @staticmethod
-    def optimize_offers(
-        machine_types: list[dict], q: QueryFilter, balance_resource
-    ) -> List[RawCatalogItem]:
+    def optimize_offers(machine_types, q: QueryFilter, balance_resource) -> List[RawCatalogItem]:
         offers = []
         if any(
             condition is not None
@@ -136,7 +134,7 @@ def get_raw_catalog(machine_type, spec):
     return raw
 
 
-def optimize_offers_with_gpu(q: QueryFilter, machine_type, balance_resources) -> List[dict]:
+def optimize_offers_with_gpu(q: QueryFilter, machine_type, balance_resources):
     # Generate ranges for CPU, GPU, and memory based on the specified minimums, maximums, and available resources
     cpu_range = get_cpu_range(q.min_cpu, q.max_cpu, machine_type["maxVcpuFree"])
     gpu_range = get_gpu_range(q.min_gpu_count, q.max_gpu_count, machine_type["maxGpuFree"])
@@ -200,7 +198,7 @@ def optimize_offers_with_gpu(q: QueryFilter, machine_type, balance_resources) ->
     return unbalanced_specs
 
 
-def optimize_offers_no_gpu(q: QueryFilter, machine_type, balance_resource) -> List[dict]:
+def optimize_offers_no_gpu(q: QueryFilter, machine_type, balance_resource):
     # Generate ranges for CPU, memory based on the specified minimums, maximums, and available resources
     cpu_range = get_cpu_range(q.min_cpu, q.max_cpu, machine_type["maxVcpuFree"])
     memory_range = get_memory_range(q.min_memory, q.max_memory, machine_type["maxMemoryGibFree"])
