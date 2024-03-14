@@ -21,6 +21,7 @@ def default_catalog() -> Catalog:
     for module, provider in [
         ("gpuhunt.providers.tensordock", "TensorDockProvider"),
         ("gpuhunt.providers.vastai", "VastAIProvider"),
+        ("gpuhunt.providers.cudo", "CudoProvider"),
     ]:
         try:
             module = importlib.import_module(module)

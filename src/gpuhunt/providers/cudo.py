@@ -1,19 +1,26 @@
 import logging
 from collections import namedtuple
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import chain
-from typing import List, Optional
+from math import ceil
+from typing import List, Optional, TypeVar, Union
 
 import requests
 
 from gpuhunt import QueryFilter, RawCatalogItem
-from gpuhunt._internal.constraints import KNOWN_GPUS
+from gpuhunt._internal.constraints import KNOWN_GPUS, get_compute_capability, is_between
 from gpuhunt.providers import AbstractProvider
 
 CpuMemoryGpu = namedtuple("CpuMemoryGpu", ["cpu", "memory", "gpu"])
 logger = logging.getLogger(__name__)
 
 API_URL = "https://rest.compute.cudo.org/v1"
+MIN_CPU = 2
+MIN_MEMORY = 8
+RAM_PER_VRAM = 2
+RAM_DIV = 2
+CPU_DIV = 2
+RAM_PER_CORE = 4
+MIN_DISK_SIZE = 100
 
 
 class CudoProvider(AbstractProvider):
@@ -22,94 +29,309 @@ class CudoProvider(AbstractProvider):
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
     ) -> List[RawCatalogItem]:
-        offers = self.fetch_all_vm_types()
+        offers = self.fetch_offers(query_filter, balance_resources)
         return sorted(offers, key=lambda i: i.price)
 
-    def fetch_all_vm_types(self):
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [
-                executor.submit(self.fetch_vm_type, cmg.cpu, cmg.memory, cmg.gpu)
-                for cmg in GPU_MACHINES
-            ]
-            results = []
-            for future in as_completed(futures):
-                try:
-                    result = future.result()
-                    results.append(result)
-                except Exception as e:
-                    logger.info(
-                        f"Unable to find VM type with vCPU: {e.vcpu}, Memory: {e.memory_gib} GiB, GPU: {e.gpu}."
-                    )
-        return list(chain.from_iterable(results))
+    def fetch_offers(
+        self, query_filter: Optional[QueryFilter], balance_resources
+    ) -> List[RawCatalogItem]:
+        machine_types = self.list_vm_machine_types()
+        if query_filter is not None:
+            return self.optimize_offers(machine_types, query_filter, balance_resources)
+        else:
+            offers = []
+            for machine_type in machine_types:
+                optimized_specs = optimize_offers_with_gpu(
+                    QueryFilter(), machine_type, balance_resources=False
+                )
+                raw_catalogs = [get_raw_catalog(machine_type, spec) for spec in optimized_specs]
+                offers.append(raw_catalogs)
+            return list(chain.from_iterable(offers))
 
-    def get_raw_catalog_list(self, vm_machine_type_list, vcpu, memory, gpu: int):
-        raw_list = []
-        for vm in vm_machine_type_list:
-            memory = None
-            name = gpu_name(vm["gpuModel"])
-            if name is not None:
-                memory = get_memory(name)
-            if gpu and name is None:
-                logger.warning("Skip. Unknown GPU name: %s", vm["gpuModel"])
-                continue
-            raw = RawCatalogItem(
-                instance_name=vm["machineType"],
-                location=vm["dataCenterId"],
-                spot=False,
-                price=round(float(vm["totalPriceHr"]["value"]), 5),
-                cpu=vcpu,
-                memory=memory,
-                gpu_count=gpu,
-                gpu_name=name,
-                gpu_memory=memory,
-                disk_size=None,
-            )
-            raw_list.append(raw)
-        return raw_list
-
-    def fetch_vm_type(self, vcpu, memory_gib, gpu):
-        try:
-            result = self._list_vm_machine_types(vcpu, memory_gib, gpu)
-            return self.get_raw_catalog_list(result, vcpu, memory_gib, gpu)
-        except requests.HTTPError as e:
-            raise VMTypeFetchError(f"Failed to fetch VM type: {e}", vcpu, memory_gib, gpu)
-
-    def _list_vm_machine_types(self, vcpu, memory_gib, gpu):
+    @staticmethod
+    def list_vm_machine_types():
         resp = requests.request(
             method="GET",
-            url=f"{API_URL}/vms/machine-types?vcpu={vcpu}&memory_gib={memory_gib}&gpu={gpu}",
+            url=f"{API_URL}/vms/machine-types-2",
         )
         if resp.ok:
             data = resp.json()
-            return data["hostConfigs"]
+            return data["machineTypes"]
         resp.raise_for_status()
 
+    @staticmethod
+    def optimize_offers(machine_types, q: QueryFilter, balance_resource) -> List[RawCatalogItem]:
+        offers = []
+        if any(
+            condition is not None
+            for condition in [
+                q.min_gpu_count,
+                q.max_gpu_count,
+                q.min_total_gpu_memory,
+                q.max_total_gpu_memory,
+                q.min_gpu_memory,
+                q.max_gpu_memory,
+                q.gpu_name,
+            ]
+        ):
+            # filter offers with gpus
+            gpu_machine_types = [vm for vm in machine_types if vm["maxGpuFree"] != 0]
+            for machine_type in gpu_machine_types:
+                gpu_model_name = gpu_name(machine_type["gpuModel"])
+                if gpu_model_name is None:
+                    continue
+                gpu_memory_size = get_memory(gpu_model_name)
+                if gpu_memory_size is None:
+                    continue
+                machine_type["gpu_name"] = gpu_model_name
+                machine_type["gpu_memory"] = gpu_memory_size
+                if not is_between(
+                    machine_type["gpu_memory"], q.min_gpu_memory, q.max_total_gpu_memory
+                ):
+                    continue
+                if q.gpu_name is not None and machine_type["gpu_name"].lower() not in q.gpu_name:
+                    continue
+                cc = get_compute_capability(machine_type["gpu_name"])
+                if not cc or not is_between(
+                    cc, q.min_compute_capability, q.max_compute_capability
+                ):
+                    continue
+                optimized_specs = optimize_offers_with_gpu(q, machine_type, balance_resource)
+                raw_catalogs = [get_raw_catalog(machine_type, spec) for spec in optimized_specs]
+                offers.append(raw_catalogs)
+        else:
+            cpu_only_machine_types = [vm for vm in machine_types if vm["maxVcpuFree"] != 0]
+            for machine_type in cpu_only_machine_types:
+                optimized_specs = optimize_offers_no_gpu(q, machine_type, balance_resource)
+                raw_catalogs = [get_raw_catalog(machine_type, spec) for spec in optimized_specs]
+                offers.append(raw_catalogs)
 
-class VMTypeFetchError(Exception):
-    def __init__(self, message, vcpu, memory_gib, gpu):
-        super().__init__(message)
-        self.vcpu = vcpu
-        self.memory_gib = memory_gib
-        self.gpu = gpu
+        return list(chain.from_iterable(offers))
 
-    def __str__(self):
-        return f"{super().__str__()} - [vCPU: {self.vcpu}, Memory: {self.memory_gib} GiB, GPU: {self.gpu}]"
+
+def get_raw_catalog(machine_type, spec):
+    raw = RawCatalogItem(
+        instance_name=machine_type["machineType"],
+        location=machine_type["dataCenterId"],
+        spot=False,
+        price=(round(float(machine_type["vcpuPriceHr"]["value"]), 5) * spec["cpu"])
+        + (round(float(machine_type["memoryGibPriceHr"]["value"]), 5) * spec["memory"])
+        + (round(float(machine_type["gpuPriceHr"]["value"]), 5) * spec.get("gpu", 0))
+        + (round(float(machine_type["minStorageGibPriceHr"]["value"]), 5) * spec["disk_size"])
+        + (round(float(machine_type["ipv4PriceHr"]["value"]), 5)),
+        cpu=spec["cpu"],
+        memory=spec["memory"],
+        gpu_count=spec.get("gpu", 0),
+        gpu_name=machine_type.get("gpu_name", ""),
+        gpu_memory=machine_type.get("gpu_memory", 0),
+        disk_size=spec["disk_size"],
+    )
+    return raw
+
+
+def optimize_offers_with_gpu(q: QueryFilter, machine_type, balance_resources):
+    # Generate ranges for CPU, GPU, and memory based on the specified minimums, maximums, and available resources
+    cpu_range = get_cpu_range(q.min_cpu, q.max_cpu, machine_type["maxVcpuFree"])
+    gpu_range = get_gpu_range(q.min_gpu_count, q.max_gpu_count, machine_type["maxGpuFree"])
+    memory_range = get_memory_range(q.min_memory, q.max_memory, machine_type["maxMemoryGibFree"])
+    min_vcpu_per_memory_gib = machine_type.get("minVcpuPerMemoryGib", 0)
+    max_vcpu_per_memory_gib = machine_type.get("maxVcpuPerMemoryGib", float("inf"))
+    min_vcpu_per_gpu = machine_type.get("minVcpuPerGpu", 0)
+    max_vcpu_per_gpu = machine_type.get("maxVcpuPerGpu", float("inf"))
+    unbalanced_specs = []
+    for cpu in cpu_range:
+        for gpu in gpu_range:
+            for memory in memory_range:
+                # Check CPU/memory constraints
+                if not is_between(
+                    cpu, memory * min_vcpu_per_memory_gib, memory * max_vcpu_per_memory_gib
+                ):
+                    continue
+
+                # Check CPU/GPU constraints
+                if gpu > 0:
+                    if not is_between(cpu, gpu * min_vcpu_per_gpu, gpu * max_vcpu_per_gpu):
+                        continue
+
+                # If all constraints are met, append this combination
+                unbalanced_specs.append({"cpu": cpu, "memory": memory, "gpu": gpu})
+
+    # If resource balancing is required, filter combinations to meet the balanced memory requirement
+    if balance_resources:
+        memory_balanced = [
+            spec
+            for spec in unbalanced_specs
+            if spec["memory"]
+            == get_balanced_memory(spec["gpu"], machine_type["gpu_memory"], q.max_memory)
+        ]
+        balanced_specs = memory_balanced
+        # Add disk
+        balanced_specs = [
+            {
+                "cpu": spec["cpu"],
+                "memory": spec["memory"],
+                "gpu": spec["gpu"],
+                "disk_size": get_balanced_disk_size(
+                    machine_type["maxStorageGibFree"],
+                    spec["memory"],
+                    spec["gpu"] * machine_type["gpu_memory"],
+                    q.max_disk_size,
+                    q.min_disk_size,
+                ),
+            }
+            for spec in balanced_specs
+        ]
+        # Return balanced combinations if any; otherwise, return all combinations
+        return balanced_specs
+
+    disk_size = q.min_disk_size if q.min_disk_size is not None else MIN_DISK_SIZE
+    # Add disk
+    unbalanced_specs = [
+        {"cpu": spec["cpu"], "memory": spec["memory"], "gpu": spec["gpu"], "disk_size": disk_size}
+        for spec in unbalanced_specs
+    ]
+    return unbalanced_specs
+
+
+def optimize_offers_no_gpu(q: QueryFilter, machine_type, balance_resource):
+    # Generate ranges for CPU, memory based on the specified minimums, maximums, and available resources
+    cpu_range = get_cpu_range(q.min_cpu, q.max_cpu, machine_type["maxVcpuFree"])
+    memory_range = get_memory_range(q.min_memory, q.max_memory, machine_type["maxMemoryGibFree"])
+
+    # Cudo Specific Constraints
+    min_vcpu_per_memory_gib = machine_type.get("minVcpuPerMemoryGib", 0)
+    max_vcpu_per_memory_gib = machine_type.get("maxVcpuPerMemoryGib", float("inf"))
+
+    unbalanced_specs = []
+    for cpu in cpu_range:
+        for memory in memory_range:
+            # Check CPU/memory constraints
+            if not is_between(
+                cpu, memory * min_vcpu_per_memory_gib, memory * max_vcpu_per_memory_gib
+            ):
+                continue
+            # If all constraints are met, append this combination
+            unbalanced_specs.append({"cpu": cpu, "memory": memory})
+
+    # If resource balancing is required, filter combinations to meet the balanced memory requirement
+    if balance_resource:
+        cpu_balanced = [
+            spec
+            for spec in unbalanced_specs
+            if spec["cpu"] == get_balanced_cpu(spec["memory"], q.max_memory)
+        ]
+
+        balanced_specs = cpu_balanced
+        # Add disk
+        disk_size = q.min_disk_size if q.min_disk_size is not None else MIN_DISK_SIZE
+        balanced_specs = [
+            {"cpu": spec["cpu"], "memory": spec["memory"], "disk_size": disk_size}
+            for spec in balanced_specs
+        ]
+        # Return balanced combinations if any; otherwise, return all combinations
+        return balanced_specs
+
+    disk_size = q.min_disk_size if q.min_disk_size is not None else MIN_DISK_SIZE
+    # Add disk
+    unbalanced_specs = [
+        {
+            "cpu": spec["cpu"],
+            "memory": spec["memory"],
+            "gpu": 0,
+            "disk_size": min_none(machine_type["maxStorageGibFree"], disk_size),
+        }
+        for spec in unbalanced_specs
+    ]
+    return unbalanced_specs
+
+
+def get_cpu_range(min_cpu, max_cpu, max_cpu_free):
+    cpu_range = range(
+        min_cpu if min_cpu is not None else MIN_CPU,
+        min(max_cpu if max_cpu is not None else max_cpu_free, max_cpu_free) + 1,
+    )
+    return cpu_range
+
+
+def get_gpu_range(min_gpu_count, max_gpu_count, max_gpu_free):
+    gpu_range = range(
+        min_gpu_count if min_gpu_count is not None else 1,
+        min(max_gpu_count if max_gpu_count is not None else max_gpu_free, max_gpu_free) + 1,
+    )
+    return gpu_range
+
+
+def get_memory_range(min_memory, max_memory, max_memory_gib_free):
+    memory_range = range(
+        int(min_memory) if min_memory is not None else MIN_MEMORY,
+        min(
+            int(max_memory) if max_memory is not None else max_memory_gib_free, max_memory_gib_free
+        )
+        + 1,
+    )
+    return memory_range
+
+
+def get_balanced_memory(gpu_count, gpu_memory, max_memory):
+    return min_none(
+        round_up(RAM_PER_VRAM * gpu_memory * gpu_count, RAM_DIV), round_down(max_memory, RAM_DIV)
+    )
+
+
+def get_balanced_cpu(memory, max_cpu):
+    return min_none(
+        round_up(ceil(memory / RAM_PER_CORE), CPU_DIV),
+        round_down(max_cpu, CPU_DIV),  # can be None
+    )
+
+
+def get_balanced_disk_size(available_disk, memory, total_gpu_memory, max_disk_size, min_disk_size):
+    return max_none(
+        min_none(
+            available_disk,
+            max(memory, total_gpu_memory),
+            max_disk_size,
+        ),
+        min_disk_size,
+    )
 
 
 def gpu_name(name: str) -> Optional[str]:
     if not name:
         return None
     result = GPU_MAP.get(name)
-    if result is None:
-        raise Exception("There is no '%s' in GPU_MAP", name)
     return result
 
 
 def get_memory(gpu_name: str) -> Optional[int]:
+    if not gpu_name:
+        return None
     for gpu in KNOWN_GPUS:
         if gpu.name.lower() == gpu_name.lower():
             return gpu.memory
-    raise Exception("There is no '%s' in KNOWN_GPUS", gpu_name)
+
+
+def round_up(value: Optional[Union[int, float]], step: int) -> Optional[int]:
+    if value is None:
+        return None
+    return round_down(value + step - 1, step)
+
+
+def round_down(value: Optional[Union[int, float]], step: int) -> Optional[int]:
+    if value is None:
+        return None
+    return int(value // step * step)
+
+
+T = TypeVar("T", bound=Union[int, float])
+
+
+def min_none(*args: Optional[T]) -> T:
+    return min(v for v in args if v is not None)
+
+
+def max_none(*args: Optional[T]) -> T:
+    return max(v for v in args if v is not None)
 
 
 GPU_MAP = {
@@ -119,373 +341,5 @@ GPU_MAP = {
     "RTX A6000": "A6000",
     "NVIDIA A40": "A40",
     "NVIDIA V100": "V100",
+    "RTX 3080": "RTX3080",
 }
-
-GPU_MACHINES = [
-    CpuMemoryGpu(1, 1, 1),
-    CpuMemoryGpu(1, 2, 1),
-    CpuMemoryGpu(1, 3, 1),
-    CpuMemoryGpu(1, 4, 1),
-    CpuMemoryGpu(2, 2, 1),
-    CpuMemoryGpu(2, 2, 2),
-    CpuMemoryGpu(2, 3, 1),
-    CpuMemoryGpu(2, 3, 2),
-    CpuMemoryGpu(2, 4, 1),
-    CpuMemoryGpu(2, 4, 2),
-    CpuMemoryGpu(2, 6, 1),
-    CpuMemoryGpu(2, 6, 2),
-    CpuMemoryGpu(2, 8, 1),
-    CpuMemoryGpu(2, 8, 2),
-    CpuMemoryGpu(3, 3, 1),
-    CpuMemoryGpu(3, 3, 2),
-    CpuMemoryGpu(3, 3, 3),
-    CpuMemoryGpu(3, 4, 1),
-    CpuMemoryGpu(3, 4, 2),
-    CpuMemoryGpu(3, 4, 3),
-    CpuMemoryGpu(3, 6, 1),
-    CpuMemoryGpu(3, 6, 2),
-    CpuMemoryGpu(3, 6, 3),
-    CpuMemoryGpu(3, 8, 1),
-    CpuMemoryGpu(3, 8, 2),
-    CpuMemoryGpu(3, 8, 3),
-    CpuMemoryGpu(3, 12, 1),
-    CpuMemoryGpu(3, 12, 2),
-    CpuMemoryGpu(3, 12, 3),
-    CpuMemoryGpu(4, 4, 1),
-    CpuMemoryGpu(4, 4, 2),
-    CpuMemoryGpu(4, 4, 3),
-    CpuMemoryGpu(4, 4, 4),
-    CpuMemoryGpu(4, 6, 1),
-    CpuMemoryGpu(4, 6, 2),
-    CpuMemoryGpu(4, 6, 3),
-    CpuMemoryGpu(4, 6, 4),
-    CpuMemoryGpu(4, 8, 1),
-    CpuMemoryGpu(4, 8, 2),
-    CpuMemoryGpu(4, 8, 3),
-    CpuMemoryGpu(4, 8, 4),
-    CpuMemoryGpu(4, 12, 1),
-    CpuMemoryGpu(4, 12, 2),
-    CpuMemoryGpu(4, 12, 3),
-    CpuMemoryGpu(4, 12, 4),
-    CpuMemoryGpu(4, 16, 1),
-    CpuMemoryGpu(4, 16, 2),
-    CpuMemoryGpu(4, 16, 3),
-    CpuMemoryGpu(4, 16, 4),
-    CpuMemoryGpu(6, 6, 1),
-    CpuMemoryGpu(6, 6, 2),
-    CpuMemoryGpu(6, 6, 3),
-    CpuMemoryGpu(6, 6, 4),
-    CpuMemoryGpu(6, 6, 5),
-    CpuMemoryGpu(6, 6, 6),
-    CpuMemoryGpu(6, 8, 1),
-    CpuMemoryGpu(6, 8, 2),
-    CpuMemoryGpu(6, 8, 3),
-    CpuMemoryGpu(6, 8, 4),
-    CpuMemoryGpu(6, 8, 5),
-    CpuMemoryGpu(6, 8, 6),
-    CpuMemoryGpu(6, 12, 1),
-    CpuMemoryGpu(6, 12, 2),
-    CpuMemoryGpu(6, 12, 3),
-    CpuMemoryGpu(6, 12, 4),
-    CpuMemoryGpu(6, 12, 5),
-    CpuMemoryGpu(6, 12, 6),
-    CpuMemoryGpu(6, 16, 1),
-    CpuMemoryGpu(6, 16, 2),
-    CpuMemoryGpu(6, 16, 3),
-    CpuMemoryGpu(6, 16, 4),
-    CpuMemoryGpu(6, 16, 5),
-    CpuMemoryGpu(6, 16, 6),
-    CpuMemoryGpu(6, 24, 1),
-    CpuMemoryGpu(6, 24, 2),
-    CpuMemoryGpu(6, 24, 3),
-    CpuMemoryGpu(6, 24, 4),
-    CpuMemoryGpu(6, 24, 5),
-    CpuMemoryGpu(6, 24, 6),
-    CpuMemoryGpu(8, 8, 1),
-    CpuMemoryGpu(8, 8, 2),
-    CpuMemoryGpu(8, 8, 3),
-    CpuMemoryGpu(8, 8, 4),
-    CpuMemoryGpu(8, 8, 5),
-    CpuMemoryGpu(8, 8, 6),
-    CpuMemoryGpu(8, 8, 7),
-    CpuMemoryGpu(8, 8, 8),
-    CpuMemoryGpu(8, 12, 1),
-    CpuMemoryGpu(8, 12, 2),
-    CpuMemoryGpu(8, 12, 3),
-    CpuMemoryGpu(8, 12, 4),
-    CpuMemoryGpu(8, 12, 5),
-    CpuMemoryGpu(8, 12, 6),
-    CpuMemoryGpu(8, 12, 7),
-    CpuMemoryGpu(8, 12, 8),
-    CpuMemoryGpu(8, 16, 1),
-    CpuMemoryGpu(8, 16, 2),
-    CpuMemoryGpu(8, 16, 3),
-    CpuMemoryGpu(8, 16, 4),
-    CpuMemoryGpu(8, 16, 5),
-    CpuMemoryGpu(8, 16, 6),
-    CpuMemoryGpu(8, 16, 7),
-    CpuMemoryGpu(8, 16, 8),
-    CpuMemoryGpu(8, 24, 1),
-    CpuMemoryGpu(8, 24, 2),
-    CpuMemoryGpu(8, 24, 3),
-    CpuMemoryGpu(8, 24, 4),
-    CpuMemoryGpu(8, 24, 5),
-    CpuMemoryGpu(8, 24, 6),
-    CpuMemoryGpu(8, 24, 7),
-    CpuMemoryGpu(8, 24, 8),
-    CpuMemoryGpu(8, 32, 1),
-    CpuMemoryGpu(8, 32, 2),
-    CpuMemoryGpu(8, 32, 3),
-    CpuMemoryGpu(8, 32, 4),
-    CpuMemoryGpu(8, 32, 5),
-    CpuMemoryGpu(8, 32, 6),
-    CpuMemoryGpu(8, 32, 7),
-    CpuMemoryGpu(8, 32, 8),
-    CpuMemoryGpu(12, 12, 1),
-    CpuMemoryGpu(12, 12, 2),
-    CpuMemoryGpu(12, 12, 3),
-    CpuMemoryGpu(12, 12, 4),
-    CpuMemoryGpu(12, 12, 5),
-    CpuMemoryGpu(12, 12, 6),
-    CpuMemoryGpu(12, 12, 7),
-    CpuMemoryGpu(12, 12, 8),
-    CpuMemoryGpu(12, 16, 1),
-    CpuMemoryGpu(12, 16, 2),
-    CpuMemoryGpu(12, 16, 3),
-    CpuMemoryGpu(12, 16, 4),
-    CpuMemoryGpu(12, 16, 5),
-    CpuMemoryGpu(12, 16, 6),
-    CpuMemoryGpu(12, 16, 7),
-    CpuMemoryGpu(12, 16, 8),
-    CpuMemoryGpu(12, 24, 1),
-    CpuMemoryGpu(12, 24, 2),
-    CpuMemoryGpu(12, 24, 3),
-    CpuMemoryGpu(12, 24, 4),
-    CpuMemoryGpu(12, 24, 5),
-    CpuMemoryGpu(12, 24, 6),
-    CpuMemoryGpu(12, 24, 7),
-    CpuMemoryGpu(12, 24, 8),
-    CpuMemoryGpu(12, 32, 1),
-    CpuMemoryGpu(12, 32, 2),
-    CpuMemoryGpu(12, 32, 3),
-    CpuMemoryGpu(12, 32, 4),
-    CpuMemoryGpu(12, 32, 5),
-    CpuMemoryGpu(12, 32, 6),
-    CpuMemoryGpu(12, 32, 7),
-    CpuMemoryGpu(12, 32, 8),
-    CpuMemoryGpu(12, 48, 1),
-    CpuMemoryGpu(12, 48, 2),
-    CpuMemoryGpu(12, 48, 3),
-    CpuMemoryGpu(12, 48, 4),
-    CpuMemoryGpu(12, 48, 5),
-    CpuMemoryGpu(12, 48, 6),
-    CpuMemoryGpu(12, 48, 7),
-    CpuMemoryGpu(12, 48, 8),
-    CpuMemoryGpu(16, 16, 1),
-    CpuMemoryGpu(16, 16, 2),
-    CpuMemoryGpu(16, 16, 3),
-    CpuMemoryGpu(16, 16, 4),
-    CpuMemoryGpu(16, 16, 5),
-    CpuMemoryGpu(16, 16, 6),
-    CpuMemoryGpu(16, 16, 7),
-    CpuMemoryGpu(16, 16, 8),
-    CpuMemoryGpu(16, 24, 1),
-    CpuMemoryGpu(16, 24, 2),
-    CpuMemoryGpu(16, 24, 3),
-    CpuMemoryGpu(16, 24, 4),
-    CpuMemoryGpu(16, 24, 5),
-    CpuMemoryGpu(16, 24, 6),
-    CpuMemoryGpu(16, 24, 7),
-    CpuMemoryGpu(16, 24, 8),
-    CpuMemoryGpu(16, 32, 1),
-    CpuMemoryGpu(16, 32, 2),
-    CpuMemoryGpu(16, 32, 3),
-    CpuMemoryGpu(16, 32, 4),
-    CpuMemoryGpu(16, 32, 5),
-    CpuMemoryGpu(16, 32, 6),
-    CpuMemoryGpu(16, 32, 7),
-    CpuMemoryGpu(16, 32, 8),
-    CpuMemoryGpu(16, 48, 1),
-    CpuMemoryGpu(16, 48, 2),
-    CpuMemoryGpu(16, 48, 3),
-    CpuMemoryGpu(16, 48, 4),
-    CpuMemoryGpu(16, 48, 5),
-    CpuMemoryGpu(16, 48, 6),
-    CpuMemoryGpu(16, 48, 7),
-    CpuMemoryGpu(16, 48, 8),
-    CpuMemoryGpu(16, 64, 1),
-    CpuMemoryGpu(16, 64, 2),
-    CpuMemoryGpu(16, 64, 3),
-    CpuMemoryGpu(16, 64, 4),
-    CpuMemoryGpu(16, 64, 5),
-    CpuMemoryGpu(16, 64, 6),
-    CpuMemoryGpu(16, 64, 7),
-    CpuMemoryGpu(16, 64, 8),
-    CpuMemoryGpu(24, 24, 1),
-    CpuMemoryGpu(24, 24, 2),
-    CpuMemoryGpu(24, 24, 3),
-    CpuMemoryGpu(24, 24, 4),
-    CpuMemoryGpu(24, 24, 5),
-    CpuMemoryGpu(24, 24, 6),
-    CpuMemoryGpu(24, 24, 7),
-    CpuMemoryGpu(24, 24, 8),
-    CpuMemoryGpu(24, 32, 1),
-    CpuMemoryGpu(24, 32, 2),
-    CpuMemoryGpu(24, 32, 3),
-    CpuMemoryGpu(24, 32, 4),
-    CpuMemoryGpu(24, 32, 5),
-    CpuMemoryGpu(24, 32, 6),
-    CpuMemoryGpu(24, 32, 7),
-    CpuMemoryGpu(24, 32, 8),
-    CpuMemoryGpu(24, 48, 1),
-    CpuMemoryGpu(24, 48, 2),
-    CpuMemoryGpu(24, 48, 3),
-    CpuMemoryGpu(24, 48, 4),
-    CpuMemoryGpu(24, 48, 5),
-    CpuMemoryGpu(24, 48, 6),
-    CpuMemoryGpu(24, 48, 7),
-    CpuMemoryGpu(24, 48, 8),
-    CpuMemoryGpu(24, 64, 1),
-    CpuMemoryGpu(24, 64, 2),
-    CpuMemoryGpu(24, 64, 3),
-    CpuMemoryGpu(24, 64, 4),
-    CpuMemoryGpu(24, 64, 5),
-    CpuMemoryGpu(24, 64, 6),
-    CpuMemoryGpu(24, 64, 7),
-    CpuMemoryGpu(24, 64, 8),
-    CpuMemoryGpu(24, 96, 1),
-    CpuMemoryGpu(24, 96, 2),
-    CpuMemoryGpu(24, 96, 3),
-    CpuMemoryGpu(24, 96, 4),
-    CpuMemoryGpu(24, 96, 5),
-    CpuMemoryGpu(24, 96, 6),
-    CpuMemoryGpu(24, 96, 7),
-    CpuMemoryGpu(24, 96, 8),
-    CpuMemoryGpu(32, 32, 1),
-    CpuMemoryGpu(32, 32, 2),
-    CpuMemoryGpu(32, 32, 3),
-    CpuMemoryGpu(32, 32, 4),
-    CpuMemoryGpu(32, 32, 5),
-    CpuMemoryGpu(32, 32, 6),
-    CpuMemoryGpu(32, 32, 7),
-    CpuMemoryGpu(32, 32, 8),
-    CpuMemoryGpu(32, 48, 1),
-    CpuMemoryGpu(32, 48, 2),
-    CpuMemoryGpu(32, 48, 3),
-    CpuMemoryGpu(32, 48, 4),
-    CpuMemoryGpu(32, 48, 5),
-    CpuMemoryGpu(32, 48, 6),
-    CpuMemoryGpu(32, 48, 7),
-    CpuMemoryGpu(32, 48, 8),
-    CpuMemoryGpu(32, 64, 1),
-    CpuMemoryGpu(32, 64, 2),
-    CpuMemoryGpu(32, 64, 3),
-    CpuMemoryGpu(32, 64, 4),
-    CpuMemoryGpu(32, 64, 5),
-    CpuMemoryGpu(32, 64, 6),
-    CpuMemoryGpu(32, 64, 7),
-    CpuMemoryGpu(32, 64, 8),
-    CpuMemoryGpu(32, 96, 1),
-    CpuMemoryGpu(32, 96, 2),
-    CpuMemoryGpu(32, 96, 3),
-    CpuMemoryGpu(32, 96, 4),
-    CpuMemoryGpu(32, 96, 5),
-    CpuMemoryGpu(32, 96, 6),
-    CpuMemoryGpu(32, 96, 7),
-    CpuMemoryGpu(32, 96, 8),
-    CpuMemoryGpu(32, 128, 2),
-    CpuMemoryGpu(32, 128, 3),
-    CpuMemoryGpu(32, 128, 4),
-    CpuMemoryGpu(32, 128, 5),
-    CpuMemoryGpu(32, 128, 6),
-    CpuMemoryGpu(32, 128, 7),
-    CpuMemoryGpu(32, 128, 8),
-    CpuMemoryGpu(48, 48, 2),
-    CpuMemoryGpu(48, 48, 3),
-    CpuMemoryGpu(48, 48, 4),
-    CpuMemoryGpu(48, 48, 5),
-    CpuMemoryGpu(48, 48, 6),
-    CpuMemoryGpu(48, 48, 7),
-    CpuMemoryGpu(48, 48, 8),
-    CpuMemoryGpu(48, 64, 2),
-    CpuMemoryGpu(48, 64, 3),
-    CpuMemoryGpu(48, 64, 4),
-    CpuMemoryGpu(48, 64, 5),
-    CpuMemoryGpu(48, 64, 6),
-    CpuMemoryGpu(48, 64, 7),
-    CpuMemoryGpu(48, 64, 8),
-    CpuMemoryGpu(48, 96, 2),
-    CpuMemoryGpu(48, 96, 3),
-    CpuMemoryGpu(48, 96, 4),
-    CpuMemoryGpu(48, 96, 5),
-    CpuMemoryGpu(48, 96, 6),
-    CpuMemoryGpu(48, 96, 7),
-    CpuMemoryGpu(48, 96, 8),
-    CpuMemoryGpu(48, 128, 2),
-    CpuMemoryGpu(48, 128, 3),
-    CpuMemoryGpu(48, 128, 4),
-    CpuMemoryGpu(48, 128, 5),
-    CpuMemoryGpu(48, 128, 6),
-    CpuMemoryGpu(48, 128, 7),
-    CpuMemoryGpu(48, 128, 8),
-    CpuMemoryGpu(48, 192, 2),
-    CpuMemoryGpu(48, 192, 3),
-    CpuMemoryGpu(48, 192, 4),
-    CpuMemoryGpu(48, 192, 5),
-    CpuMemoryGpu(48, 192, 6),
-    CpuMemoryGpu(48, 192, 7),
-    CpuMemoryGpu(48, 192, 8),
-    CpuMemoryGpu(64, 64, 2),
-    CpuMemoryGpu(64, 64, 3),
-    CpuMemoryGpu(64, 64, 4),
-    CpuMemoryGpu(64, 64, 5),
-    CpuMemoryGpu(64, 64, 6),
-    CpuMemoryGpu(64, 64, 7),
-    CpuMemoryGpu(64, 64, 8),
-    CpuMemoryGpu(64, 96, 2),
-    CpuMemoryGpu(64, 96, 3),
-    CpuMemoryGpu(64, 96, 4),
-    CpuMemoryGpu(64, 96, 5),
-    CpuMemoryGpu(64, 96, 6),
-    CpuMemoryGpu(64, 96, 7),
-    CpuMemoryGpu(64, 96, 8),
-    CpuMemoryGpu(64, 128, 2),
-    CpuMemoryGpu(64, 128, 3),
-    CpuMemoryGpu(64, 128, 4),
-    CpuMemoryGpu(64, 128, 5),
-    CpuMemoryGpu(64, 128, 6),
-    CpuMemoryGpu(64, 128, 7),
-    CpuMemoryGpu(64, 128, 8),
-    CpuMemoryGpu(64, 192, 2),
-    CpuMemoryGpu(64, 192, 4),
-    CpuMemoryGpu(64, 192, 5),
-    CpuMemoryGpu(64, 192, 6),
-    CpuMemoryGpu(64, 192, 7),
-    CpuMemoryGpu(64, 192, 8),
-    CpuMemoryGpu(64, 256, 4),
-    CpuMemoryGpu(64, 256, 5),
-    CpuMemoryGpu(64, 256, 6),
-    CpuMemoryGpu(64, 256, 7),
-    CpuMemoryGpu(64, 256, 8),
-    CpuMemoryGpu(96, 96, 4),
-    CpuMemoryGpu(96, 96, 6),
-    CpuMemoryGpu(96, 96, 7),
-    CpuMemoryGpu(96, 96, 8),
-    CpuMemoryGpu(96, 128, 4),
-    CpuMemoryGpu(96, 128, 6),
-    CpuMemoryGpu(96, 128, 7),
-    CpuMemoryGpu(96, 128, 8),
-    CpuMemoryGpu(96, 192, 6),
-    CpuMemoryGpu(96, 192, 7),
-    CpuMemoryGpu(96, 192, 8),
-    CpuMemoryGpu(96, 256, 6),
-    CpuMemoryGpu(96, 256, 7),
-    CpuMemoryGpu(96, 256, 8),
-    CpuMemoryGpu(96, 384, 6),
-    CpuMemoryGpu(96, 384, 7),
-    CpuMemoryGpu(96, 384, 8),
-    CpuMemoryGpu(128, 128, 8),
-    CpuMemoryGpu(128, 192, 8),
-    CpuMemoryGpu(128, 256, 8),
-    CpuMemoryGpu(128, 384, 8),
-]
