@@ -63,9 +63,11 @@ class CudoProvider(AbstractProvider):
     @staticmethod
     def optimize_offers(machine_types, q: QueryFilter, balance_resource) -> List[RawCatalogItem]:
         offers = []
-        if any(
-            condition is not None
-            for condition in [
+
+        # Empty query, example: QureyFilter(provider="cudo")
+        get_all_offers = all(
+            condition is None
+            for condition in (
                 q.min_gpu_count,
                 q.max_gpu_count,
                 q.min_total_gpu_memory,
@@ -73,10 +75,27 @@ class CudoProvider(AbstractProvider):
                 q.min_gpu_memory,
                 q.max_gpu_memory,
                 q.gpu_name,
-            ]
-        ):
+            )
+        )
+
+        has_significant_gpu_filter = any(
+            condition is not None
+            for condition in (
+                q.min_gpu_count or None,
+                q.max_gpu_count or None,
+                q.min_total_gpu_memory or None,
+                q.max_total_gpu_memory or None,
+                q.min_gpu_memory or None,
+                q.max_gpu_memory or None,
+                q.gpu_name or None,
+            )
+        )
+
+        if has_significant_gpu_filter or get_all_offers:
             # filter offers with gpus
-            gpu_machine_types = [vm for vm in machine_types if vm["maxGpuFree"] != 0]
+            gpu_machine_types = [
+                vm for vm in machine_types if vm["maxGpuFree"] != 0 and vm["gpuModelId"]
+            ]
             for machine_type in gpu_machine_types:
                 gpu_model_name = gpu_name(machine_type["gpuModel"])
                 if gpu_model_name is None:
@@ -100,8 +119,19 @@ class CudoProvider(AbstractProvider):
                 optimized_specs = optimize_offers_with_gpu(q, machine_type, balance_resource)
                 raw_catalogs = [get_raw_catalog(machine_type, spec) for spec in optimized_specs]
                 offers.append(raw_catalogs)
-        else:
-            cpu_only_machine_types = [vm for vm in machine_types if vm["maxVcpuFree"] != 0]
+
+        include_cpu_offers = any(
+            (
+                q.min_gpu_count == 0,
+                (q.min_total_gpu_memory == 0) if q.min_total_gpu_memory is not None else False,
+                q.min_gpu_memory == 0,
+            )
+        )
+
+        if not has_significant_gpu_filter or get_all_offers or include_cpu_offers:
+            cpu_only_machine_types = [
+                vm for vm in machine_types if vm["maxVcpuFree"] != 0 and not vm["gpuModelId"]
+            ]
             for machine_type in cpu_only_machine_types:
                 optimized_specs = optimize_offers_no_gpu(q, machine_type, balance_resource)
                 raw_catalogs = [get_raw_catalog(machine_type, spec) for spec in optimized_specs]
