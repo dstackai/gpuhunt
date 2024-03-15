@@ -1,4 +1,5 @@
 import logging
+import math
 from collections import namedtuple
 from itertools import chain
 from math import ceil
@@ -114,11 +115,18 @@ def get_raw_catalog(machine_type, spec):
         instance_name=machine_type["machineType"],
         location=machine_type["dataCenterId"],
         spot=False,
-        price=(round(float(machine_type["vcpuPriceHr"]["value"]), 5) * spec["cpu"])
-        + (round(float(machine_type["memoryGibPriceHr"]["value"]), 5) * spec["memory"])
-        + (round(float(machine_type["gpuPriceHr"]["value"]), 5) * spec.get("gpu", 0))
-        + (round(float(machine_type["minStorageGibPriceHr"]["value"]), 5) * spec["disk_size"])
-        + (round(float(machine_type["ipv4PriceHr"]["value"]), 5)),
+        price=round(
+            math.fsum(
+                (
+                    float(machine_type["vcpuPriceHr"]["value"]) * spec["cpu"],
+                    float(machine_type["memoryGibPriceHr"]["value"]) * spec["memory"],
+                    float(machine_type["gpuPriceHr"]["value"]) * spec.get("gpu", 0),
+                    float(machine_type["minStorageGibPriceHr"]["value"]) * spec["disk_size"],
+                    float(machine_type["ipv4PriceHr"]["value"]),
+                )
+            ),
+            5,
+        ),
         cpu=spec["cpu"],
         memory=spec["memory"],
         gpu_count=spec.get("gpu", 0),
