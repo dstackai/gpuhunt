@@ -19,6 +19,7 @@ def main():
             "gcp",
             "lambdalabs",
             "nebius",
+            "runpod",
             "tensordock",
             "vastai",
         ],
@@ -58,6 +59,10 @@ def main():
         from gpuhunt.providers.nebius import NebiusProvider
 
         provider = NebiusProvider(json.loads(os.getenv("NEBIUS_SERVICE_ACCOUNT")))
+    elif args.provider == "runpod":
+        from gpuhunt.providers.runpod import RunpodProvider
+
+        provider = RunpodProvider()
     elif args.provider == "tensordock":
         from gpuhunt.providers.tensordock import TensorDockProvider
 
