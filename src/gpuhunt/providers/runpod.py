@@ -33,6 +33,7 @@ class RunpodProvider(AbstractProvider):
             gpu_types = make_request(payload_gpu_types)
         except RequestException as e:
             logger.exception("Failed to make request for GPU types: %s", e)
+            raise
 
         with ThreadPoolExecutor(max_workers=10) as executor:
             futures = [
