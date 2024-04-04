@@ -31,6 +31,7 @@ class CudoProvider(AbstractProvider):
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
     ) -> List[RawCatalogItem]:
         offers = self.fetch_offers(query_filter, balance_resources)
+        offers = get_min_price_for_location_and_instance(offers)
         return sorted(offers, key=lambda i: i.price)
 
     def fetch_offers(
@@ -165,6 +166,19 @@ def get_raw_catalog(machine_type, spec):
         disk_size=spec["disk_size"],
     )
     return raw
+
+
+def get_min_price_for_location_and_instance(offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
+    """
+    Returns offers with the minimum price for each unique combination
+    of location and instance name.
+    """
+    min_price_offers = {}
+    for offer in offers:
+        key = (offer.location, offer.instance_name)
+        if key not in min_price_offers or offer.price < min_price_offers[key].price:
+            min_price_offers[key] = offer
+    return list(min_price_offers.values())
 
 
 def optimize_offers_with_gpu(q: QueryFilter, machine_type, balance_resources):
