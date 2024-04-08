@@ -3,7 +3,7 @@ import math
 from collections import namedtuple
 from itertools import chain
 from math import ceil
-from typing import List, Optional, TypeVar, Union
+from typing import Dict, List, Optional, TypeVar, Union
 
 import requests
 
@@ -43,6 +43,14 @@ class CudoProvider(AbstractProvider):
         else:
             offers = []
             for machine_type in machine_types:
+                gpu_model_name = gpu_name(machine_type["gpuModel"])
+                if gpu_model_name is None:
+                    continue
+                gpu_memory_size = get_memory(gpu_model_name)
+                if gpu_memory_size is None:
+                    continue
+                machine_type["gpu_name"] = gpu_model_name
+                machine_type["gpu_memory"] = gpu_memory_size
                 optimized_specs = optimize_offers_with_gpu(
                     QueryFilter(), machine_type, balance_resources=False
                 )
@@ -51,7 +59,7 @@ class CudoProvider(AbstractProvider):
             return list(chain.from_iterable(offers))
 
     @staticmethod
-    def list_vm_machine_types():
+    def list_vm_machine_types() -> Dict:
         resp = requests.request(
             method="GET",
             url=f"{API_URL}/vms/machine-types-2",
@@ -181,7 +189,7 @@ def get_min_price_for_location_and_instance(offers: List[RawCatalogItem]) -> Lis
     return list(min_price_offers.values())
 
 
-def optimize_offers_with_gpu(q: QueryFilter, machine_type, balance_resources):
+def optimize_offers_with_gpu(q: QueryFilter, machine_type, balance_resources: bool):
     # Generate ranges for CPU, GPU, and memory based on the specified minimums, maximums, and available resources
     cpu_range = get_cpu_range(q.min_cpu, q.max_cpu, machine_type["maxVcpuFree"])
     gpu_range = get_gpu_range(q.min_gpu_count, q.max_gpu_count, machine_type["maxGpuFree"])
