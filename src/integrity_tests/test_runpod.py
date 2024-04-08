@@ -22,12 +22,12 @@ def select_row(rows, name: str) -> List[str]:
 def test_locations(data_rows):
     expected = {
         "CA-MTL-1",
+        "CA-MTL-2",
         "EU-NL-1",
         "EU-RO-1",
         "EU-SE-1",
         "EUR-IS-1",
         "EUR-IS-2",
-        "EUR-NO-1",
         "US-OR-1",
     }
     locations = select_row(data_rows, "location")
