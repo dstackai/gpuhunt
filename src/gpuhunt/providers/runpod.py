@@ -203,8 +203,8 @@ def get_raw_catalog(offer: dict) -> List[RawCatalogItem]:
 
 
 GPU_MAP = {
-    "NVIDIA A100 80GB PCIe": "A100",
-    "NVIDIA A100-SXM4-80GB": "A100",
+    # "NVIDIA A100 80GB PCIe": "A100",
+    # "NVIDIA A100-SXM4-80GB": "A100",
     "NVIDIA A40": "A40",
     "NVIDIA GeForce RTX 4090": "RTX4090",
     "NVIDIA H100 80GB HBM3": "H100",
