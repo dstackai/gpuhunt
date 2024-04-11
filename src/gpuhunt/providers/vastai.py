@@ -39,6 +39,7 @@ class VastAIProvider(AbstractProvider):
 
         instance_offers = []
         for offer in data["offers"]:
+            disk_size = query_filter and query_filter.min_disk_size or offer["disk_space"]
             if not self.satisfies_filters(offer, filters):
                 logger.warning("Offer %s does not satisfy filters", offer["id"])
                 continue
@@ -49,8 +50,7 @@ class VastAIProvider(AbstractProvider):
                 location=get_location(offer["geolocation"]),
                 # storage_cost is $/gb/month
                 price=round(
-                    offer["dph_base"]
-                    + (query_filter.min_disk_size or 0) * offer["storage_cost"] / 30 / 24,
+                    offer["dph_base"] + disk_size * offer["storage_cost"] / 30 / 24,
                     5,
                 ),
                 cpu=int(offer["cpu_cores_effective"]),
@@ -63,7 +63,7 @@ class VastAIProvider(AbstractProvider):
                 gpu_name=gpu_name,
                 gpu_memory=float(gpu_memory),
                 spot=False,
-                disk_size=offer["disk_space"],
+                disk_size=disk_size,
             )
             instance_offers.append(ondemand_offer)
 
