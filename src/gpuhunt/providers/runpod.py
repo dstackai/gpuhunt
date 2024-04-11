@@ -202,21 +202,30 @@ def get_raw_catalog(offer: dict) -> List[RawCatalogItem]:
     return catalog_items
 
 
-GPU_MAP = {
-    # "NVIDIA A100 80GB PCIe": "A100",
-    # "NVIDIA A100-SXM4-80GB": "A100",
-    "NVIDIA A40": "A40",
-    "NVIDIA GeForce RTX 4090": "RTX4090",
-    "NVIDIA H100 80GB HBM3": "H100",
-    "NVIDIA L40S": "L40",
-    "NVIDIA L40": "L40",
-    "NVIDIA RTX 4000 Ada Generation": "RTX4000",
-    "NVIDIA RTX 6000 Ada Generation": "RTX6000",
-    "NVIDIA RTX A4000": "RTXA4000",
-    # "NVIDIA RTX A4500": "RTXA4500",
-    "NVIDIA RTX A5000": "RTXA5000",
-    "NVIDIA RTX A6000": "RTXA6000",
-}
+def get_gpu_map():
+    payload_gpus = {"query": "query GpuTypes { gpuTypes { id displayName memoryInGb } }"}
+    gpu_types = make_request(payload_gpus)
+    gpu_map = {
+        item["id"]: get_gpu_name(item["displayName"])
+        for item in gpu_types["data"]["gpuTypes"]
+        if get_gpu_name(item["displayName"]) is not None
+    }
+    return gpu_map
+
+
+def get_gpu_name(name: str) -> Optional[str]:
+    if "V100" in name:
+        return "V100"
+    if name.startswith(("A", "L", "H")):
+        gpu_name, _, _ = name.partition(" ")
+        return gpu_name
+    if name.startswith("RTX"):
+        gpu_name = name.replace(" ", "")
+        return gpu_name
+    return None
+
+
+GPU_MAP = get_gpu_map()
 
 gpu_types_query = """
 query GpuTypes {
