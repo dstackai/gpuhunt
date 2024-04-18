@@ -126,6 +126,8 @@ class NebiusProvider(AbstractProvider):
         for platform, presets in GPU_PLATFORMS.items():
             prices = platform_resources[platform]
             for cpu, memory, gpu_count, gpu_name, gpu_memory in presets:
+                if "cpu" not in prices:
+                    continue
                 items.append(
                     RawCatalogItem(
                         instance_name=platform,
@@ -154,6 +156,8 @@ class NebiusProvider(AbstractProvider):
         items = []
         for platform, limits in CPU_PLATFORMS.items():
             prices = platform_resources[platform]
+            if "cpu" not in prices:
+                continue
             for ratio in limits["ratios"]:
                 for cpu in limits["cpus"]:
                     items.append(
