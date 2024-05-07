@@ -170,6 +170,33 @@ jobs:
           path: lambdalabs.csv
           retention-days: 1
 
+  catalog-oci:
+    name: Collect OCI catalog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+      - name: Install dependencies
+        run: |
+          pip install pip -U
+          pip install -e '.[oci]'
+      - name: Collect catalog
+        working-directory: src
+        run: python -m gpuhunt oci --output ../oci.csv
+        env:
+          OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
+          OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_CLI_KEY_CONTENT }}
+          OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
+          OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
+          OCI_CLI_REGION: ${{ secrets.OCI_CLI_REGION }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: catalogs-oci
+          path: oci.csv
+          retention-days: 1
+
   catalog-runpod:
     name: Collect Runpod catalog
     runs-on: ubuntu-latest
@@ -200,6 +227,7 @@ jobs:
       - catalog-datacrunch
       - catalog-gcp
       - catalog-lambdalabs
+      - catalog-oci
       - catalog-runpod
     runs-on: ubuntu-latest
     steps:

@@ -17,6 +17,7 @@ def main():
             "datacrunch",
             "gcp",
             "lambdalabs",
+            "oci",
             "runpod",
             "tensordock",
             "vastai",
@@ -57,6 +58,18 @@ def main():
         from gpuhunt.providers.lambdalabs import LambdaLabsProvider
 
         provider = LambdaLabsProvider(os.getenv("LAMBDALABS_TOKEN"))
+    elif args.provider == "oci":
+        from gpuhunt.providers.oci import OCICredentials, OCIProvider
+
+        provider = OCIProvider(
+            OCICredentials(
+                user=os.getenv("OCI_CLI_USER"),
+                key_content=os.getenv("OCI_CLI_KEY_CONTENT"),
+                fingerprint=os.getenv("OCI_CLI_FINGERPRINT"),
+                tenancy=os.getenv("OCI_CLI_TENANCY"),
+                region=os.getenv("OCI_CLI_REGION"),
+            )
+        )
     elif args.provider == "runpod":
         from gpuhunt.providers.runpod import RunpodProvider
 

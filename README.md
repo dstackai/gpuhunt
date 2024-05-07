@@ -60,6 +60,7 @@ print(*items, sep="\n")
 * DataCrunch
 * GCP
 * LambdaLabs
+* OCI
 * RunPod
 * TensorDock
 * Vast AI
