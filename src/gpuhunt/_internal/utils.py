@@ -16,3 +16,10 @@ def parse_compute_capability(
         major, minor = value.split(".")
         return int(major), int(minor)
     return value
+
+
+def to_camel_case(snake_case: str) -> str:
+    words = snake_case.split("_")
+    words = list(filter(None, words))
+    words[1:] = [word[:1].upper() + word[1:] for word in words[1:]]
+    return "".join(words)
