@@ -1,7 +1,7 @@
 [![](https://img.shields.io/pypi/v/gpuhunt)](https://pypi.org/project/gpuhunt/)
 
-Easy access to GPU pricing data for major cloud providers: AWS, Azure, GCP, and LambdaLabs.
-The catalog includes details about prices, locations, CPUs, RAM, GPUs, and spots (interruptable instances).
+Easy access to GPU pricing data for major cloud providers: AWS, Azure, GCP, etc.
+The catalog includes details about prices, locations, CPUs, RAM, GPUs, and spots (interruptible instances).
 
 ## Usage
 
@@ -46,7 +46,7 @@ List of all available filters:
 from gpuhunt import Catalog
 
 catalog = Catalog()
-catalog.load(version="20240402")
+catalog.load(version="20240508")
 items = catalog.query()
 
 print(*items, sep="\n")
@@ -60,7 +60,7 @@ print(*items, sep="\n")
 * DataCrunch
 * GCP
 * LambdaLabs
-* Nebius
+* RunPod
 * TensorDock
 * Vast AI
 
