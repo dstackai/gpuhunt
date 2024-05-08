@@ -39,6 +39,10 @@ def main():
         from gpuhunt.providers.azure import AzureProvider
 
         provider = AzureProvider(os.getenv("AZURE_SUBSCRIPTION_ID"))
+    elif args.provider == "cudo":
+        from gpuhunt.providers.cudo import CudoProvider
+
+        provider = CudoProvider()
     elif args.provider == "datacrunch":
         from gpuhunt.providers.datacrunch import DataCrunchProvider
 
@@ -65,10 +69,6 @@ def main():
         from gpuhunt.providers.vastai import VastAIProvider
 
         provider = VastAIProvider()
-    elif args.provider == "cudo":
-        from gpuhunt.providers.cudo import CudoProvider
-
-        provider = CudoProvider()
     else:
         exit(f"Unknown provider {args.provider}")
 
