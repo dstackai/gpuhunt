@@ -82,12 +82,12 @@ class GCPProvider(AbstractProvider):
                         location=zone,
                         cpu=machine_type.guest_cpus,
                         memory=round(machine_type.memory_mb / 1024, 1),
-                        gpu_count=machine_type.accelerators[0].guest_accelerator_count
-                        if gpu
-                        else 0,
-                        gpu_name=machine_type.accelerators[0].guest_accelerator_type
-                        if gpu
-                        else None,
+                        gpu_count=(
+                            machine_type.accelerators[0].guest_accelerator_count if gpu else 0
+                        ),
+                        gpu_name=(
+                            machine_type.accelerators[0].guest_accelerator_type if gpu else None
+                        ),
                         gpu_memory=gpu.memory if gpu else None,
                         price=None,
                         spot=None,

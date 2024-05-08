@@ -256,9 +256,9 @@ class NebiusProvider(AbstractProvider):
             if gpu_name not in GPU_NAME_PLATFORM:
                 logger.warning("Unknown GPU name: %s", gpu_name)
                 continue
-            platform_resources[GPU_NAME_PLATFORM[gpu_name]][
-                vm_resources[resource_name]
-            ] = self.get_sku_price(sku["pricingVersions"])
+            platform_resources[GPU_NAME_PLATFORM[gpu_name]][vm_resources[resource_name]] = (
+                self.get_sku_price(sku["pricingVersions"])
+            )
 
         return platform_resources
 
