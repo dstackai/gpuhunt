@@ -9,9 +9,11 @@ def data(catalog_dir: Path) -> str:
 
 
 class TestNebiusCatalog:
+    @pytest.mark.xfail
     def test_zone_presented(self, data: str):
         assert ",eu-north1-c," in data
 
+    @pytest.mark.xfail
     def test_gpu_presented(self, data: str):
         gpus = [
             "A100",
@@ -21,6 +23,7 @@ class TestNebiusCatalog:
         ]
         assert all(f",{i}," in data for i in gpus)
 
+    @pytest.mark.xfail
     def test_h100_platforms(self, data: str):
         platforms = [
             "gpu-h100",
@@ -29,5 +32,6 @@ class TestNebiusCatalog:
         ]
         assert all(f"\n{i}," in data for i in platforms)
 
+    @pytest.mark.xfail
     def test_no_spots(self, data: str):
         assert ",True\n" not in data

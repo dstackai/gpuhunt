@@ -1,5 +1,4 @@
 import argparse
-import json
 import logging
 import os
 import sys
@@ -18,7 +17,6 @@ def main():
             "datacrunch",
             "gcp",
             "lambdalabs",
-            "nebius",
             "runpod",
             "tensordock",
             "vastai",
@@ -55,10 +53,6 @@ def main():
         from gpuhunt.providers.lambdalabs import LambdaLabsProvider
 
         provider = LambdaLabsProvider(os.getenv("LAMBDALABS_TOKEN"))
-    elif args.provider == "nebius":
-        from gpuhunt.providers.nebius import NebiusProvider
-
-        provider = NebiusProvider(json.loads(os.getenv("NEBIUS_SERVICE_ACCOUNT")))
     elif args.provider == "runpod":
         from gpuhunt.providers.runpod import RunpodProvider
 
