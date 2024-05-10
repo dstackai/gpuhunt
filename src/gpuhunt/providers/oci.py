@@ -78,15 +78,24 @@ class OCIProvider(AbstractProvider):
 
             vcpu = ocpu_product.qty if shape.is_arm_cpu() else ocpu_product.qty * 2
 
+            gpu = dict(
+                gpu_count=shape.gpu_qty or 0,
+                gpu_name=get_gpu_name(shape.name),
+                gpu_memory=shape.get_gpu_unit_memory_gb(),
+            )
+            if any(gpu.values()) and not all(gpu.values()):
+                logger.warning(
+                    "Skipping shape %s due to incomplete GPU parameters: %s", shape.name, gpu
+                )
+                continue
+
             catalog_item = RawCatalogItem(
                 instance_name=shape.name,
                 location=None,
                 price=shape_price,
                 cpu=vcpu,
                 memory=shape.bundle_memory_qty,
-                gpu_count=shape.gpu_qty or 0,
-                gpu_name=get_gpu_name(shape.name),
-                gpu_memory=shape.get_gpu_unit_memory_gb(),
+                **gpu,
                 spot=False,
                 disk_size=None,
             )
