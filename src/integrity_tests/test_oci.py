@@ -23,3 +23,13 @@ def test_on_demand_present(data_rows: List[dict]):
 
 def test_vm_present(data_rows: List[dict]):
     assert any(name.startswith("VM") for name in map(itemgetter("instance_name"), data_rows))
+
+
+def test_quantity_decreases_as_query_complexity_increases(data_rows: List[dict]):
+    zero_or_one_gpu = list(filter(lambda row: int(row["gpu_count"]) in (0, 1), data_rows))
+    zero_gpu = list(filter(lambda row: int(row["gpu_count"]) == 0, data_rows))
+    one_gpu = list(filter(lambda row: int(row["gpu_count"]) == 1, data_rows))
+
+    assert len(data_rows) > len(zero_or_one_gpu)
+    assert len(zero_or_one_gpu) > len(zero_gpu)
+    assert len(zero_gpu) > len(one_gpu)
