@@ -208,8 +208,7 @@ class CostEstimator:
 
 
 def get_gpu_name(shape_name: str) -> Optional[str]:
-    parts = re.split(r"[\.-]", shape_name)
-    parts = list(map(str.upper, parts))
+    parts = re.split(r"[\.-]", shape_name.upper())
 
     if "GPU4" in parts:
         return "A100"
