@@ -1,0 +1,135 @@
+{
+    "TPU v5p": {
+        "us-east5": {
+            "Location": "Ohio",
+            "On Demand (USD)": 4.2000,
+            "1-year Commitment (USD)": 2.9400,
+            "3-year Commitment (USD)": 1.8900,
+            "Spot (USD)": 2.1000
+        },
+        "us-east1": {
+            "Location": "South Carolina",
+            "On Demand (USD)": 4.2000,
+            "1-year Commitment (USD)": 2.9400,
+            "3-year Commitment (USD)": 1.8900,
+            "Spot (USD)": 2.1000
+        }
+    },
+    "TPU v5e": {
+        "us-central1": {
+            "Location": "Iowa",
+            "On Demand (USD)": 1.2000,
+            "1-year Commitment (USD)": 0.8400,
+            "3-year Commitment (USD)": 0.5400,
+            "Spot (USD)": 0.6000
+        },
+        "us-east5": {
+            "Location": "Ohio",
+            "On Demand (USD)": 1.2000,
+            "1-year Commitment (USD)": 0.8400,
+            "3-year Commitment (USD)": 0.5400,
+            "Spot (USD)": 0.6000
+        },
+        "us-south1": {
+            "Location": "Dallas",
+            "On Demand (USD)": 1.2000,
+            "1-year Commitment (USD)": 0.8400,
+            "3-year Commitment (USD)": 0.5400,
+            "Spot (USD)": 0.6000
+        },
+        "us-west1": {
+            "Location": "Oregon",
+            "On Demand (USD)": 1.2000,
+            "1-year Commitment (USD)": 0.8400,
+            "3-year Commitment (USD)": 0.5400,
+            "Spot (USD)": 0.6000
+        },
+        "us-west4": {
+            "Location": "Nevada",
+            "On Demand (USD)": 1.2000,
+            "1-year Commitment (USD)": 0.8400,
+            "3-year Commitment (USD)": 0.5400,
+            "Spot (USD)": 0.6000
+        },
+        "europe-west1": {
+            "Location": "Belgium",
+            "On Demand (USD)": 1.3213,
+            "1-year Commitment (USD)": 0.9249,
+            "3-year Commitment (USD)": 0.5946,
+            "Spot (USD)": 0.6607
+        },
+        "europe-west4": {
+            "Location": "Netherlands",
+            "On Demand (USD)": 1.5600,
+            "1-year Commitment (USD)": 1.0920,
+            "3-year Commitment (USD)": 0.7020,
+            "Spot (USD)": 0.7800
+        },
+        "asia-southeast1": {
+            "Location": "Singapore",
+            "On Demand (USD)": 1.5600,
+            "1-year Commitment (USD)": 1.0920,
+            "3-year Commitment (USD)": 0.7020,
+            "Spot (USD)": 0.7800
+        }
+    },
+    "TPU v4 pod": {
+        "us-central2": {
+            "Location": "Oklahoma",
+            "On Demand (USD)": 3.2200,
+            "1-year Commitment (USD)": 2.0286,
+            "3-year Commitment (USD)": 1.4490,
+            "Spot (USD)": 0.9660
+        }
+    },
+    "TPU v3 pod": {
+        "europe-west4": {
+            "Location": "Netherlands",
+            "On Demand (USD)": 2.0000,
+            "1-year Commitment (USD)": 1.2600,
+            "3-year Commitment (USD)": 0.9000,
+            "Spot (USD)": 0.6000
+        }
+    },
+    "TPU v3 device": {
+        "europe-west4": {
+            "Location": "Netherlands",
+            "On Demand (USD)": 2.2000,
+            "1-year Commitment (USD)": 1.3860,
+            "3-year Commitment (USD)": 0.9900,
+            "Spot (USD)": 0.6600
+        }
+    },
+    "TPU v2 pod": {
+        "us-central1": {
+            "Location": "Iowa",
+            "On Demand (USD)": 1.5000,
+            "1-year Commitment (USD)": 0.9450,
+            "3-year Commitment (USD)": 0.6750,
+            "Spot (USD)": 0.4500
+        },
+        "europe-west4": {
+            "Location": "Netherlands",
+            "On Demand (USD)": 1.6500,
+            "1-year Commitment (USD)": 1.0395,
+            "3-year Commitment (USD)": 0.7425,
+            "Spot (USD)": 0.4950
+        }
+    },
+    "TPU v2 device": {
+        "asia-east1": {
+            "Location": "Taiwan",
+            "On Demand (USD)": 1.3050,
+            "1-year Commitment (USD)": 0.8222,
+            "3-year Commitment (USD)": 0.5873,
+            "Spot (USD)": 0.3915
+        },
+        "europe-west4": {
+            "Location": "Netherlands",
+            "On Demand (USD)": 1.2375,
+            "1-year Commitment (USD)": 0.7796,
+            "3-year Commitment (USD)": 0.5569,
+            "Spot (USD)": 0.3713
+        }
+    }
+}
