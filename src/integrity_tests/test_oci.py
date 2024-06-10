@@ -12,7 +12,7 @@ def data_rows(catalog_dir: Path) -> List[dict]:
         return list(csv.DictReader(f))
 
 
-@pytest.mark.parametrize("gpu", ["P100", "V100", "A10", ""])
+@pytest.mark.parametrize("gpu", ["P100", "V100", "A10", "A100", "H100", ""])
 def test_gpu_present(gpu: str, data_rows: List[dict]):
     assert gpu in map(itemgetter("gpu_name"), data_rows)
 
@@ -21,8 +21,9 @@ def test_on_demand_present(data_rows: List[dict]):
     assert "False" in map(itemgetter("spot"), data_rows)
 
 
-def test_vm_present(data_rows: List[dict]):
-    assert any(name.startswith("VM") for name in map(itemgetter("instance_name"), data_rows))
+@pytest.mark.parametrize("prefix", ["VM.Standard", "BM.Standard", "VM.GPU", "BM.GPU"])
+def test_family_present(prefix: str, data_rows: List[dict]):
+    assert any(name.startswith(prefix) for name in map(itemgetter("instance_name"), data_rows))
 
 
 def test_quantity_decreases_as_query_complexity_increases(data_rows: List[dict]):
