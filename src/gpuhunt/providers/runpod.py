@@ -136,8 +136,7 @@ def get_raw_catalog(offer: dict) -> List[RawCatalogItem]:
 
     # Check if both community_price and secure_price are present
     if offer["community_price"] is not None and offer["secure_price"] is not None:
-        # Handle the secure_price case
-        secure_spot = offer["secure_spot_price"] is not None and offer["secure_spot_price"] > 0
+        # Handle the secure_price on demand case
         catalog_items.append(
             RawCatalogItem(
                 instance_name=offer["id"],
@@ -148,15 +147,28 @@ def get_raw_catalog(offer: dict) -> List[RawCatalogItem]:
                 gpu_count=offer["gpu"],
                 gpu_name=offer["gpu_name"],
                 gpu_memory=offer["gpu_memory"],
-                spot=secure_spot,
+                spot=False,
                 disk_size=None,
             )
         )
+        secure_spot = offer["secure_spot_price"] is not None and offer["secure_spot_price"] > 0
+        if secure_spot:
+            catalog_items.append(
+                RawCatalogItem(
+                    instance_name=offer["id"],
+                    location=offer["data_center_id"],
+                    price=float(offer["secure_spot_price"] * offer["gpu"]),
+                    cpu=offer["cpu"],
+                    memory=offer["memory"],
+                    gpu_count=offer["gpu"],
+                    gpu_name=offer["gpu_name"],
+                    gpu_memory=offer["gpu_memory"],
+                    spot=True,
+                    disk_size=None,
+                )
+            )
 
         # Handle the community_price case
-        community_spot = (
-            offer["community_spot_price"] is not None and offer["community_spot_price"] > 0
-        )
         catalog_items.append(
             RawCatalogItem(
                 instance_name=offer["id"],
@@ -167,10 +179,28 @@ def get_raw_catalog(offer: dict) -> List[RawCatalogItem]:
                 gpu_count=offer["gpu"],
                 gpu_name=offer["gpu_name"],
                 gpu_memory=offer["gpu_memory"],
-                spot=community_spot,
+                spot=False,
                 disk_size=None,
             )
         )
+        community_spot = (
+            offer["community_spot_price"] is not None and offer["community_spot_price"] > 0
+        )
+        if community_spot:
+            catalog_items.append(
+                RawCatalogItem(
+                    instance_name=f'{offer["id"]}',
+                    location=offer["data_center_id"],
+                    price=float(offer["community_spot_price"] * offer["gpu"]),
+                    cpu=offer["cpu"],
+                    memory=offer["memory"],
+                    gpu_count=offer["gpu"],
+                    gpu_name=offer["gpu_name"],
+                    gpu_memory=offer["gpu_memory"],
+                    spot=True,
+                    disk_size=None,
+                )
+            )
     else:
         # Handle the case where only one price is present
         price = (
@@ -183,7 +213,6 @@ def get_raw_catalog(offer: dict) -> List[RawCatalogItem]:
             if offer["secure_price"] is not None
             else offer["community_spot_price"]
         )
-        spot = spot_price is not None and spot_price > 0
         catalog_items.append(
             RawCatalogItem(
                 instance_name=offer["id"],
@@ -194,11 +223,26 @@ def get_raw_catalog(offer: dict) -> List[RawCatalogItem]:
                 gpu_count=offer["gpu"],
                 gpu_name=offer["gpu_name"],
                 gpu_memory=offer["gpu_memory"],
-                spot=spot,
+                spot=False,
                 disk_size=None,
             )
         )
-
+        spot = spot_price is not None and spot_price > 0
+        if spot:
+            catalog_items.append(
+                RawCatalogItem(
+                    instance_name=f'{offer["id"]}',
+                    location=offer["data_center_id"],
+                    price=float(spot_price * offer["gpu"]),
+                    cpu=offer["cpu"],
+                    memory=offer["memory"],
+                    gpu_count=offer["gpu"],
+                    gpu_name=offer["gpu_name"],
+                    gpu_memory=offer["gpu_memory"],
+                    spot=True,
+                    disk_size=None,
+                )
+            )
     return catalog_items
 
 
