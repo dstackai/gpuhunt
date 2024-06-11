@@ -36,7 +36,8 @@ azure = [
 ]
 gcp = [
     "google-cloud-billing",
-    "google-cloud-compute"
+    "google-cloud-compute",
+    "google-cloud-tpu"
 ]
 nebius = [
     "pyjwt",

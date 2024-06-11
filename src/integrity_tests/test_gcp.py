@@ -148,6 +148,15 @@ class TestGCPCatalog:
         ]
         assert all(f",{i}," in data for i in gpus)
 
+    def test_tpu_presented(self, data: str):
+        gpus = [
+            "v2",
+            "v3",
+            "v5litepod",
+            "v5p",
+        ]
+        assert all(gpu in data for gpu in gpus)
+
     def test_both_a100_presented(self, data: str):
         assert ",A100,40.0," in data
         assert ",A100,80.0," in data
