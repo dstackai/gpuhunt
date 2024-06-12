@@ -19,7 +19,7 @@ version_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v1/version"
 catalog_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v1/{version}/catalog.zip"
 OFFLINE_PROVIDERS = ["aws", "azure", "datacrunch", "gcp", "lambdalabs", "oci", "runpod"]
 ONLINE_PROVIDERS = ["cudo", "tensordock", "vastai"]
-RELOAD_INTERVAL = 4 * 60 * 60  # 4 hours
+RELOAD_INTERVAL = 15 * 60  # 15 minutes
 
 
 class Catalog:
