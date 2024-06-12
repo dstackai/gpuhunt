@@ -11,7 +11,7 @@ from typing import Iterable, List, Optional, Tuple, Union
 
 import gpuhunt._internal.constraints as constraints
 from gpuhunt._internal.models import CatalogItem, QueryFilter
-from gpuhunt._internal.utils import parse_compute_capability
+from gpuhunt._internal.utils import _is_tpu, parse_compute_capability
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -204,7 +204,7 @@ class Catalog:
                     # tpus does not specify cpu and memory hence different
                     # constraints matching is required.
                     if query_filter.gpu_name is not None:
-                        if any("tpu" in name for name in query_filter.gpu_name):
+                        if any(_is_tpu(name) for name in query_filter.gpu_name):
                             if constraints.tpu_matches(item, query_filter):
                                 items.append(item)
                         else:
