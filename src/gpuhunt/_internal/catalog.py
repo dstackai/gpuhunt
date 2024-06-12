@@ -201,8 +201,18 @@ class Catalog:
                 )
                 for row in reader:
                     item = CatalogItem.from_dict(row, provider=provider_name)
-                    if constraints.matches(item, query_filter):
-                        items.append(item)
+                    # tpus does not specify cpu and memory hence different
+                    # constraints matching is required.
+                    if query_filter.gpu_name is not None:
+                        if any("tpu" in name for name in query_filter.gpu_name):
+                            if constraints.tpu_matches(item, query_filter):
+                                items.append(item)
+                        else:
+                            if constraints.matches(item, query_filter):
+                                items.append(item)
+                    else:
+                        if constraints.matches(item, query_filter):
+                            items.append(item)
         return items
 
     def _get_online_provider_items(
