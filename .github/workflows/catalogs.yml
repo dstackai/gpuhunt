@@ -7,7 +7,7 @@ on:
         required: true
         default: stgn
   schedule:
-    - cron: '0 1 * * *'  # 01:00 UTC every day
+    - cron: '5 * * * *' # Run every hour at HH:05
 
 env:
   PIP_DISABLE_PIP_VERSION_CHECK: on
@@ -261,7 +261,7 @@ jobs:
           pattern: catalogs-*
           merge-multiple: true
       - name: Write version
-        run: date +%Y%m%d > version
+        run: echo "$(date +%Y%m%d)-${{ github.run_number }}" > version
       - name: Package catalogs
         run: zip catalog.zip *.csv version
       - name: Set channel
