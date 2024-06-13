@@ -69,6 +69,22 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
     return True
 
 
+def tpu_matches(i: CatalogItem, q: QueryFilter) -> bool:
+    if q.gpu_name is not None:
+        if i.gpu_name is None:
+            return False
+        if i.gpu_name.lower() not in q.gpu_name:
+            return False
+    if i.disk_size is not None:
+        if not is_between(i.disk_size, q.min_disk_size, q.max_disk_size):
+            return False
+    if not is_between(i.price, q.min_price, q.max_price):
+        return False
+    if q.spot is not None and i.spot != q.spot:
+        return False
+    return True
+
+
 def get_compute_capability(gpu_name: str) -> Optional[Tuple[int, int]]:
     for gpu in KNOWN_GPUS:
         if gpu.name.lower() == gpu_name.lower():
