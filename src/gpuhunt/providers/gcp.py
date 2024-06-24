@@ -50,6 +50,38 @@ accelerator_limits = {
 }
 accelerator_counts = [1, 2, 4, 8, 16]
 
+# https://cloud.google.com/compute/docs/disks/local-ssd#lssd_disks_fixed
+local_ssd_sizes_gib = {
+    "c3-standard-4-lssd": 1 * 375,
+    "c3-standard-8-lssd": 2 * 375,
+    "c3-standard-22-lssd": 4 * 375,
+    "c3-standard-44-lssd": 8 * 375,
+    "c3-standard-88-lssd": 16 * 375,
+    "c3-standard-176-lssd": 32 * 375,
+    "c3d-standard-8-lssd": 1 * 375,
+    "c3d-standard-16-lssd": 1 * 375,
+    "c3d-standard-30-lssd": 2 * 375,
+    "c3d-standard-60-lssd": 4 * 375,
+    "c3d-standard-90-lssd": 8 * 375,
+    "c3d-standard-180-lssd": 16 * 375,
+    "c3d-standard-360-lssd": 32 * 375,
+    "c3d-highmem-8-lssd": 1 * 375,
+    "c3d-highmem-16-lssd": 1 * 375,
+    "c3d-highmem-30-lssd": 2 * 375,
+    "c3d-highmem-60-lssd": 4 * 375,
+    "c3d-highmem-90-lssd": 8 * 375,
+    "c3d-highmem-180-lssd": 16 * 375,
+    "c3d-highmem-360-lssd": 32 * 375,
+    "a3-megagpu-8g": 16 * 375,
+    "a3-highgpu-8g": 16 * 375,
+    "a2-ultragpu-1g": 1 * 375,
+    "a2-ultragpu-2g": 2 * 375,
+    "a2-ultragpu-4g": 4 * 375,
+    "a2-ultragpu-8g": 8 * 375,
+    "z3-standard-88-lssd": 12 * 3000,
+    "z3-standard-176-lssd": 12 * 3000,
+}
+
 
 def load_tpu_pricing():
     resource_package = "gpuhunt.resources"
@@ -198,6 +230,7 @@ class Prices:
         self.cpu: DefaultDict[str, PricePerRegionSpot] = defaultdict(dict)
         self.gpu: DefaultDict[str, PricePerRegionSpot] = defaultdict(dict)
         self.ram: DefaultDict[str, PricePerRegionSpot] = defaultdict(dict)
+        self.local_ssd: PricePerRegionSpot = dict()
 
     def add_skus(self, skus: Iterable[Sku]) -> None:
         for sku in skus:
@@ -216,6 +249,8 @@ class Prices:
                 continue
             if sku.category.resource_family == "Compute":
                 self.add_compute_sku(sku)
+            elif sku.category.resource_family == "Storage":
+                self.add_storage_sku(sku)
 
     def add_compute_sku(self, sku: Sku) -> None:
         r = re.match(
@@ -251,6 +286,12 @@ class Prices:
         }[resource]
         self._add_price(sku, resource_prices[family], price)
 
+    def add_storage_sku(self, sku: Sku) -> None:
+        if sku.description.lower().startswith("ssd backed local storage"):
+            price = sku.pricing_info[0].pricing_expression.tiered_rates[0].unit_price
+            price = price.units + price.nanos / 1e9 / 30 / 24  # convert monthly to hourly
+            self._add_price(sku, self.local_ssd, price)
+
     @staticmethod
     def _add_price(sku: Sku, family_prices: PricePerRegionSpot, price: float) -> None:
         spot = sku.category.usage_type == "Preemptible"
@@ -273,6 +314,8 @@ class Prices:
             if region_spot not in self.gpu[instance.gpu_name]:
                 return None
             price += instance.gpu_count * self.gpu[instance.gpu_name][region_spot]
+        if instance.instance_name in local_ssd_sizes_gib:
+            price += local_ssd_sizes_gib[instance.instance_name] * self.local_ssd[region_spot]
 
         return price
 
