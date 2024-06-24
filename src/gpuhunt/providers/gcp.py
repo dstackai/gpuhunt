@@ -4,12 +4,13 @@ import json
 import logging
 import re
 from collections import defaultdict, namedtuple
-from typing import List, Optional
+from typing import DefaultDict, Dict, Iterable, List, Optional, Tuple
 
 import google.cloud.billing_v1 as billing_v1
 import google.cloud.compute_v1 as compute_v1
 from google.cloud import tpu_v2
 from google.cloud.billing_v1 import CloudCatalogClient, ListSkusRequest
+from google.cloud.billing_v1.types.cloud_catalog import Sku
 from google.cloud.location import locations_pb2
 from google.cloud.location.locations_pb2 import ListLocationsResponse
 
@@ -138,81 +139,16 @@ class GCPProvider(AbstractProvider):
 
     def fill_prices(self, instances: List[RawCatalogItem]) -> List[RawCatalogItem]:
         logger.info("Fetching prices")
-        # fetch per-unit prices
-        families = {
-            "gpu": defaultdict(dict),
-            "ram": defaultdict(dict),
-            "core": defaultdict(dict),
-        }
         skus = self.cloud_catalog_client.list_skus(parent=compute_service)
-        for sku in skus:
-            if sku.category.resource_family != "Compute":
-                continue
-            if sku.category.usage_type not in ["OnDemand", "Preemptible"]:
-                continue
-            if any(
-                word in sku.description
-                for word in [
-                    "Sole Tenancy",
-                    "Reserved",
-                    "Premium",
-                    "Custom",
-                    "suspended",
-                ]
-            ):
-                continue
-            r = re.match(
-                r"^(?:spot preemptible )?(.+) (gpu|ram|core)",
-                sku.description,
-                flags=re.IGNORECASE,
-            )
-            if not r:
-                continue
+        prices = Prices()
+        prices.add_skus(skus)
 
-            family, resource = r.groups()
-            resource = resource.lower()
-            if resource == "gpu":
-                family = family.replace(" ", "-").lower()
-                family = {"nvidia-tesla-a100-80gb": "nvidia-a100-80gb"}.get(family, family)
-            else:
-                r = re.match(r"^([a-z]\d.?) ", family.lower())
-                if r:
-                    family = r.group(1)
-                else:
-                    family = {
-                        "Memory-optimized Instance": "m1",
-                        "Compute optimized Instance": "c2",
-                        "Compute optimized": "c2",
-                    }.get(family, family)
-
-            price = sku.pricing_info[0].pricing_expression.tiered_rates[0].unit_price
-            price = price.units + price.nanos / 1e9
-            spot = sku.category.usage_type == "Preemptible"
-            for region in sku.service_regions:
-                families[resource][family][(region, spot)] = price
-
-        # apply per-unit prices to instances
         offers = []
         for instance in instances:
-            vm_family = instance.instance_name.split("-")[0]
-            if vm_family in [
-                "g1",
-                "f1",
-                "m2",
-            ]:  # ignore shared-core and reservation-only
-                continue
             for spot in (False, True):
-                region_spot = (instance.location[:-2], spot)
-
-                price = 0
-                if region_spot not in families["core"][vm_family]:
+                price = prices.get_instance_price(instance, spot)
+                if price is None:
                     continue
-                price += instance.cpu * families["core"][vm_family][region_spot]
-                price += instance.memory * families["ram"][vm_family][region_spot]
-                if instance.gpu_name:
-                    if region_spot not in families["gpu"][instance.gpu_name]:
-                        continue
-                    price += instance.gpu_count * families["gpu"][instance.gpu_name][region_spot]
 
                 offer = copy.deepcopy(instance)
                 offer.price = round(price, 6)
@@ -251,6 +187,94 @@ class GCPProvider(AbstractProvider):
             )
             or (i.gpu_name and i.gpu_name not in ["K80", "P4"])
         ]
+
+
+RegionSpot = Tuple[str, bool]
+PricePerRegionSpot = Dict[RegionSpot, float]
+
+
+class Prices:
+    def __init__(self):
+        self.cpu: DefaultDict[str, PricePerRegionSpot] = defaultdict(dict)
+        self.gpu: DefaultDict[str, PricePerRegionSpot] = defaultdict(dict)
+        self.ram: DefaultDict[str, PricePerRegionSpot] = defaultdict(dict)
+
+    def add_skus(self, skus: Iterable[Sku]) -> None:
+        for sku in skus:
+            if sku.category.usage_type not in ["OnDemand", "Preemptible"]:
+                continue
+            if any(
+                word in sku.description
+                for word in [
+                    "Sole Tenancy",
+                    "Reserved",
+                    "Premium",
+                    "Custom",
+                    "suspended",
+                ]
+            ):
+                continue
+            if sku.category.resource_family == "Compute":
+                self.add_compute_sku(sku)
+
+    def add_compute_sku(self, sku: Sku) -> None:
+        r = re.match(
+            r"^(?:spot preemptible )?(.+) (gpu|ram|core)",
+            sku.description,
+            flags=re.IGNORECASE,
+        )
+        if not r:
+            return
+        family, resource = r.groups()
+        resource = resource.lower()
+
+        if resource == "gpu":
+            family = family.replace(" ", "-").lower()
+            family = {"nvidia-tesla-a100-80gb": "nvidia-a100-80gb"}.get(family, family)
+        else:
+            r = re.match(r"^([a-z]\d.?) ", family.lower())
+            if r:
+                family = r.group(1)
+            else:
+                family = {
+                    "Memory-optimized Instance": "m1",
+                    "Compute optimized Instance": "c2",
+                    "Compute optimized": "c2",
+                }.get(family, family)
+
+        price = sku.pricing_info[0].pricing_expression.tiered_rates[0].unit_price
+        price = price.units + price.nanos / 1e9
+        resource_prices = {
+            "core": self.cpu,
+            "gpu": self.gpu,
+            "ram": self.ram,
+        }[resource]
+        self._add_price(sku, resource_prices[family], price)
+
+    @staticmethod
+    def _add_price(sku: Sku, family_prices: PricePerRegionSpot, price: float) -> None:
+        spot = sku.category.usage_type == "Preemptible"
+        for region in sku.service_regions:
+            family_prices[(region, spot)] = price
+
+    def get_instance_price(self, instance: RawCatalogItem, spot: bool) -> Optional[float]:
+        vm_family = instance.instance_name.split("-")[0]
+        if vm_family in ["g1", "f1", "m2"]:  # shared-core and reservation-only
+            return None
+
+        region_spot = (instance.location[:-2], spot)
+        if region_spot not in self.cpu[vm_family]:
+            return None
+
+        price = 0
+        price += instance.cpu * self.cpu[vm_family][region_spot]
+        price += instance.memory * self.ram[vm_family][region_spot]
+        if instance.gpu_name:
+            if region_spot not in self.gpu[instance.gpu_name]:
+                return None
+            price += instance.gpu_count * self.gpu[instance.gpu_name][region_spot]
+
+        return price
 
 
 def get_tpu_offers(project_id: str) -> List[RawCatalogItem]:
