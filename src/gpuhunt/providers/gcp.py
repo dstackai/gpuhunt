@@ -49,6 +49,7 @@ accelerator_limits = {
     ],
 }
 accelerator_counts = [1, 2, 4, 8, 16]
+hours_in_month = 730  # according to GCP pricing
 
 # https://cloud.google.com/compute/docs/disks/local-ssd#lssd_disks_fixed
 local_ssd_sizes_gib = {
@@ -289,7 +290,7 @@ class Prices:
     def add_storage_sku(self, sku: Sku) -> None:
         if sku.description.lower().startswith("ssd backed local storage"):
             price = sku.pricing_info[0].pricing_expression.tiered_rates[0].unit_price
-            price = price.units + price.nanos / 1e9 / 30 / 24  # convert monthly to hourly
+            price = price.units + price.nanos / 1e9 / hours_in_month
             self._add_price(sku, self.local_ssd, price)
 
     @staticmethod
