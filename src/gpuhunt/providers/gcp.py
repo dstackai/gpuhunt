@@ -22,6 +22,8 @@ compute_service = "services/6F81-5844-456A"
 AcceleratorDetails = namedtuple("AcceleratorDetails", ["name", "memory"])
 accelerator_details = {
     "nvidia-a100-80gb": AcceleratorDetails("A100", 80.0),
+    "nvidia-h100-80gb": AcceleratorDetails("H100", 80.0),
+    "nvidia-h100-mega-80gb": AcceleratorDetails("H100", 80.0),
     "nvidia-l4": AcceleratorDetails("L4", 24.0),
     "nvidia-tesla-a100": AcceleratorDetails("A100", 40.0),
     "nvidia-tesla-k80": AcceleratorDetails("K80", 12.0),
@@ -50,6 +52,7 @@ accelerator_limits = {
 }
 accelerator_counts = [1, 2, 4, 8, 16]
 hours_in_month = 730  # according to GCP pricing
+multi_token_vm_families = ["a3-megagpu"]
 
 # https://cloud.google.com/compute/docs/disks/local-ssd#lssd_disks_fixed
 local_ssd_sizes_gib = {
@@ -266,7 +269,10 @@ class Prices:
 
         if resource == "gpu":
             family = family.replace(" ", "-").lower()
-            family = {"nvidia-tesla-a100-80gb": "nvidia-a100-80gb"}.get(family, family)
+            family = {
+                "nvidia-tesla-a100-80gb": "nvidia-a100-80gb",
+                "nvidia-h100-80gb-mega": "nvidia-h100-mega-80gb",
+            }.get(family, family)
         else:
             r = re.match(r"^([a-z]\d.?) ", family.lower())
             if r:
@@ -276,6 +282,7 @@ class Prices:
                     "Memory-optimized Instance": "m1",
                     "Compute optimized Instance": "c2",
                     "Compute optimized": "c2",
+                    "A3Plus Instance": "a3-megagpu",
                 }.get(family, family)
 
         price = sku.pricing_info[0].pricing_expression.tiered_rates[0].unit_price
@@ -300,7 +307,7 @@ class Prices:
             family_prices[(region, spot)] = price
 
     def get_instance_price(self, instance: RawCatalogItem, spot: bool) -> Optional[float]:
-        vm_family = instance.instance_name.split("-")[0]
+        vm_family = self.get_vm_family(instance.instance_name)
         if vm_family in ["g1", "f1", "m2"]:  # shared-core and reservation-only
             return None
 
@@ -319,6 +326,13 @@ class Prices:
             price += local_ssd_sizes_gib[instance.instance_name] * self.local_ssd[region_spot]
 
         return price
+
+    @staticmethod
+    def get_vm_family(instance_name: str) -> str:
+        for family in multi_token_vm_families:
+            if instance_name.startswith(family):
+                return family
+        return instance_name.split("-")[0]
 
 
 def get_tpu_offers(project_id: str) -> List[RawCatalogItem]:
