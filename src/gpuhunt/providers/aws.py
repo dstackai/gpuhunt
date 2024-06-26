@@ -218,6 +218,8 @@ class AWSProvider(AbstractProvider):
                     "m5.",
                     "p3.",
                     "g5.",
+                    "g6.",
+                    "gr6.",
                     "g4dn.",
                     "p4d.",
                     "p4de.",
