@@ -55,5 +55,6 @@ class TestAWSCatalog:
             "A10G",
             "T4",
             "V100",
+            "L4",
         ]
         assert all(f",{i}," in data for i in gpus)
