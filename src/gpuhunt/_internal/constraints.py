@@ -82,8 +82,6 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
     return True
 
 
-
-
 def get_compute_capability(gpu_name: str) -> Optional[Tuple[int, int]]:
     for gpu in KNOWN_GPUS:
         if gpu.name.lower() == gpu_name.lower():
