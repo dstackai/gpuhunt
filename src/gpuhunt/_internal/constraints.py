@@ -1,6 +1,7 @@
 from typing import Optional, Tuple, TypeVar, Union
 
 from gpuhunt._internal.models import CatalogItem, GPUInfo, QueryFilter
+from gpuhunt._internal.utils import _is_tpu
 
 Comparable = TypeVar("Comparable", bound=Union[int, float, Tuple[int, int]])
 
@@ -34,8 +35,24 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
     Returns:
         whether the catalog item matches the filters
     """
+    # Common checks
     if q.provider is not None and i.provider.lower() not in q.provider:
         return False
+    if not is_between(i.price, q.min_price, q.max_price):
+        return False
+    if q.spot is not None and i.spot != q.spot:
+        return False
+
+    # TPU specific checks
+    if i.gpu_name and _is_tpu(i.gpu_name.lower()):
+        if q.gpu_name is not None:
+            if i.gpu_name is None:
+                return False
+            if i.gpu_name.lower() not in q.gpu_name:
+                return False
+        return True
+
+    # GPU & CPU checks
     if not is_between(i.cpu, q.min_cpu, q.max_cpu):
         return False
     if not is_between(i.memory, q.min_memory, q.max_memory):
@@ -62,26 +79,6 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
     if i.disk_size is not None:
         if not is_between(i.disk_size, q.min_disk_size, q.max_disk_size):
             return False
-    if not is_between(i.price, q.min_price, q.max_price):
-        return False
-    if q.spot is not None and i.spot != q.spot:
-        return False
-    return True
-
-
-def tpu_matches(i: CatalogItem, q: QueryFilter) -> bool:
-    if q.gpu_name is not None:
-        if i.gpu_name is None:
-            return False
-        if i.gpu_name.lower() not in q.gpu_name:
-            return False
-    if i.disk_size is not None:
-        if not is_between(i.disk_size, q.min_disk_size, q.max_disk_size):
-            return False
-    if not is_between(i.price, q.min_price, q.max_price):
-        return False
-    if q.spot is not None and i.spot != q.spot:
-        return False
     return True
 
 
