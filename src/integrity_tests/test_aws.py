@@ -51,6 +51,7 @@ class TestAWSCatalog:
 
     def test_gpu_presented(self, data: str):
         gpus = [
+            "H100",
             "A100",
             "A10G",
             "T4",
