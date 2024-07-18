@@ -115,7 +115,7 @@ class Catalog:
         if query_filter.provider is not None:
             # validate providers
             for p in query_filter.provider:
-                if p not in OFFLINE_PROVIDERS + ONLINE_PROVIDERS:
+                if p.lower() not in OFFLINE_PROVIDERS + ONLINE_PROVIDERS:
                     raise ValueError(f"Unknown provider: {p}")
         else:
             query_filter.provider = OFFLINE_PROVIDERS + list(
@@ -127,7 +127,7 @@ class Catalog:
             futures = []
 
             for provider_name in ONLINE_PROVIDERS:
-                if provider_name in query_filter.provider:
+                if provider_name in map(str.lower, query_filter.provider):
                     futures.append(
                         executor.submit(
                             self._get_online_provider_items,
@@ -137,7 +137,7 @@ class Catalog:
                     )
 
             for provider_name in OFFLINE_PROVIDERS:
-                if provider_name in query_filter.provider:
+                if provider_name in map(str.lower, query_filter.provider):
                     futures.append(
                         executor.submit(
                             self._get_offline_provider_items,

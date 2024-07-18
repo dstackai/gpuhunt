@@ -110,7 +110,7 @@ class TensorDockProvider(AbstractProvider):
             if not is_between(gpu_info["vram"], q.min_gpu_memory, q.max_gpu_memory):
                 continue
             gpu_name = convert_gpu_name(gpu_model)
-            if q.gpu_name is not None and gpu_name.lower() not in q.gpu_name:
+            if q.gpu_name is not None and gpu_name.lower() not in map(str.lower, q.gpu_name):
                 continue
             cc = get_compute_capability(gpu_name)
             if not cc or not is_between(cc, q.min_compute_capability, q.max_compute_capability):
