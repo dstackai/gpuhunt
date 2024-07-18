@@ -36,7 +36,7 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
         whether the catalog item matches the filters
     """
     # Common checks
-    if q.provider is not None and i.provider.lower() not in q.provider:
+    if q.provider is not None and i.provider.lower() not in map(str.lower, q.provider):
         return False
     if not is_between(i.price, q.min_price, q.max_price):
         return False
@@ -48,7 +48,7 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
         if q.gpu_name is not None:
             if i.gpu_name is None:
                 return False
-            if i.gpu_name.lower() not in q.gpu_name:
+            if i.gpu_name.lower() not in map(str.lower, q.gpu_name):
                 return False
         return True
 
@@ -62,7 +62,7 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
     if q.gpu_name is not None:
         if i.gpu_name is None:
             return False
-        if i.gpu_name.lower() not in q.gpu_name:
+        if i.gpu_name.lower() not in map(str.lower, q.gpu_name):
             return False
     if q.min_compute_capability is not None or q.max_compute_capability is not None:
         cc = get_compute_capability(i.gpu_name)

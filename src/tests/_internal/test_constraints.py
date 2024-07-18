@@ -83,8 +83,18 @@ class TestMatches:
         assert not matches(item, QueryFilter(max_gpu_memory=20.0))
 
     def test_gpu_name(self, item: CatalogItem):
+        assert matches(item, QueryFilter(gpu_name=["a100"]))
         assert matches(item, QueryFilter(gpu_name=["A100"]))
         assert not matches(item, QueryFilter(gpu_name=["A10"]))
+
+    def test_gpu_name_with_filter_setattr(self, item: CatalogItem):
+        q = QueryFilter()
+        q.gpu_name = ["a100"]
+        assert matches(item, q)
+        q.gpu_name = ["A100"]
+        assert matches(item, q)
+        q.gpu_name = ["A10"]
+        assert not matches(item, q)
 
     def test_total_gpu_memory(self, item: CatalogItem):
         assert matches(item, QueryFilter(min_total_gpu_memory=40.0))
@@ -126,4 +136,18 @@ class TestMatches:
 
     def test_provider(self, cpu_items):
         assert matches(cpu_items[0], QueryFilter(provider=["datacrunch"]))
+        assert matches(cpu_items[0], QueryFilter(provider=["DataCrunch"]))
+        assert not matches(cpu_items[0], QueryFilter(provider=["nebius"]))
+
         assert matches(cpu_items[1], QueryFilter(provider=["nebius"]))
+        assert matches(cpu_items[1], QueryFilter(provider=["Nebius"]))
+        assert not matches(cpu_items[1], QueryFilter(provider=["datacrunch"]))
+
+    def test_provider_with_filter_setattr(self, cpu_items):
+        q = QueryFilter()
+        q.provider = ["datacrunch"]
+        assert matches(cpu_items[0], q)
+        q.provider = ["DataCrunch"]
+        assert matches(cpu_items[0], q)
+        q.provider = ["nebius"]
+        assert not matches(cpu_items[0], q)

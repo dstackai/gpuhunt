@@ -38,6 +38,42 @@ class TestQuery:
             catalog_item(provider="tensordock", price=1),
         ]
 
+    def test_provider_filter(self):
+        catalog = Catalog(balance_resources=False, auto_reload=False)
+        catalog.add_provider(tensordock := TensorDockProvider())
+        catalog.add_provider(vastai := VastAIProvider())
+
+        tensordock_offers = [catalog_item(price=1)]
+        vastai_offers = [catalog_item(price=2), catalog_item(price=3)]
+
+        tensordock.get = Mock(return_value=tensordock_offers)
+        vastai.get = Mock(return_value=vastai_offers)
+
+        assert len(catalog.query(provider="tensordock")) == 1
+        assert len(catalog.query(provider="Tensordock")) == 1
+        assert len(catalog.query(provider="vastai")) == 2
+        assert len(catalog.query(provider="VastAI")) == 2
+        assert len(catalog.query(provider=["tensordock", "VastAI"])) == 3
+
+    def test_gpu_name_filter(self):
+        catalog = Catalog(balance_resources=False, auto_reload=False)
+        catalog.add_provider(tensordock := TensorDockProvider())
+
+        tensordock.get = Mock(
+            return_value=[
+                catalog_item(gpu_name="A10"),
+                catalog_item(gpu_name="A100"),
+                catalog_item(gpu_name="a100"),
+            ]
+        )
+
+        assert len(catalog.query(gpu_name="V100")) == 0
+        assert len(catalog.query(gpu_name="A10")) == 1
+        assert len(catalog.query(gpu_name="a10")) == 1
+        assert len(catalog.query(gpu_name="A100")) == 2
+        assert len(catalog.query(gpu_name="a100")) == 2
+        assert len(catalog.query(gpu_name=["a10", "A100"])) == 3
+
 
 def catalog_item(**kwargs) -> Union[CatalogItem, RawCatalogItem]:
     values = dict(

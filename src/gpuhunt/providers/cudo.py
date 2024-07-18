@@ -118,7 +118,9 @@ class CudoProvider(AbstractProvider):
                     machine_type["gpu_memory"], q.min_gpu_memory, q.max_total_gpu_memory
                 ):
                     continue
-                if q.gpu_name is not None and machine_type["gpu_name"].lower() not in q.gpu_name:
+                if q.gpu_name is not None and machine_type["gpu_name"].lower() not in map(
+                    str.lower, q.gpu_name
+                ):
                     continue
                 cc = get_compute_capability(machine_type["gpu_name"])
                 if not cc or not is_between(

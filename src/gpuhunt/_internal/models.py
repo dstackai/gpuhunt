@@ -101,14 +101,14 @@ class QueryFilter:
         spot: if `False`, only ondemand offers will be returned. If `True`, only spot offers will be returned
     """
 
-    provider: Optional[List[str]] = None
+    provider: Optional[List[str]] = None  # strings can have mixed case
     min_cpu: Optional[int] = None
     max_cpu: Optional[int] = None
     min_memory: Optional[float] = None
     max_memory: Optional[float] = None
     min_gpu_count: Optional[int] = None
     max_gpu_count: Optional[int] = None
-    gpu_name: Optional[List[str]] = None
+    gpu_name: Optional[List[str]] = None  # strings can have mixed case
     min_gpu_memory: Optional[float] = None
     max_gpu_memory: Optional[float] = None
     min_total_gpu_memory: Optional[float] = None
@@ -120,12 +120,6 @@ class QueryFilter:
     min_compute_capability: Optional[Tuple[int, int]] = None
     max_compute_capability: Optional[Tuple[int, int]] = None
     spot: Optional[bool] = None
-
-    def __post_init__(self):
-        if self.provider is not None:
-            self.provider = [i.lower() for i in self.provider]
-        if self.gpu_name is not None:
-            self.gpu_name = [i.lower() for i in self.gpu_name]
 
     def __repr__(self) -> str:
         """
