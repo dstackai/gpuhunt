@@ -303,7 +303,7 @@ class NebiusAPIClient:
             headers={"kid": self._service_account["id"]},
         )
 
-        resp = requests.post(payload["aud"], json={"jwt": jwt_token})
+        resp = requests.post(payload["aud"], json={"jwt": jwt_token}, timeout=10)
         resp.raise_for_status()
         iam_token = resp.json()["iamToken"]
         self._s.headers["Authorization"] = f"Bearer {iam_token}"

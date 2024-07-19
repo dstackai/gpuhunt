@@ -1,3 +1,5 @@
+# ruff: noqa: F401
+
 from gpuhunt._internal.catalog import Catalog
 from gpuhunt._internal.constraints import KNOWN_GPUS, GPUInfo, matches
 from gpuhunt._internal.default import default_catalog, query

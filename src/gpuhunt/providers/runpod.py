@@ -124,7 +124,7 @@ def get_pods_query_payload(query_variable: dict) -> dict:
 
 
 def make_request(payload: dict):
-    resp = requests.post(API_URL, json=payload)
+    resp = requests.post(API_URL, json=payload, timeout=10)
     if resp.ok:
         data = resp.json()
         return data

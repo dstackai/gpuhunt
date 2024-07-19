@@ -75,7 +75,7 @@ class AWSProvider(AbstractProvider):
     ) -> List[RawCatalogItem]:
         if not os.path.exists(self.cache_path):
             logger.info("Downloading EC2 prices to %s", self.cache_path)
-            with requests.get(ec2_pricing_url, stream=True) as r:
+            with requests.get(ec2_pricing_url, stream=True, timeout=20) as r:
                 r.raise_for_status()
                 with open(self.cache_path, "wb") as f:
                     for chunk in r.iter_content(chunk_size=8192):

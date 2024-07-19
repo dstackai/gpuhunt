@@ -63,6 +63,7 @@ class CudoProvider(AbstractProvider):
         resp = requests.request(
             method="GET",
             url=f"{API_URL}/vms/machine-types-2",
+            timeout=10,
         )
         if resp.ok:
             data = resp.json()
