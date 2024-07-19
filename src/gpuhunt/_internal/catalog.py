@@ -11,7 +11,7 @@ from typing import Iterable, List, Optional, Tuple, Union
 
 import gpuhunt._internal.constraints as constraints
 from gpuhunt._internal.models import CatalogItem, QueryFilter
-from gpuhunt._internal.utils import _is_tpu, parse_compute_capability
+from gpuhunt._internal.utils import parse_compute_capability
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)

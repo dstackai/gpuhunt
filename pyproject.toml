@@ -54,22 +54,23 @@ datacrunch = [
 all = ["gpuhunt[aws,azure,datacrunch,gcp,nebius,oci]"]
 dev = [
     "pre-commit",
-    "isort~=5.13",
-    "black~=24.4",
     "pytest~=7.0",
     "pytest-mock",
+    "ruff==0.5.3",  # Should match .pre-commit-config.yaml
 ]
 
 [tool.setuptools.dynamic]
 version = {attr = "gpuhunt.version.__version__"}
 
+[tool.ruff]
+line-length = 99
+
 [tool.ruff.lint]
-select = ["UP006", "UP007", "F"]
+select = ['E', 'F', 'I' ,'Q', 'W', 'PGH', 'FLY', 'S113']
+ignore = [
+  'E501',
+  'E712',
+]
 
-[tool.ruff.lint.pyupgrade]
-keep-runtime-typing = true
-
-[tool.ruff.lint.per-file-ignores]
-"src/gpuhunt/__init__.py" = ["F401"]
-"src/tests/**/*.py" = ["S101"]
-"src/integrity_tests/**/*.py" = ["S101"]
+[tool.ruff.lint.isort]
+known-first-party = ["gpuhunt"]

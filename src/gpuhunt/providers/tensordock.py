@@ -45,7 +45,7 @@ class TensorDockProvider(AbstractProvider):
     ) -> List[RawCatalogItem]:
         logger.info("Fetching TensorDock offers")
 
-        hostnodes = requests.get(marketplace_hostnodes_url).json()["hostnodes"]
+        hostnodes = requests.get(marketplace_hostnodes_url, timeout=10).json()["hostnodes"]
         offers = []
         for hostnode, details in hostnodes.items():
             location = details["location"]["country"].lower().replace(" ", "")

@@ -36,7 +36,7 @@ class LambdaLabsProvider(AbstractProvider):
     ) -> List[RawCatalogItem]:
         offers = []
         data = requests.get(
-            instance_types_url, headers={"Authorization": f"Bearer {self.token}"}
+            instance_types_url, headers={"Authorization": f"Bearer {self.token}"}, timeout=10
         ).json()["data"]
         for instance in data.values():
             instance = instance["instance_type"]

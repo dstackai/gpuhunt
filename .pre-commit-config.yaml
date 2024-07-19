@@ -1,16 +1,8 @@
 repos:
-  - repo: https://github.com/psf/black
-    rev: 24.4.2
-    hooks:
-      - id: black
-        args: ['--config', 'pyconfig.toml']
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        name: isort (python)
-        args: ['--settings-file', 'pyconfig.toml']
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.3
+    rev: v0.5.3  # Should match pyproject.toml
     hooks:
       - id: ruff
+        name: ruff common
+        args: ['--fix']
+      - id: ruff-format

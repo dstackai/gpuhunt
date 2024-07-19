@@ -264,7 +264,7 @@ def shape_to_resources(
             raise CostEstimatorDataError(f"Unknown product type {product.type.value!r}")
 
     if cpu is None:
-        raise CostEstimatorDataError(f"No ocpu product")
+        raise CostEstimatorDataError("No ocpu product")
 
     return ResourcesConfiguration(cpu, memory, gpu)
 
