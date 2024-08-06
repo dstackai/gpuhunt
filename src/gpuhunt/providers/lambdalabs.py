@@ -35,9 +35,11 @@ class LambdaLabsProvider(AbstractProvider):
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
     ) -> List[RawCatalogItem]:
         offers = []
-        data = requests.get(
+        resp = requests.get(
             instance_types_url, headers={"Authorization": f"Bearer {self.token}"}, timeout=10
-        ).json()["data"]
+        )
+        logger.info("Response from lambda: %s", resp.content)
+        data = resp.json()["data"]
         for instance in data.values():
             instance = instance["instance_type"]
             logger.info(instance["name"])
