@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import requests
 
-from gpuhunt._internal.constraints import KNOWN_GPUS
+from gpuhunt._internal.constraints import KNOWN_NVIDIA_GPUS
 from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
@@ -63,6 +63,7 @@ class VastAIProvider(AbstractProvider):
                 ),
                 cpu=int(offer["cpu_cores_effective"]),
                 memory=memory,
+                gpu_vendor=None,
                 gpu_count=offer["num_gpus"],
                 gpu_name=gpu_name,
                 gpu_memory=float(gpu_memory),
@@ -135,7 +136,7 @@ def get_gpu_name(gpu_name: str) -> str:
 
 
 def normalize_gpu_memory(gpu_name: str, memory_mib: float) -> int:
-    known_memory = [gpu.memory for gpu in KNOWN_GPUS if gpu.name == gpu_name]
+    known_memory = [gpu.memory for gpu in KNOWN_NVIDIA_GPUS if gpu.name == gpu_name]
     if known_memory:
         # return the closest known value
         return min(known_memory, key=lambda x: abs(x - memory_mib / kilo))

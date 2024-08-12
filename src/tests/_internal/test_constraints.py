@@ -4,6 +4,7 @@ import pytest
 
 from gpuhunt import CatalogItem, QueryFilter
 from gpuhunt._internal.constraints import matches
+from gpuhunt._internal.models import AcceleratorVendor
 
 
 @pytest.fixture
@@ -14,6 +15,7 @@ def item() -> CatalogItem:
         price=1.2,
         cpu=16,
         memory=64.0,
+        gpu_vendor=AcceleratorVendor.NVIDIA,
         gpu_count=1,
         gpu_name="A100",
         gpu_memory=40.0,
@@ -31,6 +33,7 @@ def cpu_items() -> List[CatalogItem]:
         price=3.0,
         cpu=120,
         memory=480.0,
+        gpu_vendor=None,
         gpu_count=0,
         gpu_name=None,
         gpu_memory=0.0,
@@ -44,6 +47,7 @@ def cpu_items() -> List[CatalogItem]:
         price=1.4016,
         cpu=48,
         memory=288.0,
+        gpu_vendor=None,
         gpu_count=0,
         gpu_name=None,
         gpu_memory=None,
@@ -69,6 +73,15 @@ class TestMatches:
         assert matches(item, QueryFilter(max_memory=64.0))
         assert not matches(item, QueryFilter(min_memory=128.0))
         assert not matches(item, QueryFilter(max_memory=32.0))
+
+    def test_gpu_vendor_nvidia(self, item: CatalogItem):
+        assert matches(item, QueryFilter(gpu_vendor=AcceleratorVendor.NVIDIA))
+        assert not matches(item, QueryFilter(gpu_vendor=AcceleratorVendor.AMD))
+
+    def test_gpu_vendor_amd(self, item: CatalogItem):
+        item.gpu_vendor = AcceleratorVendor.AMD
+        assert matches(item, QueryFilter(gpu_vendor=AcceleratorVendor.AMD))
+        assert not matches(item, QueryFilter(gpu_vendor=AcceleratorVendor.NVIDIA))
 
     def test_gpu_count(self, item: CatalogItem):
         assert matches(item, QueryFilter(min_gpu_count=1))
@@ -118,6 +131,11 @@ class TestMatches:
         assert not matches(item, QueryFilter(min_compute_capability=(8, 1)))
         assert not matches(item, QueryFilter(max_compute_capability=(7, 9)))
 
+    def test_compute_capability_not_nvidia(self, item: CatalogItem):
+        item.gpu_vendor = AcceleratorVendor.AMD
+        assert not matches(item, QueryFilter(min_compute_capability=(8, 0)))
+        assert not matches(item, QueryFilter(max_compute_capability=(8, 0)))
+
     def test_ti_gpu(self):
         item = CatalogItem(
             instance_name="large",
@@ -126,6 +144,7 @@ class TestMatches:
             cpu=16,
             memory=64.0,
             gpu_count=1,
+            gpu_vendor=AcceleratorVendor.NVIDIA,
             gpu_name="RTX3060Ti",  # case-sensitive
             gpu_memory=8.0,
             spot=False,

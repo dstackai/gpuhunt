@@ -52,6 +52,7 @@ class LambdaLabsProvider(AbstractProvider):
                 price=instance["price_cents_per_hour"] / 100,
                 cpu=instance["specs"]["vcpus"],
                 memory=float(instance["specs"]["memory_gib"]) * 1.074,
+                gpu_vendor=None,
                 gpu_count=gpu_count,
                 gpu_name=gpu_name,
                 gpu_memory=gpu_memory,

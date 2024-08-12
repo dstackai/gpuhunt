@@ -101,6 +101,7 @@ def make_offers(
             price=round(price, 5),
             cpu=cpu,
             memory=memory,
+            gpu_vendor=None,
             gpu_count=gpu_count,
             gpu_name="L40",
             gpu_memory=gpu["vram"],

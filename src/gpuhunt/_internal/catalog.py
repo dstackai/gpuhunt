@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, wait
 from typing import Iterable, List, Optional, Tuple, Union
 
 import gpuhunt._internal.constraints as constraints
-from gpuhunt._internal.models import CatalogItem, QueryFilter
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt._internal.utils import parse_compute_capability
 from gpuhunt.providers import AbstractProvider
 
@@ -45,6 +45,7 @@ class Catalog:
         max_memory: Optional[float] = None,
         min_gpu_count: Optional[int] = None,
         max_gpu_count: Optional[int] = None,
+        gpu_vendor: Optional[Union[AcceleratorVendor, str]] = None,
         gpu_name: Optional[Union[str, List[str]]] = None,
         min_gpu_memory: Optional[float] = None,
         max_gpu_memory: Optional[float] = None,
@@ -98,6 +99,7 @@ class Catalog:
             max_memory=max_memory,
             min_gpu_count=min_gpu_count,
             max_gpu_count=max_gpu_count,
+            gpu_vendor=AcceleratorVendor.cast(gpu_vendor) if gpu_vendor else None,
             gpu_name=[gpu_name] if isinstance(gpu_name, str) else gpu_name,
             min_gpu_memory=min_gpu_memory,
             max_gpu_memory=max_gpu_memory,

@@ -1,12 +1,12 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import chain
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import requests
 from requests import RequestException
 
-from gpuhunt._internal.models import QueryFilter, RawCatalogItem
+from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -50,11 +50,10 @@ class RunpodProvider(AbstractProvider):
         return list(chain.from_iterable(offers))
 
 
-def gpu_name(name: str) -> Optional[str]:
-    if not name:
+def gpu_vendor_and_name(gpu_id: str) -> Optional[Tuple[AcceleratorVendor, str]]:
+    if not gpu_id:
         return None
-    result = GPU_MAP.get(name)
-    return result
+    return GPU_MAP.get(gpu_id)
 
 
 def build_query_variables(gpu_types: List[dict]) -> List[dict]:
@@ -86,19 +85,27 @@ def get_pods(query_variable: dict) -> List[dict]:
     pods = make_request(get_pods_query_payload(query_variable))["data"]["gpuTypes"]
     offers = []
     for pod in pods:
-        listed_gpu_name = gpu_name(pod["id"])
+        listed_gpu_vendor_and_name = gpu_vendor_and_name(pod["id"])
         availability = pod["lowestPrice"]["stockStatus"]
-        if listed_gpu_name is not None and availability is not None:
+        if listed_gpu_vendor_and_name is not None and availability is not None:
             offers.append(
-                get_offers(pod, query_variable["dataCenterId"], query_variable["gpuCount"])
+                get_offers(
+                    pod,
+                    data_center_id=query_variable["dataCenterId"],
+                    gpu_count=query_variable["gpuCount"],
+                    gpu_vendor=listed_gpu_vendor_and_name[0],
+                    gpu_name=listed_gpu_vendor_and_name[1],
+                )
             )
-        elif listed_gpu_name is None and availability is not None:
+        elif listed_gpu_vendor_and_name is None and availability is not None:
             logger.warning(f"{pod['id']} missing in runpod GPU_MAP")
     return offers
 
 
-def get_offers(pod: dict, data_center_id, gpu_count) -> dict:
-    offer = {
+def get_offers(
+    pod: dict, *, data_center_id, gpu_count, gpu_vendor: AcceleratorVendor, gpu_name: str
+) -> dict:
+    return {
         "id": pod["id"],
         "data_center_id": data_center_id,
         "secure_price": pod["securePrice"],
@@ -110,9 +117,9 @@ def get_offers(pod: dict, data_center_id, gpu_count) -> dict:
         "gpu": gpu_count,
         "display_name": pod["displayName"],
         "gpu_memory": pod["memoryInGb"],
-        "gpu_name": gpu_name(pod["id"]),
+        "gpu_vendor": gpu_vendor.value,
+        "gpu_name": gpu_name,
     }
-    return offer
 
 
 def get_pods_query_payload(query_variable: dict) -> dict:
@@ -144,6 +151,7 @@ def get_raw_catalog(offer: dict) -> List[RawCatalogItem]:
                 price=float(offer["secure_price"] * offer["gpu"]),
                 cpu=offer["cpu"],
                 memory=offer["memory"],
+                gpu_vendor=offer["gpu_vendor"],
                 gpu_count=offer["gpu"],
                 gpu_name=offer["gpu_name"],
                 gpu_memory=offer["gpu_memory"],
@@ -160,6 +168,7 @@ def get_raw_catalog(offer: dict) -> List[RawCatalogItem]:
                     price=float(offer["secure_spot_price"] * offer["gpu"]),
                     cpu=offer["cpu"],
                     memory=offer["memory"],
+                    gpu_vendor=offer["gpu_vendor"],
                     gpu_count=offer["gpu"],
                     gpu_name=offer["gpu_name"],
                     gpu_memory=offer["gpu_memory"],
@@ -176,6 +185,7 @@ def get_raw_catalog(offer: dict) -> List[RawCatalogItem]:
                 price=float(offer["community_price"] * offer["gpu"]),
                 cpu=offer["cpu"],
                 memory=offer["memory"],
+                gpu_vendor=offer["gpu_vendor"],
                 gpu_count=offer["gpu"],
                 gpu_name=offer["gpu_name"],
                 gpu_memory=offer["gpu_memory"],
@@ -194,6 +204,7 @@ def get_raw_catalog(offer: dict) -> List[RawCatalogItem]:
                     price=float(offer["community_spot_price"] * offer["gpu"]),
                     cpu=offer["cpu"],
                     memory=offer["memory"],
+                    gpu_vendor=offer["gpu_vendor"],
                     gpu_count=offer["gpu"],
                     gpu_name=offer["gpu_name"],
                     gpu_memory=offer["gpu_memory"],
@@ -220,6 +231,7 @@ def get_raw_catalog(offer: dict) -> List[RawCatalogItem]:
                 price=float(price * offer["gpu"]),
                 cpu=offer["cpu"],
                 memory=offer["memory"],
+                gpu_vendor=offer["gpu_vendor"],
                 gpu_count=offer["gpu"],
                 gpu_name=offer["gpu_name"],
                 gpu_memory=offer["gpu_memory"],
@@ -236,6 +248,7 @@ def get_raw_catalog(offer: dict) -> List[RawCatalogItem]:
                     price=float(spot_price * offer["gpu"]),
                     cpu=offer["cpu"],
                     memory=offer["memory"],
+                    gpu_vendor=offer["gpu_vendor"],
                     gpu_count=offer["gpu"],
                     gpu_name=offer["gpu_name"],
                     gpu_memory=offer["gpu_memory"],
@@ -246,18 +259,32 @@ def get_raw_catalog(offer: dict) -> List[RawCatalogItem]:
     return catalog_items
 
 
-def get_gpu_map():
-    payload_gpus = {"query": "query GpuTypes { gpuTypes { id displayName memoryInGb } }"}
-    gpu_types = make_request(payload_gpus)
-    gpu_map = {
-        item["id"]: get_gpu_name(item["displayName"])
-        for item in gpu_types["data"]["gpuTypes"]
-        if get_gpu_name(item["displayName"]) is not None
+def get_gpu_map() -> Dict[str, Tuple[AcceleratorVendor, str]]:
+    payload_gpus = {
+        "query": "query GpuTypes { gpuTypes { id manufacturer displayName memoryInGb } }"
     }
+    response = make_request(payload_gpus)
+    gpu_map: Dict[str, Tuple[AcceleratorVendor, str]] = {}
+    for gpu_type in response["data"]["gpuTypes"]:
+        try:
+            vendor = AcceleratorVendor.cast(gpu_type["manufacturer"])
+        except ValueError:
+            continue
+        gpu_name = get_gpu_name(vendor, gpu_type["displayName"])
+        if gpu_name:
+            gpu_map[gpu_type["id"]] = (vendor, gpu_name)
     return gpu_map
 
 
-def get_gpu_name(name: str) -> Optional[str]:
+def get_gpu_name(vendor: AcceleratorVendor, name: str) -> Optional[str]:
+    if vendor == AcceleratorVendor.NVIDIA:
+        return get_nvidia_gpu_name(name)
+    if vendor == AcceleratorVendor.AMD:
+        return get_amd_gpu_name(name)
+    return None
+
+
+def get_nvidia_gpu_name(name: str) -> Optional[str]:
     if "V100" in name:
         return "V100"
     if name.startswith(("A", "L", "H")):
@@ -266,6 +293,12 @@ def get_gpu_name(name: str) -> Optional[str]:
     if name.startswith("RTX"):
         gpu_name = name.replace(" ", "")
         return gpu_name
+    return None
+
+
+def get_amd_gpu_name(name: str) -> Optional[str]:
+    if name == "MI300X":
+        return "MI300X"
     return None
 
 
