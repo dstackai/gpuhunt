@@ -39,6 +39,14 @@ class VastAIProvider(AbstractProvider):
 
         instance_offers = []
         for offer in data["offers"]:
+            cpu_cores = offer["cpu_cores"]
+            # although this is not stated in the docs, the value can be None
+            if cpu_cores:
+                memory = float(
+                    int(offer["cpu_ram"] * offer["cpu_cores_effective"] / cpu_cores / kilo)
+                )
+            else:
+                memory = 0.0
             disk_size = query_filter and query_filter.min_disk_size or offer["disk_space"]
             if not self.satisfies_filters(offer, filters):
                 logger.warning("Offer %s does not satisfy filters", offer["id"])
@@ -54,11 +62,7 @@ class VastAIProvider(AbstractProvider):
                     5,
                 ),
                 cpu=int(offer["cpu_cores_effective"]),
-                memory=float(
-                    int(
-                        offer["cpu_ram"] * offer["cpu_cores_effective"] / offer["cpu_cores"] / kilo
-                    )
-                ),
+                memory=memory,
                 gpu_count=offer["num_gpus"],
                 gpu_name=gpu_name,
                 gpu_memory=float(gpu_memory),
