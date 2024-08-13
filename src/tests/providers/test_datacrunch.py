@@ -5,7 +5,7 @@ from typing import List
 import pytest
 
 import gpuhunt._internal.catalog as internal_catalog
-from gpuhunt import Catalog, CatalogItem, RawCatalogItem
+from gpuhunt import AcceleratorVendor, Catalog, CatalogItem, RawCatalogItem
 from gpuhunt.providers.datacrunch import (
     DataCrunchProvider,
     InstanceType,
@@ -220,6 +220,7 @@ def test_available_query(mocker, raw_instance_types):
         price=1.7,
         cpu=30,
         memory=120.0,
+        gpu_vendor=AcceleratorVendor.NVIDIA,
         gpu_count=1,
         gpu_name="H100",
         gpu_memory=80.0,
@@ -233,6 +234,7 @@ def test_available_query(mocker, raw_instance_types):
         price=3.95,
         cpu=30,
         memory=120.0,
+        gpu_vendor=AcceleratorVendor.NVIDIA,
         gpu_count=1,
         gpu_name="H100",
         gpu_memory=80.0,
@@ -271,6 +273,7 @@ def test_available_query_with_instance(mocker, raw_instance_types):
         price=0.25,
         cpu=6,
         memory=23.0,
+        gpu_vendor=AcceleratorVendor.NVIDIA,
         gpu_count=1,
         gpu_name="V100",
         gpu_memory=16.0,
@@ -284,6 +287,7 @@ def test_available_query_with_instance(mocker, raw_instance_types):
         price=0.89,
         cpu=6,
         memory=23.0,
+        gpu_vendor=AcceleratorVendor.NVIDIA,
         gpu_count=1,
         gpu_name="V100",
         gpu_memory=16.0,
@@ -307,6 +311,7 @@ def test_transform_instance(raw_instance_types):
         price=0.7,
         cpu=20,
         memory=120,
+        gpu_vendor=AcceleratorVendor.NVIDIA.value,
         gpu_count=2,
         gpu_name="A6000",
         gpu_memory=96 / 2,
@@ -328,6 +333,7 @@ def test_cpu_instance(raw_instance_types):
         price=3,
         cpu=120,
         memory=480,
+        gpu_vendor=None,
         gpu_count=0,
         gpu_name=None,
         gpu_memory=0,

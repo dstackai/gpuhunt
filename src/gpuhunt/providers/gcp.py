@@ -136,6 +136,7 @@ class GCPProvider(AbstractProvider):
                         location=zone,
                         cpu=machine_type.guest_cpus,
                         memory=round(machine_type.memory_mb / 1024, 1),
+                        gpu_vendor=None,
                         gpu_count=(
                             machine_type.accelerators[0].guest_accelerator_count if gpu else 0
                         ),
@@ -347,6 +348,7 @@ def get_tpu_offers(project_id: str) -> List[RawCatalogItem]:
             price=item["price"],
             cpu=0,
             memory=0,
+            gpu_vendor=None,
             gpu_count=1,
             gpu_name=f'tpu-{item["instance_name"]}',
             gpu_memory=0,

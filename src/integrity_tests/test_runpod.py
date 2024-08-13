@@ -54,6 +54,6 @@ def test_price(data_rows):
 
 
 def test_gpu_present(data_rows):
-    refs = set(name for name in GPU_MAP.values())
+    refs = set(name for _, name in GPU_MAP.values())
     gpus = set(select_row(data_rows, "gpu_name"))
     assert len(refs & gpus) > 7

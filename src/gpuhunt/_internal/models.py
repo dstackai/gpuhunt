@@ -1,5 +1,13 @@
+import enum
 from dataclasses import asdict, dataclass, fields
-from typing import Dict, List, Optional, Tuple, Union
+from typing import (
+    ClassVar,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from gpuhunt._internal.utils import empty_as_none
 
@@ -10,6 +18,18 @@ def bool_loader(x: Union[bool, str]) -> bool:
     return x.lower() == "true"
 
 
+class AcceleratorVendor(enum.Enum):
+    NVIDIA = "nvidia"
+    AMD = "amd"
+    GOOGLE = "google"
+
+    @classmethod
+    def cast(cls, value: Union["AcceleratorVendor", str]) -> "AcceleratorVendor":
+        if isinstance(value, AcceleratorVendor):
+            return value
+        return cls(value.lower())
+
+
 @dataclass
 class RawCatalogItem:
     instance_name: Optional[str]
@@ -17,11 +37,26 @@ class RawCatalogItem:
     price: Optional[float]
     cpu: Optional[int]
     memory: Optional[float]
+    gpu_vendor: Optional[str]
     gpu_count: Optional[int]
     gpu_name: Optional[str]
     gpu_memory: Optional[float]
     spot: Optional[bool]
     disk_size: Optional[float]
+
+    def __post_init__(self) -> None:
+        # This heuristic will be required indefinitely since we support historical catalogs.
+        gpu_vendor = self.gpu_vendor
+        if gpu_vendor is None:
+            if not self.gpu_count:
+                # None or 0
+                return
+            if self.gpu_name and self.gpu_name.startswith("tpu-"):
+                self.gpu_vendor = AcceleratorVendor.GOOGLE.value
+            else:
+                self.gpu_vendor = AcceleratorVendor.NVIDIA.value
+        elif isinstance(gpu_vendor, AcceleratorVendor):
+            self.gpu_vendor = gpu_vendor.value
 
     @staticmethod
     def from_dict(v: dict) -> "RawCatalogItem":
@@ -31,6 +66,7 @@ class RawCatalogItem:
             price=empty_as_none(v.get("price"), loader=float),
             cpu=empty_as_none(v.get("cpu"), loader=int),
             memory=empty_as_none(v.get("memory"), loader=float),
+            gpu_vendor=empty_as_none(v.get("gpu_vendor")),
             gpu_count=empty_as_none(v.get("gpu_count"), loader=int),
             gpu_name=empty_as_none(v.get("gpu_name")),
             gpu_memory=empty_as_none(v.get("gpu_memory"), loader=float),
@@ -64,12 +100,27 @@ class CatalogItem(RawCatalogItem):
     price: float
     cpu: int
     memory: float
+    gpu_vendor: Optional[AcceleratorVendor]
     gpu_count: int
     gpu_name: Optional[str]
     gpu_memory: Optional[float]
     spot: bool
-    provider: str
     disk_size: Optional[float]
+    provider: str
+
+    def __post_init__(self) -> None:
+        # This heuristic is only required until we update all providers to always set the vendor.
+        gpu_vendor = self.gpu_vendor
+        if gpu_vendor is None:
+            if not self.gpu_count:
+                # None or 0
+                return
+            if self.gpu_name and self.gpu_name.startswith("tpu-"):
+                self.gpu_vendor = AcceleratorVendor.GOOGLE
+            else:
+                self.gpu_vendor = AcceleratorVendor.NVIDIA
+        else:
+            self.gpu_vendor = AcceleratorVendor.cast(gpu_vendor)
 
     @staticmethod
     def from_dict(v: dict, *, provider: Optional[str] = None) -> "CatalogItem":
@@ -87,6 +138,7 @@ class QueryFilter:
         max_memory: maximum amount of RAM in GB
         min_gpu_count: minimum number of GPUs
         max_gpu_count: maximum number of GPUs
+        gpu_vendor: accelerator vendor to filter by. If not specified, all vendors will be used
         gpu_name: name of the GPU to filter by. If not specified, all GPUs will be used
         min_gpu_memory: minimum amount of GPU VRAM in GB for each GPU
         max_gpu_memory: maximum amount of GPU VRAM in GB for each GPU
@@ -108,6 +160,7 @@ class QueryFilter:
     max_memory: Optional[float] = None
     min_gpu_count: Optional[int] = None
     max_gpu_count: Optional[int] = None
+    gpu_vendor: Optional[AcceleratorVendor] = None
     gpu_name: Optional[List[str]] = None  # strings can have mixed case
     min_gpu_memory: Optional[float] = None
     max_gpu_memory: Optional[float] = None
@@ -139,7 +192,23 @@ class QueryFilter:
 
 
 @dataclass
-class GPUInfo:
+class AcceleratorInfo:
+    vendor: ClassVar[AcceleratorVendor]
     name: str
     memory: int
+
+
+@dataclass
+class NvidiaGPUInfo(AcceleratorInfo):
+    vendor = AcceleratorVendor.NVIDIA
     compute_capability: Tuple[int, int]
+
+
+@dataclass
+class AMDGPUInfo(AcceleratorInfo):
+    vendor = AcceleratorVendor.AMD
+
+
+@dataclass
+class TPUInfo(AcceleratorInfo):
+    vendor = AcceleratorVendor.GOOGLE

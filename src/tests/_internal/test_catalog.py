@@ -80,6 +80,7 @@ def catalog_item(**kwargs) -> Union[CatalogItem, RawCatalogItem]:
         instance_name="instance",
         cpu=1,
         memory=1,
+        gpu_vendor="nvidia",
         gpu_count=1,
         gpu_name="gpu",
         gpu_memory=1,

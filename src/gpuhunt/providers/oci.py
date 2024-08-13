@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from requests import Session
 from typing_extensions import Annotated, TypedDict
 
-from gpuhunt._internal.constraints import KNOWN_GPUS
+from gpuhunt._internal.constraints import KNOWN_NVIDIA_GPUS
 from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt._internal.utils import to_camel_case
 from gpuhunt.providers import AbstractProvider
@@ -69,6 +69,7 @@ class OCIProvider(AbstractProvider):
                 price=resources.total_price(),
                 cpu=resources.cpu.vcpus,
                 memory=resources.memory.gbs,
+                gpu_vendor=None,
                 gpu_count=resources.gpu.units_count,
                 gpu_name=resources.gpu.name,
                 gpu_memory=resources.gpu.unit_memory_gb,
@@ -308,7 +309,7 @@ def get_gpu_name(shape_name: str) -> Optional[str]:
         if gpu_name_index < len(parts):
             gpu_name = parts[gpu_name_index]
 
-            for gpu in KNOWN_GPUS:
+            for gpu in KNOWN_NVIDIA_GPUS:
                 if gpu.name.upper() == gpu_name:
                     return gpu.name
     return None

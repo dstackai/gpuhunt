@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, TypeVar, Union
 import requests
 
 from gpuhunt import QueryFilter, RawCatalogItem
-from gpuhunt._internal.constraints import KNOWN_GPUS, get_compute_capability, is_between
+from gpuhunt._internal.constraints import KNOWN_NVIDIA_GPUS, get_compute_capability, is_between
 from gpuhunt.providers import AbstractProvider
 
 CpuMemoryGpu = namedtuple("CpuMemoryGpu", ["cpu", "memory", "gpu"])
@@ -171,6 +171,7 @@ def get_raw_catalog(machine_type, spec):
         ),
         cpu=spec["cpu"],
         memory=spec["memory"],
+        gpu_vendor=None,
         gpu_count=spec.get("gpu", 0),
         gpu_name=machine_type.get("gpu_name", ""),
         gpu_memory=machine_type.get("gpu_memory", 0),
@@ -369,7 +370,7 @@ def gpu_name(name: str) -> Optional[str]:
 def get_memory(gpu_name: str) -> Optional[int]:
     if not gpu_name:
         return None
-    for gpu in KNOWN_GPUS:
+    for gpu in KNOWN_NVIDIA_GPUS:
         if gpu.name.lower() == gpu_name.lower():
             return gpu.memory
 

@@ -95,6 +95,7 @@ class AWSProvider(AbstractProvider):
                     price=float(row["PricePerUnit"]),
                     cpu=int(row["vCPU"]),
                     memory=parse_memory(row["Memory"]),
+                    gpu_vendor=None,
                     gpu_count=parse_optional_count(row["GPU"]),
                     spot=False,
                     gpu_name=None,
