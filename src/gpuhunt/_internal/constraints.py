@@ -134,7 +134,13 @@ KNOWN_AMD_GPUS: List[AMDGPUInfo] = [
     AMDGPUInfo(name="MI300X", memory=192),
 ]
 
-KNOWN_TPUS: List[TPUInfo] = []
+KNOWN_TPUS: List[TPUInfo] = [
+    TPUInfo(name="v2", memory=0),
+    TPUInfo(name="v3", memory=0),
+    TPUInfo(name="v4", memory=0),
+    TPUInfo(name="v5p", memory=0),
+    TPUInfo(name="v5litepod", memory=0),  # a.k.a. v5e
+]
 
 KNOWN_ACCELERATORS: List[Union[NvidiaGPUInfo, AMDGPUInfo, TPUInfo]] = (
     KNOWN_NVIDIA_GPUS + KNOWN_AMD_GPUS + KNOWN_TPUS

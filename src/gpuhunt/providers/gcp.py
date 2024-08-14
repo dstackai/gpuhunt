@@ -14,12 +14,14 @@ from google.cloud.billing_v1.types.cloud_catalog import Sku
 from google.cloud.location import locations_pb2
 from google.cloud.location.locations_pb2 import ListLocationsResponse
 
-from gpuhunt._internal.models import QueryFilter, RawCatalogItem
+from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
 compute_service = "services/6F81-5844-456A"
 AcceleratorDetails = namedtuple("AcceleratorDetails", ["name", "memory"])
+# As of 2024-14-08, this mapping contains only Nvidia accelerators; update gpu_vendor
+# inferring code in fill_gpu_vendors_and_names() if a non-Nvidia accelerator is added
 accelerator_details = {
     "nvidia-a100-80gb": AcceleratorDetails("A100", 80.0),
     "nvidia-h100-80gb": AcceleratorDetails("H100", 80.0),
@@ -136,13 +138,16 @@ class GCPProvider(AbstractProvider):
                         location=zone,
                         cpu=machine_type.guest_cpus,
                         memory=round(machine_type.memory_mb / 1024, 1),
-                        gpu_vendor=None,
                         gpu_count=(
                             machine_type.accelerators[0].guest_accelerator_count if gpu else 0
                         ),
+                        # gpu_name is canonicalized and gpu_vendor is set later
+                        # in fill_gpu_vendors_and_names(), for now we use AcceleratorType.name
+                        # as a name (it contains a vendor prefix like "nvidia-")
                         gpu_name=(
                             machine_type.accelerators[0].guest_accelerator_type if gpu else None
                         ),
+                        gpu_vendor=None,
                         gpu_memory=gpu.memory if gpu else None,
                         price=None,
                         spot=None,
@@ -190,10 +195,20 @@ class GCPProvider(AbstractProvider):
                 offer = copy.deepcopy(instance)
                 offer.price = round(price, 6)
                 offer.spot = spot
-                if offer.gpu_name:
-                    offer.gpu_name = accelerator_details[offer.gpu_name].name
                 offers.append(offer)
         return offers
+
+    def fill_gpu_vendors_and_names(self, offers: List[RawCatalogItem]) -> None:
+        # Modifies offers in the list in-place
+        for offer in offers:
+            accelerator_type = offer.gpu_name
+            if not accelerator_type:
+                continue
+            offer.gpu_name = accelerator_details[accelerator_type].name
+            if accelerator_type.startswith("nvidia-"):
+                offer.gpu_vendor = AcceleratorVendor.NVIDIA.value
+            else:
+                logger.warning("Unknown accelerator vendor: %s", accelerator_type)
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
@@ -201,6 +216,7 @@ class GCPProvider(AbstractProvider):
         instances = self.list_preconfigured_instances()
         self.add_gpus(instances)
         offers = self.fill_prices(instances)
+        self.fill_gpu_vendors_and_names(offers)
         # Add tpu offerings
         offers.extend(get_tpu_offers(self.project))
         return sorted(offers, key=lambda i: i.price)
@@ -348,9 +364,9 @@ def get_tpu_offers(project_id: str) -> List[RawCatalogItem]:
             price=item["price"],
             cpu=0,
             memory=0,
-            gpu_vendor=None,
+            gpu_vendor=AcceleratorVendor.GOOGLE.value,
             gpu_count=1,
-            gpu_name=f'tpu-{item["instance_name"]}',
+            gpu_name=item["instance_name"],
             gpu_memory=0,
             spot=False,
             disk_size=None,
