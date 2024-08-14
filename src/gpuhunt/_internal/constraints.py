@@ -8,7 +8,19 @@ from gpuhunt._internal.models import (
     QueryFilter,
     TPUInfo,
 )
-from gpuhunt._internal.utils import _is_tpu
+
+# v5litepod = v5e
+_TPU_VERSIONS = ["v2", "v3", "v4", "v5p", "v5litepod"]
+
+
+def _is_tpu(name: str) -> bool:
+    parts = name.split("-")
+    if len(parts) == 2:
+        version, cores = parts
+        if version in _TPU_VERSIONS and cores.isdigit():
+            return True
+    return False
+
 
 Comparable = TypeVar("Comparable", bound=Union[int, float, Tuple[int, int]])
 
@@ -51,7 +63,7 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
         return False
 
     # TPU specific checks
-    if i.gpu_name and _is_tpu(i.gpu_name.lower()):
+    if i.gpu_vendor == AcceleratorVendor.GOOGLE and i.gpu_name and _is_tpu(i.gpu_name.lower()):
         if q.gpu_vendor is not None and q.gpu_vendor != AcceleratorVendor.GOOGLE:
             return False
         if q.gpu_name is not None:
@@ -134,13 +146,7 @@ KNOWN_AMD_GPUS: List[AMDGPUInfo] = [
     AMDGPUInfo(name="MI300X", memory=192),
 ]
 
-KNOWN_TPUS: List[TPUInfo] = [
-    TPUInfo(name="v2", memory=0),
-    TPUInfo(name="v3", memory=0),
-    TPUInfo(name="v4", memory=0),
-    TPUInfo(name="v5p", memory=0),
-    TPUInfo(name="v5litepod", memory=0),  # a.k.a. v5e
-]
+KNOWN_TPUS: List[TPUInfo] = [TPUInfo(name=version, memory=0) for version in _TPU_VERSIONS]
 
 KNOWN_ACCELERATORS: List[Union[NvidiaGPUInfo, AMDGPUInfo, TPUInfo]] = (
     KNOWN_NVIDIA_GPUS + KNOWN_AMD_GPUS + KNOWN_TPUS

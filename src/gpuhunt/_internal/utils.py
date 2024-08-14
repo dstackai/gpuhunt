@@ -23,14 +23,3 @@ def to_camel_case(snake_case: str) -> str:
     words = list(filter(None, words))
     words[1:] = [word[:1].upper() + word[1:] for word in words[1:]]
     return "".join(words)
-
-
-def _is_tpu(name: str) -> bool:
-    tpu_versions = ["tpu-v2", "tpu-v3", "tpu-v4", "tpu-v5p", "tpu-v5litepod"]
-    parts = name.split("-")
-    if len(parts) == 3:
-        version = f"{parts[0]}-{parts[1]}"
-        cores = parts[2]
-        if version in tpu_versions and cores.isdigit():
-            return True
-    return False
