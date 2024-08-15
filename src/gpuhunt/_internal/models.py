@@ -46,12 +46,17 @@ class RawCatalogItem:
 
     def __post_init__(self) -> None:
         # This heuristic will be required indefinitely since we support historical catalogs.
+        is_tpu = False
+        gpu_name = self.gpu_name
+        if gpu_name and gpu_name.startswith("tpu-"):
+            is_tpu = True
+            self.gpu_name = gpu_name[4:]
         gpu_vendor = self.gpu_vendor
         if gpu_vendor is None:
             if not self.gpu_count:
                 # None or 0
                 return
-            if self.gpu_name and self.gpu_name.startswith("tpu-"):
+            if is_tpu:
                 self.gpu_vendor = AcceleratorVendor.GOOGLE.value
             else:
                 self.gpu_vendor = AcceleratorVendor.NVIDIA.value
@@ -109,17 +114,18 @@ class CatalogItem(RawCatalogItem):
     provider: str
 
     def __post_init__(self) -> None:
-        # This heuristic is only required until we update all providers to always set the vendor.
         gpu_vendor = self.gpu_vendor
         if gpu_vendor is None:
+            # This heuristic is only required until we update all providers to always set
+            # the vendor.
             if not self.gpu_count:
                 # None or 0
                 return
-            if self.gpu_name and self.gpu_name.startswith("tpu-"):
-                self.gpu_vendor = AcceleratorVendor.GOOGLE
-            else:
-                self.gpu_vendor = AcceleratorVendor.NVIDIA
+            # GCPProvider already sets gpu_vendor, and all other providers only support Nvidia
+            self.gpu_vendor = AcceleratorVendor.NVIDIA
         else:
+            # This cast to the enum is always required since RawCatalogItem.gpu_vendor
+            # is a string field (for (de)serialization purposes).
             self.gpu_vendor = AcceleratorVendor.cast(gpu_vendor)
 
     @staticmethod
