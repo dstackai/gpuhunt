@@ -37,12 +37,12 @@ class RawCatalogItem:
     price: Optional[float]
     cpu: Optional[int]
     memory: Optional[float]
-    gpu_vendor: Optional[str]
     gpu_count: Optional[int]
     gpu_name: Optional[str]
     gpu_memory: Optional[float]
     spot: Optional[bool]
     disk_size: Optional[float]
+    gpu_vendor: Optional[str] = None
 
     def __post_init__(self) -> None:
         # This heuristic will be required indefinitely since we support historical catalogs.
@@ -84,7 +84,7 @@ class RawCatalogItem:
 
 
 @dataclass
-class CatalogItem(RawCatalogItem):
+class CatalogItem:
     """
     Attributes:
         instance_name: name of the instance
@@ -105,13 +105,13 @@ class CatalogItem(RawCatalogItem):
     price: float
     cpu: int
     memory: float
-    gpu_vendor: Optional[AcceleratorVendor]
     gpu_count: int
     gpu_name: Optional[str]
     gpu_memory: Optional[float]
     spot: bool
     disk_size: Optional[float]
     provider: str
+    gpu_vendor: Optional[AcceleratorVendor] = None
 
     def __post_init__(self) -> None:
         gpu_vendor = self.gpu_vendor
