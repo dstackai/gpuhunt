@@ -138,7 +138,7 @@ class AWSProvider(AbstractProvider):
                         gpu = i["GpuInfo"]["Gpus"][0]
                         gpus[i["InstanceType"]] = (
                             gpu["Name"],
-                            gpu["MemoryInfo"]["SizeInMiB"] / 1024,
+                            _get_gpu_memory_gib(gpu["Name"], gpu["MemoryInfo"]["SizeInMiB"]),
                         )
 
             regions = {
@@ -228,6 +228,22 @@ class AWSProvider(AbstractProvider):
                 ]
             )
         ]
+
+
+def _get_gpu_memory_gib(gpu_name: str, reported_memory_mib: int) -> float:
+    """
+    Fixes L4 memory size misreported by AWS API
+    """
+
+    if gpu_name != "L4":
+        return reported_memory_mib / 1024
+
+    if reported_memory_mib not in (22888, 91553, 183105):
+        logger.warning(
+            "The L4 memory size reported by AWS changed. "
+            "Please check that it is now correct and remove the hardcoded size if it is."
+        )
+    return 24
 
 
 def parse_memory(s: str) -> float:
