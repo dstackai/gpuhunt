@@ -132,6 +132,8 @@ def get_gpu_name(gpu_name: str) -> str:
     gpu_name = gpu_name.replace("RTX A", "A").replace("Tesla ", "").replace("Q ", "")
     if gpu_name.startswith("A100 "):
         return "A100"
+    if gpu_name.startswith("H100 ") and "NVL" not in gpu_name:
+        return "H100"
     return gpu_name.replace(" ", "")
 
 
