@@ -287,12 +287,15 @@ def get_gpu_name(vendor: AcceleratorVendor, name: str) -> Optional[str]:
 def get_nvidia_gpu_name(name: str) -> Optional[str]:
     if "V100" in name:
         return "V100"
+    if name == "H100 NVL":
+        return "H100NVL"
     if name.startswith(("A", "L", "H")):
         gpu_name, _, _ = name.partition(" ")
         return gpu_name
+    if name.startswith("RTX A"):
+        return name.lstrip("RTX ").replace(" ", "")
     if name.startswith("RTX"):
-        gpu_name = name.replace(" ", "")
-        return gpu_name
+        return name.replace(" ", "")
     return None
 
 
