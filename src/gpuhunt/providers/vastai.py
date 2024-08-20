@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import requests
 
-from gpuhunt._internal.constraints import KNOWN_NVIDIA_GPUS
+from gpuhunt._internal.constraints import correct_gpu_memory_gib
 from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
@@ -52,7 +52,7 @@ class VastAIProvider(AbstractProvider):
                 logger.warning("Offer %s does not satisfy filters", offer["id"])
                 continue
             gpu_name = get_gpu_name(offer["gpu_name"])
-            gpu_memory = normalize_gpu_memory(gpu_name, offer["gpu_ram"])
+            gpu_memory = correct_gpu_memory_gib(gpu_name, offer["gpu_ram"])
             ondemand_offer = RawCatalogItem(
                 instance_name=str(offer["id"]),
                 location=get_location(offer["geolocation"]),
@@ -135,14 +135,6 @@ def get_gpu_name(gpu_name: str) -> str:
     if gpu_name.startswith("H100 ") and "NVL" not in gpu_name:
         return "H100"
     return gpu_name.replace(" ", "")
-
-
-def normalize_gpu_memory(gpu_name: str, memory_mib: float) -> int:
-    known_memory = [gpu.memory for gpu in KNOWN_NVIDIA_GPUS if gpu.name == gpu_name]
-    if known_memory:
-        # return the closest known value
-        return min(known_memory, key=lambda x: abs(x - memory_mib / kilo))
-    return int(memory_mib / kilo)
 
 
 def get_location(location: Optional[str]) -> str:

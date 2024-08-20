@@ -154,7 +154,7 @@ class Catalog:
             items = list(heapq.merge(*[f.result() for f in completed], key=lambda i: i.price))
         return items
 
-    def load(self, version: str = None):
+    def load(self, version: Optional[str] = None):
         """
         Fetch the catalog from the S3 bucket
 

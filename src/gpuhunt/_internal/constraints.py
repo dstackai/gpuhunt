@@ -114,6 +114,27 @@ def get_compute_capability(gpu_name: str) -> Optional[Tuple[int, int]]:
     return None
 
 
+def correct_gpu_memory_gib(gpu_name: str, memory_mib: float) -> int:
+    """
+    Round to whole number of gibibytes and attempt correcting the reported GPU
+    memory size if the actual memory size for that GPU is known and the
+    difference between the reported and the known memory is within a heuristic
+    threshold.
+
+    This is useful for cases when nvidia-smi or cloud providers report the GPU
+    memory imprecisely.
+    """
+
+    memory_gib = memory_mib / 1024
+    known_memories_gib = {gpu.memory for gpu in KNOWN_ACCELERATORS if gpu.name == gpu_name}
+    if known_memories_gib:
+        closest_known_memory_gib = min(known_memories_gib, key=lambda x: abs(x - memory_gib))
+        difference_gib = abs(closest_known_memory_gib - memory_gib)
+        if difference_gib / closest_known_memory_gib < 0.07:
+            return closest_known_memory_gib
+    return round(memory_gib)
+
+
 KNOWN_NVIDIA_GPUS: List[NvidiaGPUInfo] = [
     NvidiaGPUInfo(name="A10", memory=24, compute_capability=(8, 6)),
     NvidiaGPUInfo(name="A40", memory=48, compute_capability=(8, 6)),
