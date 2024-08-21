@@ -3,7 +3,7 @@ from typing import List
 import pytest
 
 from gpuhunt import CatalogItem, QueryFilter
-from gpuhunt._internal.constraints import matches
+from gpuhunt._internal.constraints import correct_gpu_memory_gib, matches
 from gpuhunt._internal.models import AcceleratorVendor
 
 
@@ -170,3 +170,17 @@ class TestMatches:
         assert matches(cpu_items[0], q)
         q.provider = ["nebius"]
         assert not matches(cpu_items[0], q)
+
+
+@pytest.mark.parametrize(
+    ("gpu_name", "memory_mib", "expected_memory_gib"),
+    [
+        ("H100NVL", 95830.0, 94),
+        ("L40S", 46068.0, 48),
+        ("A10G", 23028.0, 24),
+        ("A10", 4096.0, 4),
+        ("unknown", 8200.1, 8),
+    ],
+)
+def test_correct_gpu_memory(gpu_name: str, memory_mib: float, expected_memory_gib: int) -> None:
+    assert correct_gpu_memory_gib(gpu_name, memory_mib) == expected_memory_gib
