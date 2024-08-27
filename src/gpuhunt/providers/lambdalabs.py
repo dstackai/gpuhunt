@@ -12,11 +12,14 @@ logger = logging.getLogger(__name__)
 instance_types_url = "https://cloud.lambdalabs.com/api/v1/instance-types"
 all_regions = [
     "us-south-1",
+    "us-south-2",
+    "us-south-3",
     "us-west-2",
     "us-west-1",
     "us-midwest-1",
     "us-west-3",
     "us-east-1",
+    "us-east-2",
     "europe-central-1",
     "asia-south-1",
     "me-west-1",
