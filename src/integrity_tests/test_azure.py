@@ -45,6 +45,7 @@ class TestAzureCatalog:
             "koreacentral",
             "koreasouth",
             "mexicocentral",
+            "newzealandnorth",
             "northcentralus",
             "northeurope",
             "norwayeast",
