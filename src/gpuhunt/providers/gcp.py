@@ -1,5 +1,5 @@
 import copy
-import importlib
+import importlib.resources
 import json
 import logging
 import re
@@ -93,7 +93,7 @@ def load_tpu_pricing():
     resource_package = "gpuhunt.resources"
     resource_name = "tpu_pricing.json"
 
-    with importlib.resources.open_text(resource_package, resource_name) as f:
+    with importlib.resources.files(resource_package).joinpath(resource_name).open() as f:
         return json.load(f)
 
 
@@ -590,6 +590,21 @@ def get_no_of_chips(expression: str) -> int:
 
 
 def get_locations(project_id: str) -> List[str]:
+    return [
+        "asia-east1-c",
+        "europe-west4-a",
+        "europe-west4-b",
+        "us-central1-a",
+        "us-central1-b",
+        "us-central1-c",
+        "us-east5-b",
+        "us-east5-c",
+        "us-south1-a",
+        "us-south1-c",
+        "us-west1-c",
+        "us-west4-a",
+        "us-west4-b",
+    ]
     client = tpu_v2.TpuClient()
     # Initialize request argument(s)
     parent = f"projects/{project_id}"
