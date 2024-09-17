@@ -18,6 +18,13 @@ AMD = AcceleratorVendor.AMD
         pytest.param(1, None, "tpu-v3", "google", "v3", id="one-tpu-vendor-not-set"),
         pytest.param(1, "google", "tpu-v5p", "google", "v5p", id="one-tpu-vendor-is-set"),
         pytest.param(1, AMD, "MI300X", "amd", "MI300X", id="cast-enum-to-string"),
+        pytest.param(1, AMD, "MI300A", "amd", "MI300A", id="cast-enum-to-string"),
+        pytest.param(1, AMD, "MI308X", "amd", "MI308X", id="cast-enum-to-string"),
+        pytest.param(1, AMD, "MI325X", "amd", "MI325X", id="cast-enum-to-string"),
+        pytest.param(1, AMD, "MI250X", "amd", "MI250X", id="cast-enum-to-string"),
+        pytest.param(1, AMD, "MI250", "amd", "MI250", id="cast-enum-to-string"),
+        pytest.param(1, AMD, "MI210", "amd", "MI210", id="cast-enum-to-string"),
+        pytest.param(1, AMD, "MI100", "amd", "MI100", id="cast-enum-to-string"),
     ],
 )
 def test_raw_catalog_item_gpu_vendor_heuristic(
@@ -49,6 +56,13 @@ def test_raw_catalog_item_gpu_vendor_heuristic(
         pytest.param(1, None, None, NVIDIA, id="one-gpu-no-name"),
         pytest.param(1, None, "v3", NVIDIA, id="one-gpu-with-any-name"),
         pytest.param(1, "amd", "MI300X", AMD, id="cast-string-to-enum"),
+        pytest.param(1, "amd", "MI300A", AMD, id="cast-string-to-enum"),
+        pytest.param(1, "amd", "MI308X", AMD, id="cast-string-to-enum"),
+        pytest.param(1, "amd", "MI325X", AMD, id="cast-string-to-enum"),
+        pytest.param(1, "amd", "MI250X", AMD, id="cast-string-to-enum"),
+        pytest.param(1, "amd", "MI250", AMD, id="cast-string-to-enum"),
+        pytest.param(1, "amd", "MI210", AMD, id="cast-string-to-enum"),
+        pytest.param(1, "amd", "MI100", AMD, id="cast-string-to-enum"),
     ],
 )
 def test_catalog_item_gpu_vendor_heuristic(
