@@ -5,7 +5,7 @@ import pytest
 from gpuhunt._internal.constraints import KNOWN_AMD_GPUS
 from gpuhunt._internal.models import (
     AcceleratorVendor,
-    AmdArchitecture,
+    AMDArchitecture,
     CatalogItem,
     Optional,
     RawCatalogItem,
@@ -25,13 +25,6 @@ AMD = AcceleratorVendor.AMD
         pytest.param(1, None, "tpu-v3", "google", "v3", id="one-tpu-vendor-not-set"),
         pytest.param(1, "google", "tpu-v5p", "google", "v5p", id="one-tpu-vendor-is-set"),
         pytest.param(1, AMD, "MI300X", "amd", "MI300X", id="cast-enum-to-string"),
-        pytest.param(1, AMD, "MI300A", "amd", "MI300A", id="cast-enum-to-string"),
-        pytest.param(1, AMD, "MI308X", "amd", "MI308X", id="cast-enum-to-string"),
-        pytest.param(1, AMD, "MI325X", "amd", "MI325X", id="cast-enum-to-string"),
-        pytest.param(1, AMD, "MI250X", "amd", "MI250X", id="cast-enum-to-string"),
-        pytest.param(1, AMD, "MI250", "amd", "MI250", id="cast-enum-to-string"),
-        pytest.param(1, AMD, "MI210", "amd", "MI210", id="cast-enum-to-string"),
-        pytest.param(1, AMD, "MI100", "amd", "MI100", id="cast-enum-to-string"),
     ],
 )
 def test_raw_catalog_item_gpu_vendor_heuristic(
@@ -63,13 +56,6 @@ def test_raw_catalog_item_gpu_vendor_heuristic(
         pytest.param(1, None, None, NVIDIA, id="one-gpu-no-name"),
         pytest.param(1, None, "v3", NVIDIA, id="one-gpu-with-any-name"),
         pytest.param(1, "amd", "MI300X", AMD, id="cast-string-to-enum"),
-        pytest.param(1, "amd", "MI300A", AMD, id="cast-string-to-enum"),
-        pytest.param(1, "amd", "MI308X", AMD, id="cast-string-to-enum"),
-        pytest.param(1, "amd", "MI325X", AMD, id="cast-string-to-enum"),
-        pytest.param(1, "amd", "MI250X", AMD, id="cast-string-to-enum"),
-        pytest.param(1, "amd", "MI250", AMD, id="cast-string-to-enum"),
-        pytest.param(1, "amd", "MI210", AMD, id="cast-string-to-enum"),
-        pytest.param(1, "amd", "MI100", AMD, id="cast-string-to-enum"),
     ],
 )
 def test_catalog_item_gpu_vendor_heuristic(
@@ -99,17 +85,17 @@ def test_catalog_item_gpu_vendor_heuristic(
 @pytest.mark.parametrize(
     ["model", "architecture", "expected_memory"],
     [
-        pytest.param("MI325X", AmdArchitecture.CDNA3, 288, id="MI325X"),
-        pytest.param("MI308X", AmdArchitecture.CDNA3, 128, id="MI308X"),
-        pytest.param("MI300X", AmdArchitecture.CDNA3, 192, id="MI300X"),
-        pytest.param("MI300A", AmdArchitecture.CDNA3, 128, id="MI300A"),
-        pytest.param("MI250X", AmdArchitecture.CDNA2, 128, id="MI250X"),
-        pytest.param("MI250", AmdArchitecture.CDNA2, 128, id="MI250"),
-        pytest.param("MI210", AmdArchitecture.CDNA2, 64, id="MI210"),
-        pytest.param("MI100", AmdArchitecture.CDNA, 32, id="MI100"),
+        pytest.param("MI325X", AMDArchitecture.CDNA3, 288, id="MI325X"),
+        pytest.param("MI308X", AMDArchitecture.CDNA3, 128, id="MI308X"),
+        pytest.param("MI300X", AMDArchitecture.CDNA3, 192, id="MI300X"),
+        pytest.param("MI300A", AMDArchitecture.CDNA3, 128, id="MI300A"),
+        pytest.param("MI250X", AMDArchitecture.CDNA2, 128, id="MI250X"),
+        pytest.param("MI250", AMDArchitecture.CDNA2, 128, id="MI250"),
+        pytest.param("MI210", AMDArchitecture.CDNA2, 64, id="MI210"),
+        pytest.param("MI100", AMDArchitecture.CDNA, 32, id="MI100"),
     ],
 )
-def test_amd_gpu_architecture(model: str, architecture: AmdArchitecture, expected_memory: int):
+def test_amd_gpu_architecture(model: str, architecture: AMDArchitecture, expected_memory: int):
     for gpu in KNOWN_AMD_GPUS:
         if gpu.name == model:
             assert gpu.architecture == architecture

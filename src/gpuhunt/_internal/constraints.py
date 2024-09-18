@@ -2,7 +2,7 @@ from typing import List, Optional, Tuple, TypeVar, Union
 
 from gpuhunt._internal.models import (
     AcceleratorVendor,
-    AmdArchitecture,
+    AMDArchitecture,
     AMDGPUInfo,
     CatalogItem,
     NvidiaGPUInfo,
@@ -170,14 +170,14 @@ KNOWN_NVIDIA_GPUS: List[NvidiaGPUInfo] = [
 ]
 
 KNOWN_AMD_GPUS: List[AMDGPUInfo] = [
-    AMDGPUInfo(name="MI100", memory=32, architecture=AmdArchitecture.CDNA),
-    AMDGPUInfo(name="MI210", memory=64, architecture=AmdArchitecture.CDNA2),
-    AMDGPUInfo(name="MI250", memory=128, architecture=AmdArchitecture.CDNA2),
-    AMDGPUInfo(name="MI250X", memory=128, architecture=AmdArchitecture.CDNA2),
-    AMDGPUInfo(name="MI300A", memory=128, architecture=AmdArchitecture.CDNA3),
-    AMDGPUInfo(name="MI300X", memory=192, architecture=AmdArchitecture.CDNA3),
-    AMDGPUInfo(name="MI308X", memory=128, architecture=AmdArchitecture.CDNA3),
-    AMDGPUInfo(name="MI325X", memory=288, architecture=AmdArchitecture.CDNA3),
+    AMDGPUInfo(name="MI100", memory=32, architecture=AMDArchitecture.CDNA),
+    AMDGPUInfo(name="MI210", memory=64, architecture=AMDArchitecture.CDNA2),
+    AMDGPUInfo(name="MI250", memory=128, architecture=AMDArchitecture.CDNA2),
+    AMDGPUInfo(name="MI250X", memory=128, architecture=AMDArchitecture.CDNA2),
+    AMDGPUInfo(name="MI300A", memory=128, architecture=AMDArchitecture.CDNA3),
+    AMDGPUInfo(name="MI300X", memory=192, architecture=AMDArchitecture.CDNA3),
+    AMDGPUInfo(name="MI308X", memory=128, architecture=AMDArchitecture.CDNA3),
+    AMDGPUInfo(name="MI325X", memory=288, architecture=AMDArchitecture.CDNA3),
 ]
 
 KNOWN_TPUS: List[TPUInfo] = [TPUInfo(name=version, memory=0) for version in _TPU_VERSIONS]

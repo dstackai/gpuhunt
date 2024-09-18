@@ -18,7 +18,7 @@ def bool_loader(x: Union[bool, str]) -> bool:
     return x.lower() == "true"
 
 
-class AmdArchitecture(enum.Enum):
+class AMDArchitecture(enum.Enum):
     CDNA = "CDNA"
     CDNA2 = "CDNA2"
     CDNA3 = "CDNA3"
@@ -225,7 +225,7 @@ class NvidiaGPUInfo(AcceleratorInfo):
 @dataclass
 class AMDGPUInfo(AcceleratorInfo):
     vendor = AcceleratorVendor.AMD
-    architecture: AmdArchitecture
+    architecture: AMDArchitecture
 
 
 @dataclass
