@@ -1,0 +1,44 @@
+name: Generate GPU Prices
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Runs daily at midnight UTC
+  workflow_dispatch:  # Allows manual triggering from the GitHub UI
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Step 1: Checkout the repository
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    # Step 2: Set up Python
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    # Step 3: Install required Python dependencies (if any)
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # Install gpuhunt and any other dependencies if necessary
+        pip install gpuhunt
+
+    # Step 4: Run the Python script to generate the GPU prices
+    - name: Run GPU Price Script
+      run: |
+        python generate_gpu_prices.py
+
+    # Step 5: Commit and push the output file to the gpu-price branch
+    - name: Commit and Push Changes
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git checkout -B gpu-price  # Create or switch to gpu-price branch
+        git add gpu_prices.json
+        current_date=$(date +"%Y-%m-%d")  # Get the current date in the format YYYY-MM-DD
+        git commit -m "Update GPU prices on $current_date"
+        git push origin gpu-price --force
