@@ -24,8 +24,8 @@ class AMDArchitecture(enum.Enum):
     CDNA3 = "CDNA3"
 
     @classmethod
-    def cast(cls, value: Union["AcceleratorVendor", str]) -> "AcceleratorVendor":
-        if isinstance(value, AcceleratorVendor):
+    def cast(cls, value: Union["AMDArchitecture", str]) -> "AMDArchitecture":
+        if isinstance(value, AMDArchitecture):
             return value
         return cls(value.upper())
 
