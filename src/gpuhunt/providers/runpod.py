@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Tuple
 import requests
 from requests import RequestException
 
+from gpuhunt._internal.constraints import KNOWN_AMD_GPUS
 from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
@@ -300,8 +301,9 @@ def get_nvidia_gpu_name(name: str) -> Optional[str]:
 
 
 def get_amd_gpu_name(name: str) -> Optional[str]:
-    if name == "MI300X":
-        return "MI300X"
+    for gpu in KNOWN_AMD_GPUS:
+        if gpu.name == name:
+            return name
     return None
 
 
