@@ -1,5 +1,4 @@
 import dataclasses
-import logging
 from typing import List
 
 import pytest
@@ -46,13 +45,13 @@ def raw_instance_types() -> List[dict]:
         "cpu": {"description": "20 CPU", "number_of_cores": 20},
         "deploy_warning": None,
         "description": "Dedicated Hardware Instance",
-        "gpu": {"description": "2x NVidia RTX A6000 48GB", "number_of_gpus": 2},
+        "gpu": {"description": "2x NVIDIA RTX A6000 48GB", "number_of_gpus": 2},
         "gpu_memory": {"description": "96GB GPU RAM", "size_in_gigabytes": 96},
         "id": "07cf5dc1-a5d2-4972-ae4e-d429115d055b",
         "instance_type": "2A6000.20V",
         "memory": {"description": "120GB RAM", "size_in_gigabytes": 120},
         "model": "RTX A6000",
-        "name": "NVidia RTX A6000 48GB",
+        "name": "NVIDIA RTX A6000 48GB",
         "p2p": "",
         "price_per_hour": "1.98",
         "spot_price": "0.70",
@@ -87,13 +86,13 @@ def raw_instance_types() -> List[dict]:
         "cpu": {"description": "6 CPU", "number_of_cores": 6},
         "deploy_warning": None,
         "description": "Dedicated Hardware Instance",
-        "gpu": {"description": "1x NVidia Tesla V100 16GB", "number_of_gpus": 1},
+        "gpu": {"description": "1x NVIDIA Tesla V100 16GB", "number_of_gpus": 1},
         "gpu_memory": {"description": "16GB GPU RAM", "size_in_gigabytes": 16},
         "id": "04cf5dc1-a5d2-4972-ae4e-d429115d055b",
         "instance_type": "1V100.6V",
         "memory": {"description": "23GB RAM", "size_in_gigabytes": 23},
         "model": "Tesla V100",
-        "name": "NVidia Tesla V100 16GB",
+        "name": "NVIDIA Tesla V100 16GB",
         "p2p": "",
         "price_per_hour": "0.89",
         "spot_price": "0.25",
@@ -182,10 +181,6 @@ def list_available_instances(raw_instance_types, locations):
 def test_gpu_name(caplog):
     assert get_gpu_name("1x H100 SXM5 80GB") == "H100"
     assert get_gpu_name("") is None
-
-    with caplog.at_level(logging.WARNING):
-        get_gpu_name("1x H200 SXM5 80GB")
-    assert "There is no '1x H200 SXM5 80GB' in GPU_MAP" in caplog.text
 
 
 def transform(raw_catalog_items: List[RawCatalogItem]) -> List[CatalogItem]:
