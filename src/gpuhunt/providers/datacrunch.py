@@ -101,22 +101,22 @@ GPU_MAP = {
     "2x A100 SXM4 40GB": "A100",
     "4x A100 SXM4 40GB": "A100",
     "8x A100 SXM4 40GB": "A100",
-    "1x NVidia RTX6000 Ada 48GB": "RTX6000Ada",
-    "2x NVidia RTX6000 Ada 48GB": "RTX6000Ada",
-    "4x NVidia RTX6000 Ada 48GB": "RTX6000Ada",
-    "8x NVidia RTX6000 Ada 48GB": "RTX6000Ada",
-    "1x NVidia RTX A6000 48GB": "A6000",
-    "2x NVidia RTX A6000 48GB": "A6000",
-    "4x NVidia RTX A6000 48GB": "A6000",
-    "8x NVidia RTX A6000 48GB": "A6000",
-    "1x NVidia Tesla V100 16GB": "V100",
-    "2x NVidia Tesla V100 16GB": "V100",
-    "4x NVidia Tesla V100 16GB": "V100",
-    "8x NVidia Tesla V100 16GB": "V100",
-    "1x NVidia L40S": "L40S",
-    "2x NVidia L40S": "L40S",
-    "4x NVidia L40S": "L40S",
-    "8x NVidia L40S": "L40S",
+    "1x NVIDIA RTX6000 Ada 48GB": "RTX6000Ada",
+    "2x NVIDIA RTX6000 Ada 48GB": "RTX6000Ada",
+    "4x NVIDIA RTX6000 Ada 48GB": "RTX6000Ada",
+    "8x NVIDIA RTX6000 Ada 48GB": "RTX6000Ada",
+    "1x NVIDIA RTX A6000 48GB": "A6000",
+    "2x NVIDIA RTX A6000 48GB": "A6000",
+    "4x NVIDIA RTX A6000 48GB": "A6000",
+    "8x NVIDIA RTX A6000 48GB": "A6000",
+    "1x NVIDIA Tesla V100 16GB": "V100",
+    "2x NVIDIA Tesla V100 16GB": "V100",
+    "4x NVIDIA Tesla V100 16GB": "V100",
+    "8x NVIDIA Tesla V100 16GB": "V100",
+    "1x NVIDIA L40S": "L40S",
+    "2x NVIDIA L40S": "L40S",
+    "4x NVIDIA L40S": "L40S",
+    "8x NVIDIA L40S": "L40S",
     "1x AMD 7900XTX": AMD_RX7900XTX,
     "2x AMD 7900XTX": AMD_RX7900XTX,
     "4x AMD 7900XTX": AMD_RX7900XTX,
@@ -128,10 +128,5 @@ GPU_MAP = {
 def get_gpu_name(name: str) -> Optional[str]:
     if not name:
         return None
-
     result = GPU_MAP.get(name)
-
-    if result is None:
-        logger.warning("There is no '%s' in GPU_MAP", name)
-
     return result
