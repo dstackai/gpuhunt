@@ -1,7 +1,8 @@
 import copy
 import itertools
 import logging
-from typing import Iterable, List, Optional
+from collections.abc import Iterable
+from typing import Optional
 
 from datacrunch import DataCrunchClient
 from datacrunch.instance_types.instance_types import InstanceType
@@ -25,7 +26,7 @@ class DataCrunchProvider(AbstractProvider):
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
-    ) -> List[RawCatalogItem]:
+    ) -> list[RawCatalogItem]:
         instance_types = self._get_instance_types()
         locations = self._get_locations()
 
@@ -35,23 +36,23 @@ class DataCrunchProvider(AbstractProvider):
 
         return sorted(instances, key=lambda x: x.price)
 
-    def _get_instance_types(self) -> List[InstanceType]:
+    def _get_instance_types(self) -> list[InstanceType]:
         return self.datacrunch_client.instance_types.get()
 
-    def _get_availabilities(self, spot: bool) -> List[dict]:
+    def _get_availabilities(self, spot: bool) -> list[dict]:
         return self.datacrunch_client.instances.get_availabilities(is_spot=spot)
 
-    def _get_locations(self) -> List[dict]:
+    def _get_locations(self) -> list[dict]:
         return self.datacrunch_client.locations.get()
 
     @classmethod
-    def filter(cls, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
+    def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
         return [o for o in offers if o.gpu_name not in ALL_AMD_GPUS]  # skip AMD GPU
 
 
 def generate_instances(
     spots: Iterable[bool], location_codes: Iterable[str], instance_types: Iterable[InstanceType]
-) -> List[RawCatalogItem]:
+) -> list[RawCatalogItem]:
     instances = []
     for spot, location, instance in itertools.product(spots, location_codes, instance_types):
         item = transform_instance(copy.copy(instance), spot, location)

@@ -1,7 +1,7 @@
 import copy
 import logging
 import re
-from typing import List, Optional, Tuple
+from typing import Optional
 
 import requests
 
@@ -36,7 +36,7 @@ class LambdaLabsProvider(AbstractProvider):
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
-    ) -> List[RawCatalogItem]:
+    ) -> list[RawCatalogItem]:
         offers = []
         data = requests.get(
             instance_types_url, headers={"Authorization": f"Bearer {self.token}"}, timeout=10
@@ -67,7 +67,7 @@ class LambdaLabsProvider(AbstractProvider):
         offers = self.add_regions(offers)
         return sorted(offers, key=lambda i: i.price)
 
-    def add_regions(self, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
+    def add_regions(self, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
         # TODO: we don't know which regions are actually available for each instance type
         region_offers = []
         for region in all_regions:
@@ -78,7 +78,7 @@ class LambdaLabsProvider(AbstractProvider):
         return region_offers
 
 
-def parse_description(v: str) -> Optional[Tuple[int, str, float]]:
+def parse_description(v: str) -> Optional[tuple[int, str, float]]:
     """Returns gpus count, gpu name, and GPU memory"""
     r = re.match(r"^(\d)x (?:Tesla )?(.+) \((\d+) GB", v)
     if r is None:

@@ -1,7 +1,7 @@
 import copy
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Literal, Optional, Union
 
 import requests
 
@@ -19,13 +19,13 @@ FilterValue = Union[int, float, str, bool]
 class VastAIProvider(AbstractProvider):
     NAME = "vastai"
 
-    def __init__(self, extra_filters: Optional[Dict[str, Dict[Operators, FilterValue]]] = None):
+    def __init__(self, extra_filters: Optional[dict[str, dict[Operators, FilterValue]]] = None):
         self.extra_filters = extra_filters
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
-    ) -> List[RawCatalogItem]:
-        filters: Dict[str, Any] = self.make_filters(query_filter or QueryFilter())
+    ) -> list[RawCatalogItem]:
+        filters: dict[str, Any] = self.make_filters(query_filter or QueryFilter())
         if self.extra_filters:
             for key, constraints in self.extra_filters.items():
                 for op, value in constraints.items():
@@ -79,7 +79,7 @@ class VastAIProvider(AbstractProvider):
         return instance_offers
 
     @staticmethod
-    def make_filters(q: QueryFilter) -> Dict[str, Dict[Operators, FilterValue]]:
+    def make_filters(q: QueryFilter) -> dict[str, dict[Operators, FilterValue]]:
         filters = defaultdict(dict)
         if q.min_cpu is not None:
             filters["cpu_cores"]["gte"] = q.min_cpu
@@ -110,7 +110,7 @@ class VastAIProvider(AbstractProvider):
         return filters
 
     @staticmethod
-    def satisfies_filters(offer: dict, filters: Dict[str, Dict[Operators, FilterValue]]) -> bool:
+    def satisfies_filters(offer: dict, filters: dict[str, dict[Operators, FilterValue]]) -> bool:
         for key in filters:
             if key not in offer:
                 continue
@@ -148,7 +148,7 @@ def get_location(location: Optional[str]) -> str:
     return location.lower().replace(" ", "")
 
 
-def compute_cap(cc: Tuple[int, int]) -> str:
+def compute_cap(cc: tuple[int, int]) -> str:
     """
     >>> compute_cap((7, 0))
     '700'

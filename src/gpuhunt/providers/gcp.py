@@ -4,7 +4,8 @@ import json
 import logging
 import re
 from collections import defaultdict, namedtuple
-from typing import DefaultDict, Dict, Iterable, List, Optional, Tuple
+from collections.abc import Iterable
+from typing import Optional
 
 import google.cloud.billing_v1 as billing_v1
 import google.cloud.compute_v1 as compute_v1
@@ -111,7 +112,7 @@ class GCPProvider(AbstractProvider):
         self.regions_client = compute_v1.RegionsClient()
         self.cloud_catalog_client = billing_v1.CloudCatalogClient()
 
-    def list_preconfigured_instances(self) -> List[RawCatalogItem]:
+    def list_preconfigured_instances(self) -> list[RawCatalogItem]:
         instances = []
         for region in self.regions_client.list(project=self.project):
             for zone_url in region.zones:
@@ -156,7 +157,7 @@ class GCPProvider(AbstractProvider):
                     instances.append(instance)
         return instances
 
-    def add_gpus(self, instances: List[RawCatalogItem]):
+    def add_gpus(self, instances: list[RawCatalogItem]):
         n1_instances = defaultdict(list)
         for instance in instances:
             if instance.instance_name.startswith("n1-"):
@@ -179,7 +180,7 @@ class GCPProvider(AbstractProvider):
                         instances_with_gpus.append(i)
         instances += instances_with_gpus
 
-    def fill_prices(self, instances: List[RawCatalogItem]) -> List[RawCatalogItem]:
+    def fill_prices(self, instances: list[RawCatalogItem]) -> list[RawCatalogItem]:
         logger.info("Fetching prices")
         skus = self.cloud_catalog_client.list_skus(parent=compute_service)
         prices = Prices()
@@ -198,7 +199,7 @@ class GCPProvider(AbstractProvider):
                 offers.append(offer)
         return offers
 
-    def fill_gpu_vendors_and_names(self, offers: List[RawCatalogItem]) -> None:
+    def fill_gpu_vendors_and_names(self, offers: list[RawCatalogItem]) -> None:
         # Modifies offers in the list in-place
         for offer in offers:
             accelerator_type = offer.gpu_name
@@ -212,7 +213,7 @@ class GCPProvider(AbstractProvider):
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
-    ) -> List[RawCatalogItem]:
+    ) -> list[RawCatalogItem]:
         instances = self.list_preconfigured_instances()
         self.add_gpus(instances)
         offers = self.fill_prices(instances)
@@ -222,7 +223,7 @@ class GCPProvider(AbstractProvider):
         return sorted(offers, key=lambda i: i.price)
 
     @classmethod
-    def filter(cls, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
+    def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
         return [
             i
             for i in offers
@@ -242,15 +243,15 @@ class GCPProvider(AbstractProvider):
         ]
 
 
-RegionSpot = Tuple[str, bool]
-PricePerRegionSpot = Dict[RegionSpot, float]
+RegionSpot = tuple[str, bool]
+PricePerRegionSpot = dict[RegionSpot, float]
 
 
 class Prices:
     def __init__(self):
-        self.cpu: DefaultDict[str, PricePerRegionSpot] = defaultdict(dict)
-        self.gpu: DefaultDict[str, PricePerRegionSpot] = defaultdict(dict)
-        self.ram: DefaultDict[str, PricePerRegionSpot] = defaultdict(dict)
+        self.cpu: defaultdict[str, PricePerRegionSpot] = defaultdict(dict)
+        self.gpu: defaultdict[str, PricePerRegionSpot] = defaultdict(dict)
+        self.ram: defaultdict[str, PricePerRegionSpot] = defaultdict(dict)
         self.local_ssd: PricePerRegionSpot = dict()
 
     def add_skus(self, skus: Iterable[Sku]) -> None:
@@ -352,10 +353,10 @@ class Prices:
         return instance_name.split("-")[0]
 
 
-def get_tpu_offers(project_id: str) -> List[RawCatalogItem]:
+def get_tpu_offers(project_id: str) -> list[RawCatalogItem]:
     logger.info("Fetching tpu offers")
-    raw_catalog_items: List[RawCatalogItem] = []
-    catalog_items: List[dict] = get_catalog_items(project_id)
+    raw_catalog_items: list[RawCatalogItem] = []
+    catalog_items: list[dict] = get_catalog_items(project_id)
     filtered_catalog_items = [item for item in catalog_items if item["price"] is not None]
     for item in filtered_catalog_items:
         on_demand_item = RawCatalogItem(
@@ -380,9 +381,9 @@ def get_tpu_offers(project_id: str) -> List[RawCatalogItem]:
     return raw_catalog_items
 
 
-def get_catalog_items(project_id: str) -> List[dict]:
-    tpu_prices: List[dict] = get_tpu_prices()
-    configs: List[dict] = get_tpu_configs(project_id)
+def get_catalog_items(project_id: str) -> list[dict]:
+    tpu_prices: list[dict] = get_tpu_prices()
+    configs: list[dict] = get_tpu_configs(project_id)
     for config in configs:
         instance_name = config["instance_name"]
         location = config["location"].rsplit("-", 1)[0]  # Remove the part after the last '-'
@@ -459,7 +460,7 @@ def get_catalog_items(project_id: str) -> List[dict]:
     return configs
 
 
-def get_tpu_prices() -> List[dict]:
+def get_tpu_prices() -> list[dict]:
     client = CloudCatalogClient()
     tpu_configs = []
     # E000-3F24-B8AA contains prices for TPU versions v2,v3,v4.
@@ -500,7 +501,7 @@ def get_tpu_prices() -> List[dict]:
 
 
 def find_base_price(
-    instance_name: str, location: str, tpu_prices: List[dict], spot: bool, is_pod: bool
+    instance_name: str, location: str, tpu_prices: list[dict], spot: bool, is_pod: bool
 ) -> Optional[float]:
     for price_info in tpu_prices:
         if (
@@ -513,7 +514,7 @@ def find_base_price(
     return None
 
 
-def find_no_of_chips(instance_name: str, configs: List[dict]):
+def find_no_of_chips(instance_name: str, configs: list[dict]):
     for config in configs:
         if config["instance_name"] == instance_name:
             return config["no_of_chips"]
@@ -542,7 +543,7 @@ def find_tpu_price_static_src(
 
 
 def find_base_price_v5(
-    instance_name: str, location: str, tpu_prices: List[dict], spot: bool
+    instance_name: str, location: str, tpu_prices: list[dict], spot: bool
 ) -> Optional[float]:
     for price_info in tpu_prices:
         if (
@@ -554,8 +555,8 @@ def find_base_price_v5(
     return None
 
 
-def get_tpu_configs(project_id: str) -> List[dict]:
-    instances: List[dict] = []
+def get_tpu_configs(project_id: str) -> list[dict]:
+    instances: list[dict] = []
     client = tpu_v2.TpuClient()
     for location in get_locations(project_id):
         parent = f"projects/{project_id}/locations/{location}"
@@ -589,7 +590,7 @@ def get_no_of_chips(expression: str) -> int:
     return product
 
 
-def get_locations(project_id: str) -> List[str]:
+def get_locations(project_id: str) -> list[str]:
     client = tpu_v2.TpuClient()
     # Initialize request argument(s)
     parent = f"projects/{project_id}"

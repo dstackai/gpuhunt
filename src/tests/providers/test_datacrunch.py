@@ -1,5 +1,4 @@
 import dataclasses
-from typing import List
 
 import pytest
 
@@ -15,7 +14,7 @@ from gpuhunt.providers.datacrunch import (
 
 
 @pytest.fixture
-def raw_instance_types() -> List[dict]:
+def raw_instance_types() -> list[dict]:
     # datacrunch.instance_types.get()
     one_gpu = {
         "best_for": [
@@ -103,7 +102,7 @@ def raw_instance_types() -> List[dict]:
 
 
 @pytest.fixture
-def availabilities() -> List[dict]:
+def availabilities() -> list[dict]:
     # datacrunch.instances.get_availabilities(is_spot=True)
     data = [
         {
@@ -183,7 +182,7 @@ def test_gpu_name(caplog):
     assert get_gpu_name("") is None
 
 
-def transform(raw_catalog_items: List[RawCatalogItem]) -> List[CatalogItem]:
+def transform(raw_catalog_items: list[RawCatalogItem]) -> list[CatalogItem]:
     items = []
     for raw in raw_catalog_items:
         item = CatalogItem(provider="datacrunch", **dataclasses.asdict(raw))

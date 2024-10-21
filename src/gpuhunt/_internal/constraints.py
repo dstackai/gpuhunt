@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, TypeVar, Union
+from typing import Optional, TypeVar, Union
 
 from gpuhunt._internal.models import (
     AcceleratorVendor,
@@ -23,7 +23,7 @@ def _is_tpu(name: str) -> bool:
     return False
 
 
-Comparable = TypeVar("Comparable", bound=Union[int, float, Tuple[int, int]])
+Comparable = TypeVar("Comparable", bound=Union[int, float, tuple[int, int]])
 
 
 def is_between(value: Comparable, left: Optional[Comparable], right: Optional[Comparable]) -> bool:
@@ -108,7 +108,7 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
     return True
 
 
-def get_compute_capability(gpu_name: str) -> Optional[Tuple[int, int]]:
+def get_compute_capability(gpu_name: str) -> Optional[tuple[int, int]]:
     for gpu in KNOWN_NVIDIA_GPUS:
         if gpu.name.lower() == gpu_name.lower():
             return gpu.compute_capability
@@ -136,7 +136,7 @@ def correct_gpu_memory_gib(gpu_name: str, memory_mib: float) -> int:
     return round(memory_gib)
 
 
-KNOWN_NVIDIA_GPUS: List[NvidiaGPUInfo] = [
+KNOWN_NVIDIA_GPUS: list[NvidiaGPUInfo] = [
     NvidiaGPUInfo(name="A10", memory=24, compute_capability=(8, 6)),
     NvidiaGPUInfo(name="A40", memory=48, compute_capability=(8, 6)),
     NvidiaGPUInfo(name="A100", memory=40, compute_capability=(8, 0)),
@@ -169,7 +169,7 @@ KNOWN_NVIDIA_GPUS: List[NvidiaGPUInfo] = [
     NvidiaGPUInfo(name="V100", memory=32, compute_capability=(7, 0)),
 ]
 
-KNOWN_AMD_GPUS: List[AMDGPUInfo] = [
+KNOWN_AMD_GPUS: list[AMDGPUInfo] = [
     AMDGPUInfo(name="MI100", memory=32, architecture=AMDArchitecture.CDNA),
     AMDGPUInfo(name="MI210", memory=64, architecture=AMDArchitecture.CDNA2),
     AMDGPUInfo(name="MI250", memory=128, architecture=AMDArchitecture.CDNA2),
@@ -180,8 +180,8 @@ KNOWN_AMD_GPUS: List[AMDGPUInfo] = [
     AMDGPUInfo(name="MI325X", memory=288, architecture=AMDArchitecture.CDNA3),
 ]
 
-KNOWN_TPUS: List[TPUInfo] = [TPUInfo(name=version, memory=0) for version in _TPU_VERSIONS]
+KNOWN_TPUS: list[TPUInfo] = [TPUInfo(name=version, memory=0) for version in _TPU_VERSIONS]
 
-KNOWN_ACCELERATORS: List[Union[NvidiaGPUInfo, AMDGPUInfo, TPUInfo]] = (
+KNOWN_ACCELERATORS: list[Union[NvidiaGPUInfo, AMDGPUInfo, TPUInfo]] = (
     KNOWN_NVIDIA_GPUS + KNOWN_AMD_GPUS + KNOWN_TPUS
 )
