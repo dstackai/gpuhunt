@@ -2,10 +2,7 @@ import enum
 from dataclasses import asdict, dataclass, fields
 from typing import (
     ClassVar,
-    Dict,
-    List,
     Optional,
-    Tuple,
     Union,
 )
 
@@ -91,7 +88,7 @@ class RawCatalogItem:
             disk_size=empty_as_none(v.get("disk_size"), loader=float),
         )
 
-    def dict(self) -> Dict[str, Union[str, int, float, bool, None]]:
+    def dict(self) -> dict[str, Union[str, int, float, bool, None]]:
         return asdict(self)
 
 
@@ -171,7 +168,7 @@ class QueryFilter:
         spot: if `False`, only ondemand offers will be returned. If `True`, only spot offers will be returned
     """
 
-    provider: Optional[List[str]] = None  # strings can have mixed case
+    provider: Optional[list[str]] = None  # strings can have mixed case
     min_cpu: Optional[int] = None
     max_cpu: Optional[int] = None
     min_memory: Optional[float] = None
@@ -179,7 +176,7 @@ class QueryFilter:
     min_gpu_count: Optional[int] = None
     max_gpu_count: Optional[int] = None
     gpu_vendor: Optional[AcceleratorVendor] = None
-    gpu_name: Optional[List[str]] = None  # strings can have mixed case
+    gpu_name: Optional[list[str]] = None  # strings can have mixed case
     min_gpu_memory: Optional[float] = None
     max_gpu_memory: Optional[float] = None
     min_total_gpu_memory: Optional[float] = None
@@ -188,8 +185,8 @@ class QueryFilter:
     max_disk_size: Optional[int] = None
     min_price: Optional[float] = None
     max_price: Optional[float] = None
-    min_compute_capability: Optional[Tuple[int, int]] = None
-    max_compute_capability: Optional[Tuple[int, int]] = None
+    min_compute_capability: Optional[tuple[int, int]] = None
+    max_compute_capability: Optional[tuple[int, int]] = None
     spot: Optional[bool] = None
 
     def __repr__(self) -> str:
@@ -219,7 +216,7 @@ class AcceleratorInfo:
 @dataclass
 class NvidiaGPUInfo(AcceleratorInfo):
     vendor = AcceleratorVendor.NVIDIA
-    compute_capability: Tuple[int, int]
+    compute_capability: tuple[int, int]
 
 
 @dataclass

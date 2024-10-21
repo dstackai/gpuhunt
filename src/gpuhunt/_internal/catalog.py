@@ -6,8 +6,9 @@ import logging
 import time
 import urllib.request
 import zipfile
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, wait
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Optional, Union
 
 import gpuhunt._internal.constraints as constraints
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
@@ -31,14 +32,14 @@ class Catalog:
         """
         self.catalog = None
         self.loaded_at = None
-        self.providers: List[AbstractProvider] = []
+        self.providers: list[AbstractProvider] = []
         self.balance_resources = balance_resources
         self.auto_reload = auto_reload
 
     def query(
         self,
         *,
-        provider: Optional[Union[str, List[str]]] = None,
+        provider: Optional[Union[str, list[str]]] = None,
         min_cpu: Optional[int] = None,
         max_cpu: Optional[int] = None,
         min_memory: Optional[float] = None,
@@ -46,7 +47,7 @@ class Catalog:
         min_gpu_count: Optional[int] = None,
         max_gpu_count: Optional[int] = None,
         gpu_vendor: Optional[Union[AcceleratorVendor, str]] = None,
-        gpu_name: Optional[Union[str, List[str]]] = None,
+        gpu_name: Optional[Union[str, list[str]]] = None,
         min_gpu_memory: Optional[float] = None,
         max_gpu_memory: Optional[float] = None,
         min_total_gpu_memory: Optional[float] = None,
@@ -55,10 +56,10 @@ class Catalog:
         max_disk_size: Optional[int] = None,
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
-        min_compute_capability: Optional[Union[str, Tuple[int, int]]] = None,
-        max_compute_capability: Optional[Union[str, Tuple[int, int]]] = None,
+        min_compute_capability: Optional[Union[str, tuple[int, int]]] = None,
+        max_compute_capability: Optional[Union[str, tuple[int, int]]] = None,
         spot: Optional[bool] = None,
-    ) -> List[CatalogItem]:
+    ) -> list[CatalogItem]:
         """
         Query the catalog for matching offers
 
@@ -187,7 +188,7 @@ class Catalog:
 
     def _get_offline_provider_items(
         self, provider_name: str, query_filter: QueryFilter
-    ) -> List[CatalogItem]:
+    ) -> list[CatalogItem]:
         logger.debug("Loading items for offline provider %s", provider_name)
 
         items = []
@@ -209,7 +210,7 @@ class Catalog:
 
     def _get_online_provider_items(
         self, provider_name: str, query_filter: QueryFilter
-    ) -> List[CatalogItem]:
+    ) -> list[CatalogItem]:
         logger.debug("Loading items for online provider %s", provider_name)
         items = []
         found = False

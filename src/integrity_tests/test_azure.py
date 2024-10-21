@@ -1,18 +1,17 @@
 import csv
 from pathlib import Path
-from typing import List
 
 import pytest
 
 
 @pytest.fixture
-def data_rows(catalog_dir: Path) -> List[dict]:
-    with open(catalog_dir / "azure.csv", "r") as f:
+def data_rows(catalog_dir: Path) -> list[dict]:
+    with open(catalog_dir / "azure.csv") as f:
         return list(csv.DictReader(f))
 
 
 class TestAzureCatalog:
-    def test_standard_d2s_v3_locations(self, data_rows: List[dict]):
+    def test_standard_d2s_v3_locations(self, data_rows: list[dict]):
         expected_locations = {
             "attatlanta1",
             "attdallas1",
@@ -82,13 +81,13 @@ class TestAzureCatalog:
         )
         assert expected_locations == locations
 
-    def test_spots_presented(self, data_rows: List[dict]):
+    def test_spots_presented(self, data_rows: list[dict]):
         assert any(row["spot"] == "True" for row in data_rows)
 
-    def test_ondemand_presented(self, data_rows: List[dict]):
+    def test_ondemand_presented(self, data_rows: list[dict]):
         assert any(row["spot"] == "False" for row in data_rows)
 
-    def test_gpu_presented(self, data_rows: List[dict]):
+    def test_gpu_presented(self, data_rows: list[dict]):
         expected_gpus = {
             "A100",
             "A10",
@@ -98,7 +97,7 @@ class TestAzureCatalog:
         gpus = set(row["gpu_name"] for row in data_rows if row["gpu_name"])
         assert expected_gpus == gpus
 
-    def test_both_a100_presented(self, data_rows: List[dict]):
+    def test_both_a100_presented(self, data_rows: list[dict]):
         expected_gpu_memory = {"40.0", "80.0"}
         gpu_memory = set(row["gpu_memory"] for row in data_rows if row["gpu_name"] == "A100")
         assert expected_gpu_memory == gpu_memory

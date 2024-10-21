@@ -1,6 +1,6 @@
 import logging
 from math import ceil
-from typing import List, Optional, TypeVar, Union
+from typing import Optional, TypeVar, Union
 
 import requests
 
@@ -42,7 +42,7 @@ class TensorDockProvider(AbstractProvider):
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
-    ) -> List[RawCatalogItem]:
+    ) -> list[RawCatalogItem]:
         logger.info("Fetching TensorDock offers")
 
         hostnodes = requests.get(marketplace_hostnodes_url, timeout=10).json()["hostnodes"]
@@ -93,7 +93,7 @@ class TensorDockProvider(AbstractProvider):
         instance_name: str,
         location: str,
         balance_resources: bool = True,
-    ) -> List[RawCatalogItem]:
+    ) -> list[RawCatalogItem]:
         """
         Picks the best offer for the given query filter
         Doesn't respect max values, additional filtering is required

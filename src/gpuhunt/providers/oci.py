@@ -1,13 +1,14 @@
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from typing import Iterable, List, Optional, Type
+from typing import Annotated, Optional
 
 import oci
 from oci.identity.models import Region
 from pydantic import BaseModel, Field
 from requests import Session
-from typing_extensions import Annotated, TypedDict
+from typing_extensions import TypedDict
 
 from gpuhunt._internal.constraints import KNOWN_NVIDIA_GPUS
 from gpuhunt._internal.models import QueryFilter, RawCatalogItem
@@ -38,10 +39,10 @@ class OCIProvider(AbstractProvider):
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
-    ) -> List[RawCatalogItem]:
+    ) -> list[RawCatalogItem]:
         shapes = self.cost_estimator.get_shapes()
         products = self.cost_estimator.get_products()
-        regions: List[Region] = self.api_client.list_regions().data
+        regions: list[Region] = self.api_client.list_regions().data
 
         result = []
 
@@ -83,7 +84,7 @@ class OCIProvider(AbstractProvider):
     @staticmethod
     def _duplicate_item_in_regions(
         item: RawCatalogItem, regions: Iterable[Region]
-    ) -> List[RawCatalogItem]:
+    ) -> list[RawCatalogItem]:
         result = []
         for region in regions:
             regional_item = RawCatalogItem(**item.dict())
@@ -115,7 +116,7 @@ class CostEstimatorShape(BaseModel):
     processor_type: CostEstimatorTypeField
     shape_type: CostEstimatorTypeField
     sub_type: CostEstimatorTypeField
-    products: List[CostEstimatorShapeProduct]
+    products: list[CostEstimatorShapeProduct]
 
     class Config:
         alias_generator = to_camel_case
@@ -134,7 +135,7 @@ class CostEstimatorShape(BaseModel):
 
 
 class CostEstimatorShapeList(BaseModel):
-    items: List[CostEstimatorShape]
+    items: list[CostEstimatorShape]
 
 
 class CostEstimatorPrice(BaseModel):
@@ -144,7 +145,7 @@ class CostEstimatorPrice(BaseModel):
 
 class CostEstimatorPriceLocalization(BaseModel):
     currency_code: str
-    prices: List[CostEstimatorPrice]
+    prices: list[CostEstimatorPrice]
 
     class Config:
         alias_generator = to_camel_case
@@ -154,7 +155,7 @@ class CostEstimatorProduct(BaseModel):
     part_number: str
     billing_model: str
     price_type: Annotated[str, Field(alias="pricetype")]
-    currency_code_localizations: List[CostEstimatorPriceLocalization]
+    currency_code_localizations: list[CostEstimatorPriceLocalization]
 
     class Config:
         alias_generator = to_camel_case
@@ -170,7 +171,7 @@ class CostEstimatorProduct(BaseModel):
 
 
 class CostEstimatorProductList(BaseModel):
-    items: List[CostEstimatorProduct]
+    items: list[CostEstimatorProduct]
 
     def find(self, part_number: str) -> Optional[CostEstimatorProduct]:
         return next(filter(lambda product: product.part_number == part_number, self.items), None)
@@ -186,7 +187,7 @@ class CostEstimator:
     def get_products(self) -> CostEstimatorProductList:
         return self._get("products.json", CostEstimatorProductList)
 
-    def _get(self, resource: str, ResponseModel: Type[BaseModel]):
+    def _get(self, resource: str, ResponseModel: type[BaseModel]):
         url = COST_ESTIMATOR_URL_TEMPLATE.format(resource=resource)
         resp = self.session.get(url, timeout=COST_ESTIMATOR_REQUEST_TIMEOUT)
         resp.raise_for_status()

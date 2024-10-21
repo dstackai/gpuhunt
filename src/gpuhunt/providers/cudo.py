@@ -3,7 +3,7 @@ import math
 from collections import namedtuple
 from itertools import chain
 from math import ceil
-from typing import Dict, List, Optional, TypeVar, Union
+from typing import Optional, TypeVar, Union
 
 import requests
 
@@ -29,14 +29,14 @@ class CudoProvider(AbstractProvider):
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
-    ) -> List[RawCatalogItem]:
+    ) -> list[RawCatalogItem]:
         offers = self.fetch_offers(query_filter, balance_resources)
         offers = get_min_price_for_location_and_instance(offers)
         return sorted(offers, key=lambda i: i.price)
 
     def fetch_offers(
         self, query_filter: Optional[QueryFilter], balance_resources
-    ) -> List[RawCatalogItem]:
+    ) -> list[RawCatalogItem]:
         machine_types = self.list_vm_machine_types()
         if query_filter is not None:
             return self.optimize_offers(machine_types, query_filter, balance_resources)
@@ -59,7 +59,7 @@ class CudoProvider(AbstractProvider):
             return list(chain.from_iterable(offers))
 
     @staticmethod
-    def list_vm_machine_types() -> Dict:
+    def list_vm_machine_types() -> dict:
         resp = requests.request(
             method="GET",
             url=f"{API_URL}/vms/machine-types-2",
@@ -71,7 +71,7 @@ class CudoProvider(AbstractProvider):
         resp.raise_for_status()
 
     @staticmethod
-    def optimize_offers(machine_types, q: QueryFilter, balance_resource) -> List[RawCatalogItem]:
+    def optimize_offers(machine_types, q: QueryFilter, balance_resource) -> list[RawCatalogItem]:
         offers = []
 
         # Empty query, example: QureyFilter(provider="cudo")
@@ -180,7 +180,7 @@ def get_raw_catalog(machine_type, spec):
     return raw
 
 
-def get_min_price_for_location_and_instance(offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
+def get_min_price_for_location_and_instance(offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
     """
     Returns offers with the minimum price for each unique combination
     of location and instance name.

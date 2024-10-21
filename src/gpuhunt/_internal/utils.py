@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Tuple, Union
+from typing import Callable, Optional, Union
 
 
 def empty_as_none(value: Optional[str], loader: Optional[Callable] = None):
@@ -10,8 +10,8 @@ def empty_as_none(value: Optional[str], loader: Optional[Callable] = None):
 
 
 def parse_compute_capability(
-    value: Optional[Union[str, Tuple[int, int]]],
-) -> Optional[Tuple[int, int]]:
+    value: Optional[Union[str, tuple[int, int]]],
+) -> Optional[tuple[int, int]]:
     if isinstance(value, str):
         major, minor = value.split(".")
         return int(major), int(minor)

@@ -1,5 +1,3 @@
-from typing import List
-
 import pytest
 
 from gpuhunt import CatalogItem, QueryFilter
@@ -26,7 +24,7 @@ def item() -> CatalogItem:
 
 
 @pytest.fixture
-def cpu_items() -> List[CatalogItem]:
+def cpu_items() -> list[CatalogItem]:
     datacrunch = CatalogItem(
         instance_name="CPU.120V.480G",
         location="ICE-01",

@@ -3,7 +3,7 @@ import logging
 import re
 import time
 from collections import defaultdict
-from typing import Dict, List, Literal, Optional, TypedDict
+from typing import Literal, Optional, TypedDict
 
 import bs4
 import jwt
@@ -100,7 +100,7 @@ class NebiusProvider(AbstractProvider):
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
-    ) -> List[RawCatalogItem]:
+    ) -> list[RawCatalogItem]:
         zone = self.api_client.compute_zones_list()[0]["id"]
         skus = []
         page_token = None
@@ -121,7 +121,7 @@ class NebiusProvider(AbstractProvider):
     @staticmethod
     def get_gpu_platforms(
         zone: str, platform_resources: "PlatformResourcePrice"
-    ) -> List[RawCatalogItem]:
+    ) -> list[RawCatalogItem]:
         items = []
         for platform, presets in GPU_PLATFORMS.items():
             prices = platform_resources[platform]
@@ -153,7 +153,7 @@ class NebiusProvider(AbstractProvider):
     @staticmethod
     def get_cpu_platforms(
         zone: str, platform_resources: "PlatformResourcePrice"
-    ) -> List[RawCatalogItem]:
+    ) -> list[RawCatalogItem]:
         items = []
         for platform, limits in CPU_PLATFORMS.items():
             prices = platform_resources[platform]
@@ -179,7 +179,7 @@ class NebiusProvider(AbstractProvider):
         return items
 
     @staticmethod
-    def parse_gpu_platforms(raw_html: str) -> Dict[str, List[List]]:
+    def parse_gpu_platforms(raw_html: str) -> dict[str, list[list]]:
         """Parse GPU platforms from Nebius docs.
 
         Returns:
@@ -209,7 +209,7 @@ class NebiusProvider(AbstractProvider):
         return platforms
 
     @staticmethod
-    def parse_cpu_platforms(raw_html: str) -> Dict[str, Dict[str, List]]:
+    def parse_cpu_platforms(raw_html: str) -> dict[str, dict[str, list]]:
         """Parse CPU platforms from Nebius docs.
 
         Returns:
@@ -238,7 +238,7 @@ class NebiusProvider(AbstractProvider):
             }
         return platforms
 
-    def aggregate_skus(self, skus: List[dict]) -> "PlatformResourcePrice":
+    def aggregate_skus(self, skus: list[dict]) -> "PlatformResourcePrice":
         vm_resources = {
             "GPU": "gpu",
             "RAM": "ram",
@@ -265,7 +265,7 @@ class NebiusProvider(AbstractProvider):
         return platform_resources
 
     @staticmethod
-    def get_sku_price(pricing_versions: List[dict]) -> Optional[float]:
+    def get_sku_price(pricing_versions: list[dict]) -> Optional[float]:
         now = datetime.datetime.now(datetime.timezone.utc)
         price = None
         for version in sorted(pricing_versions, key=lambda p: p["effectiveTime"]):
@@ -331,7 +331,7 @@ class NebiusAPIClient:
         resp.raise_for_status()
         return resp.json()
 
-    def compute_zones_list(self) -> List[dict]:
+    def compute_zones_list(self) -> list[dict]:
         logger.debug("Fetching compute zones")
         self.get_token()
         resp = self._s.get(self.url("compute", "/zones"))
@@ -352,8 +352,8 @@ class ServiceAccount(TypedDict):
 
 
 class BillingSkusListResponse(TypedDict):
-    skus: List[dict]
+    skus: list[dict]
     nextPageToken: Optional[str]
 
 
-PlatformResourcePrice = Dict[str, Dict[Literal["cpu", "ram", "gpu"], float]]
+PlatformResourcePrice = dict[str, dict[Literal["cpu", "ram", "gpu"], float]]

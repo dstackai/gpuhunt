@@ -1,5 +1,3 @@
-from typing import List
-
 import pytest
 
 from gpuhunt import QueryFilter
@@ -88,7 +86,7 @@ class TestTensorDockMinimalConfiguration:
 
 def make_offers(
     specs: dict, cpu: int, memory: float, disk_size: float, gpu_count: int
-) -> List[RawCatalogItem]:
+) -> list[RawCatalogItem]:
     gpu = list(specs["gpu"].values())[0]
     price = cpu * specs["cpu"]["price"]
     price += memory * specs["ram"]["price"]

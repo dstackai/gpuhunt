@@ -10,7 +10,7 @@ from gpuhunt._internal.catalog import Catalog
 logger = logging.getLogger(__name__)
 
 
-@functools.lru_cache()
+@functools.lru_cache
 def default_catalog() -> Catalog:
     """
     Returns:
