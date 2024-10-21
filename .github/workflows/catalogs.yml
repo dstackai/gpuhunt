@@ -13,6 +13,7 @@ env:
   PIP_DISABLE_PIP_VERSION_CHECK: on
   PIP_DEFAULT_TIMEOUT: 10
   PIP_PROGRESS_BAR: off
+  PYTHON_VERSION: 3.13
 
 jobs:
   catalog-aws:
@@ -22,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
           pip install pip -U
@@ -52,7 +53,7 @@ jobs:
           creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
           pip install pip -U
@@ -75,7 +76,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
           pip install pip -U
@@ -96,7 +97,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
           pip install pip -U
@@ -128,7 +129,7 @@ jobs:
           create_credentials_file: true
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
           pip install pip -U
@@ -154,7 +155,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
           pip install pip -U
@@ -177,7 +178,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
           pip install pip -U
@@ -204,7 +205,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
           pip install pip -U
@@ -234,7 +235,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
           pip install pip -U
