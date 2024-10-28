@@ -5,9 +5,10 @@ import os
 import re
 import time
 from collections import namedtuple
+from collections.abc import Iterable
 from queue import Queue
 from threading import Thread
-from typing import Iterable, List, Optional, Tuple
+from typing import Optional
 
 import requests
 import requests.adapters
@@ -78,7 +79,7 @@ class AzureProvider(AbstractProvider):
             subscription_id=subscription_id,
         )
 
-    def get_pages(self, threads: int = 8) -> Iterable[List[dict]]:
+    def get_pages(self, threads: int = 8) -> Iterable[list[dict]]:
         q = Queue()
         workers = [
             Thread(target=self._get_pages_worker, args=(q, threads, i), daemon=True)
@@ -106,7 +107,7 @@ class AzureProvider(AbstractProvider):
                 if self.cache_dir is not None:
                     cached_page = os.path.join(self.cache_dir, f"{page_id:04}.json")
                 if cached_page is not None and os.path.exists(cached_page):
-                    with open(cached_page, "r") as f:
+                    with open(cached_page) as f:
                         data = json.load(f)
                 else:
                     logger.info("Worker %s fetches pricing page %s", worker_id, page_id)
@@ -139,7 +140,7 @@ class AzureProvider(AbstractProvider):
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
-    ) -> List[RawCatalogItem]:
+    ) -> list[RawCatalogItem]:
         offers = []
         for page in self.get_pages():
             for item in page:
@@ -167,7 +168,7 @@ class AzureProvider(AbstractProvider):
         offers = self.fill_details(offers)
         return sorted(offers, key=lambda i: i.price)
 
-    def fill_details(self, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
+    def fill_details(self, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
         logger.info("Fetching instance details")
         instances = {}
         resources = self.client.resource_skus.list()
@@ -212,7 +213,7 @@ class AzureProvider(AbstractProvider):
         return with_details + without_details
 
     @classmethod
-    def filter(cls, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
+    def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
         vm_series = [
             VMSeries(r"D(\d+)s_v3", None, None),  # Dsv3-series
             VMSeries(r"E(\d+)i?s_v4", None, None),  # Esv4-series
@@ -233,7 +234,7 @@ class AzureProvider(AbstractProvider):
         return [i for i in offers if vm_series_pattern.match(i.instance_name)]
 
 
-def get_gpu_name_memory(vm_name: str) -> Tuple[Optional[str], Optional[float]]:
+def get_gpu_name_memory(vm_name: str) -> tuple[Optional[str], Optional[float]]:
     for pattern, gpu_name, gpu_memory in gpu_vm_series:
         m = re.match(f"^Standard_{pattern}$", vm_name)
         if m is None:

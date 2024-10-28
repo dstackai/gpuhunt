@@ -6,8 +6,9 @@ import os
 import re
 import tempfile
 from collections import defaultdict
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Optional
 
 import boto3
 import requests
@@ -72,7 +73,7 @@ class AWSProvider(AbstractProvider):
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
-    ) -> List[RawCatalogItem]:
+    ) -> list[RawCatalogItem]:
         if not os.path.exists(self.cache_path):
             logger.info("Downloading EC2 prices to %s", self.cache_path)
             with requests.get(ec2_pricing_url, stream=True, timeout=20) as r:
@@ -82,7 +83,7 @@ class AWSProvider(AbstractProvider):
                         f.write(chunk)
 
         offers = []
-        with open(self.cache_path, "r", newline="") as f:
+        with open(self.cache_path, newline="") as f:
             for _ in range(disclaimer_rows_skip):
                 f.readline()
             reader: Iterable[dict[str, str]] = csv.DictReader(f)
@@ -107,7 +108,7 @@ class AWSProvider(AbstractProvider):
         offers = self.add_spots(offers)
         return sorted(offers, key=lambda i: i.price)
 
-    def skip(self, row: Dict[str, str]) -> bool:
+    def skip(self, row: dict[str, str]) -> bool:
         if any(row["Instance Type"].startswith(family) for family in previous_generation_families):
             return True
         for key, values in pricing_filters.items():
@@ -115,7 +116,7 @@ class AWSProvider(AbstractProvider):
                 return True
         return False
 
-    def fill_gpu_details(self, offers: List[RawCatalogItem]):
+    def fill_gpu_details(self, offers: list[RawCatalogItem]):
         regions = defaultdict(list)
         for offer in offers:
             if offer.gpu_count > 0 and offer.instance_name not in self.preview_gpus:
@@ -152,8 +153,8 @@ class AWSProvider(AbstractProvider):
                 offer.gpu_name, offer.gpu_memory = gpus[offer.instance_name]
 
     def _add_spots_worker(
-        self, region: str, instance_types: Set[str]
-    ) -> Dict[Tuple[str, str], float]:
+        self, region: str, instance_types: set[str]
+    ) -> dict[tuple[str, str], float]:
         spot_prices = dict()
         logger.info("Fetching spot prices for %s", region)
         try:
@@ -182,7 +183,7 @@ class AWSProvider(AbstractProvider):
             return {}
         return spot_prices
 
-    def add_spots(self, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
+    def add_spots(self, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
         region_instances = defaultdict(set)
         for offer in offers:
             region_instances[offer.location].add(offer.instance_name)
@@ -207,7 +208,7 @@ class AWSProvider(AbstractProvider):
         return offers + spot_offers
 
     @classmethod
-    def filter(cls, offers: List[RawCatalogItem]) -> List[RawCatalogItem]:
+    def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
         return [
             i
             for i in offers

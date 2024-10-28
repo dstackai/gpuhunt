@@ -20,6 +20,8 @@ def providers():
         for _, member in inspect.getmembers(module):
             if not inspect.isclass(member):
                 continue
+            if member.__name__.islower():
+                continue  # skip builtins to avoid CPython bug #89489 in `issubclass` below
             if not issubclass(member, gpuhunt.providers.AbstractProvider):
                 continue
             if member.__name__ == "AbstractProvider":
@@ -27,6 +29,7 @@ def providers():
             if member.NAME == "nebius":  # The provider has been temporarily disabled
                 continue
             members.append(member)
+    assert members
     return members
 
 

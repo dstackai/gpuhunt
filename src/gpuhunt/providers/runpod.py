@@ -1,7 +1,7 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import chain
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 import requests
 from requests import RequestException
@@ -19,16 +19,16 @@ class RunpodProvider(AbstractProvider):
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
-    ) -> List[RawCatalogItem]:
+    ) -> list[RawCatalogItem]:
         offers = self.fetch_offers()
         return sorted(offers, key=lambda i: i.price)
 
-    def fetch_offers(self) -> List[RawCatalogItem]:
+    def fetch_offers(self) -> list[RawCatalogItem]:
         offers = [get_raw_catalog(pod_type) for pod_type in self.list_pods()]
         return list(chain.from_iterable(offers))
 
     @staticmethod
-    def list_pods() -> List[dict]:
+    def list_pods() -> list[dict]:
         payload_gpu_types = {"query": gpu_types_query, "variables": {}}
         try:
             gpu_types = make_request(payload_gpu_types)
@@ -51,13 +51,13 @@ class RunpodProvider(AbstractProvider):
         return list(chain.from_iterable(offers))
 
 
-def gpu_vendor_and_name(gpu_id: str) -> Optional[Tuple[AcceleratorVendor, str]]:
+def gpu_vendor_and_name(gpu_id: str) -> Optional[tuple[AcceleratorVendor, str]]:
     if not gpu_id:
         return None
     return GPU_MAP.get(gpu_id)
 
 
-def build_query_variables(gpu_types: List[dict]) -> List[dict]:
+def build_query_variables(gpu_types: list[dict]) -> list[dict]:
     # Filter dataCenters by 'listed: True'
     listed_data_centers = [dc["id"] for dc in gpu_types["data"]["dataCenters"] if dc["listed"]]
 
@@ -82,7 +82,7 @@ def build_query_variables(gpu_types: List[dict]) -> List[dict]:
     return variables
 
 
-def get_pods(query_variable: dict) -> List[dict]:
+def get_pods(query_variable: dict) -> list[dict]:
     pods = make_request(get_pods_query_payload(query_variable))["data"]["gpuTypes"]
     offers = []
     for pod in pods:
@@ -139,7 +139,7 @@ def make_request(payload: dict):
     resp.raise_for_status()
 
 
-def get_raw_catalog(offer: dict) -> List[RawCatalogItem]:
+def get_raw_catalog(offer: dict) -> list[RawCatalogItem]:
     catalog_items = []
 
     if offer["secure_price"] is not None:
@@ -178,12 +178,12 @@ def get_raw_catalog(offer: dict) -> List[RawCatalogItem]:
     return catalog_items
 
 
-def get_gpu_map() -> Dict[str, Tuple[AcceleratorVendor, str]]:
+def get_gpu_map() -> dict[str, tuple[AcceleratorVendor, str]]:
     payload_gpus = {
         "query": "query GpuTypes { gpuTypes { id manufacturer displayName memoryInGb } }"
     }
     response = make_request(payload_gpus)
-    gpu_map: Dict[str, Tuple[AcceleratorVendor, str]] = {}
+    gpu_map: dict[str, tuple[AcceleratorVendor, str]] = {}
     for gpu_type in response["data"]["gpuTypes"]:
         try:
             vendor = AcceleratorVendor.cast(gpu_type["manufacturer"])

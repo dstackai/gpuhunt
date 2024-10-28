@@ -1,13 +1,14 @@
 import csv
 import dataclasses
-from typing import Iterable, List, Type, TypeVar
+from collections.abc import Iterable
+from typing import TypeVar
 
 from gpuhunt._internal.models import RawCatalogItem
 
 T = TypeVar("T", bound=RawCatalogItem)
 
 
-def dump(items: List[T], path: str, *, cls: Type[T] = RawCatalogItem):
+def dump(items: list[T], path: str, *, cls: type[T] = RawCatalogItem):
     with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=[field.name for field in dataclasses.fields(cls)])
         writer.writeheader()
@@ -15,9 +16,9 @@ def dump(items: List[T], path: str, *, cls: Type[T] = RawCatalogItem):
             writer.writerow(item.dict())
 
 
-def load(path: str, *, cls: Type[T] = RawCatalogItem) -> List[T]:
+def load(path: str, *, cls: type[T] = RawCatalogItem) -> list[T]:
     items = []
-    with open(path, "r", newline="") as f:
+    with open(path, newline="") as f:
         reader: Iterable[dict[str, str]] = csv.DictReader(f)
         for row in reader:
             item = cls.from_dict(row)

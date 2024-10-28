@@ -1,5 +1,3 @@
-from typing import List
-
 import pytest
 
 import gpuhunt._internal.catalog as internal_catalog
@@ -14,7 +12,7 @@ from gpuhunt.providers.cudo import (
 
 
 @pytest.fixture
-def machine_types() -> List[dict]:
+def machine_types() -> list[dict]:
     return [
         {
             "dataCenterId": "br-saopaulo-1",

@@ -1,7 +1,6 @@
 import csv
 from collections import Counter
 from pathlib import Path
-from typing import List
 
 import pytest
 
@@ -9,13 +8,13 @@ from gpuhunt.providers.runpod import GPU_MAP
 
 
 @pytest.fixture
-def data_rows(catalog_dir: Path) -> List[dict]:
+def data_rows(catalog_dir: Path) -> list[dict]:
     file = catalog_dir / "runpod.csv"
     reader = csv.DictReader(file.open())
     return list(reader)
 
 
-def select_row(rows, name: str) -> List[str]:
+def select_row(rows, name: str) -> list[str]:
     return [r[name] for r in rows if r[name]]
 
 

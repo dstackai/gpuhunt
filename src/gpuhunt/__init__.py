@@ -1,6 +1,5 @@
 # ruff: noqa: F401
 import warnings
-from typing import List, Type
 
 from gpuhunt._internal.catalog import Catalog
 from gpuhunt._internal.constraints import (
@@ -24,8 +23,8 @@ from gpuhunt._internal.models import (
 )
 
 # Deprecated aliases
-GPUInfo: Type[NvidiaGPUInfo]
-KNOWN_GPUS: List[NvidiaGPUInfo]
+GPUInfo: type[NvidiaGPUInfo]
+KNOWN_GPUS: list[NvidiaGPUInfo]
 
 
 def _warn_renamed(old: str, new: str) -> None:
