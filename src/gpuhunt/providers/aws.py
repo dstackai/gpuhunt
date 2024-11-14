@@ -220,7 +220,7 @@ class AWSProvider(AbstractProvider):
                     "m5.",
                     "p3.",
                     "p5.",
-                    "p5e."
+                    "p5e.",
                     "g5.",
                     "g6.",
                     "g6e.",

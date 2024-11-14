@@ -51,13 +51,13 @@ class TestAWSCatalog:
 
     def test_gpu_presented(self, data: str):
         gpus = [
-            "H200"
+            "H200",
             "H100",
             "A100",
             "A10G",
             "T4",
             "V100",
-            "L40S"
+            "L40S",
             "L4",
         ]
         assert all(f",{i}," in data for i in gpus)
