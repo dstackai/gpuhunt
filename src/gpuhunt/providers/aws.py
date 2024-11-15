@@ -24,18 +24,21 @@ ec2_pricing_url = (
 disclaimer_rows_skip = 5
 # https://aws.amazon.com/ec2/previous-generation/
 previous_generation_families = [
-    "t1.",
-    "m1.",
-    "m3.",
+    "a1.",
     "c1.",
     "c3.",
-    "i2.",
-    "m2.",
-    "cr1.",
-    "r3.",
-    "hs1.",
+    "c4.",
     "g2.",
-    "a1.",
+    "g3.",
+    "i2.",
+    "m1.",
+    "m2.",
+    "m3.",
+    "r3.",
+    "r4.",
+    "t1.",
+    "cr1.",
+    "hs1.",
 ]
 pricing_filters = {
     "TermType": ["OnDemand"],
