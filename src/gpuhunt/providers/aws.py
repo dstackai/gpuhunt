@@ -30,6 +30,7 @@ previous_generation_families = [
     "c4.",
     "g2.",
     "g3.",
+    "g3s.",
     "i2.",
     "m1.",
     "m2.",
