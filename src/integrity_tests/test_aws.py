@@ -51,7 +51,9 @@ class TestAWSCatalog:
 
     def test_gpu_presented(self, data: str):
         gpus = [
-            "H200",
+            # AWS pricing csv does not include H200 (p5e.) offers.
+            # TODO: Add CapacityBlocks offers to support H200.
+            # "H200",
             "H100",
             "A100",
             "A10G",
