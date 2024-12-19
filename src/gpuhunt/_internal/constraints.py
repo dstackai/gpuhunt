@@ -138,6 +138,7 @@ def correct_gpu_memory_gib(gpu_name: str, memory_mib: float) -> int:
 
 KNOWN_NVIDIA_GPUS: list[NvidiaGPUInfo] = [
     NvidiaGPUInfo(name="A10", memory=24, compute_capability=(8, 6)),
+    NvidiaGPUInfo(name="A16", memory=16, compute_capability=(8, 6)),
     NvidiaGPUInfo(name="A40", memory=48, compute_capability=(8, 6)),
     NvidiaGPUInfo(name="A100", memory=40, compute_capability=(8, 0)),
     NvidiaGPUInfo(name="A100", memory=80, compute_capability=(8, 0)),
