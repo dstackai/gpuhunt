@@ -11,7 +11,7 @@ from gpuhunt._internal.models import (
 )
 
 # v5litepod = v5e
-_TPU_VERSIONS = ["v2", "v3", "v4", "v5p", "v5litepod"]
+_TPU_VERSIONS = ["v2", "v3", "v4", "v5p", "v5litepod", "v6e"]
 
 
 def _is_tpu(name: str) -> bool:

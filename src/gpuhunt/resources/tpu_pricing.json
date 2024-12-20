@@ -1,4 +1,30 @@
 {
+    "TPU v6e": {
+        "us-east1": {
+            "Location": "South Carolina",
+            "On Demand (USD)": 2.7000,
+            "1-year Commitment (USD)": 1.8900,
+            "3-year Commitment (USD)": 1.2200
+        },
+        "us-east5": {
+            "Location": "Ohio",
+            "On Demand (USD)": 2.7000,
+            "1-year Commitment (USD)": 1.8900,
+            "3-year Commitment (USD)": 1.2200
+        },
+        "europe-west4": {
+            "Location": "Netherlands",
+            "On Demand (USD)": 2.9700,
+            "1-year Commitment (USD)": 2.0800,
+            "3-year Commitment (USD)": 1.3400
+        },
+        "asia-northeast1": {
+            "Location": "Tokio",
+            "On Demand (USD)": 3.2400,
+            "1-year Commitment (USD)": 2.2700,
+            "3-year Commitment (USD)": 1.4600
+        }
+    },
     "TPU v5p": {
         "us-east5": {
             "Location": "Ohio",
