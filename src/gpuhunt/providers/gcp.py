@@ -538,14 +538,13 @@ def find_tpu_price_static_src(
     if tpu_version in ["v2", "v3", "v4"]:
         is_pod = num_cores > 8 or tpu_version == "v4"
         tpu_type = f"TPU {tpu_version} pod" if is_pod else f"TPU {tpu_version} device"
+    price_key = "On Demand (USD)"
+    if spot:
+        price_key = "Spot (USD)"
     try:
-        on_demand_price = TPU_PRICING_TABLE[tpu_type][tpu_region]["On Demand (USD)"] * no_of_chips
-        spot_price = TPU_PRICING_TABLE[tpu_type][tpu_region]["Spot (USD)"] * no_of_chips
-        return on_demand_price if not spot else spot_price
+        return TPU_PRICING_TABLE[tpu_type][tpu_region][price_key] * no_of_chips
     except KeyError:
-        logger.debug(
-            f'KeyError for {tpu_type} {tpu_region} {"On Demand (USD)" if spot else "Spot (USD)"}.'
-        )
+        logger.debug(f"KeyError for {tpu_type} {tpu_region} {price_key}")
         return None
 
 

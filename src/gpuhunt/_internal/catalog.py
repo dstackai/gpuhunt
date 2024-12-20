@@ -3,11 +3,12 @@ import dataclasses
 import heapq
 import io
 import logging
+import os
 import time
 import urllib.request
 import zipfile
-from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, wait
+from pathlib import Path
 from typing import Optional, Union
 
 import gpuhunt._internal.constraints as constraints
@@ -190,22 +191,27 @@ class Catalog:
         self, provider_name: str, query_filter: QueryFilter
     ) -> list[CatalogItem]:
         logger.debug("Loading items for offline provider %s", provider_name)
-
         items = []
-
-        if self.catalog is None:
-            logger.warning("Catalog not loaded")
-            return items
-
-        with zipfile.ZipFile(self.catalog) as zip_file:
-            with zip_file.open(f"{provider_name}.csv", "r") as csv_file:
-                reader: Iterable[dict[str, str]] = csv.DictReader(
-                    io.TextIOWrapper(csv_file, "utf-8")
-                )
+        # Set this env var to use a local catalog instead of the s3 catalog
+        catalog_dir = os.getenv("GPUHUNT_CATALOG_DIR")
+        if catalog_dir is not None:
+            with open(Path(catalog_dir) / f"{provider_name}.csv", "rb") as csv_file:
+                reader = csv.DictReader(io.TextIOWrapper(csv_file, "utf-8"))
                 for row in reader:
                     item = CatalogItem.from_dict(row, provider=provider_name)
                     if constraints.matches(item, query_filter):
                         items.append(item)
+        else:
+            if self.catalog is None:
+                logger.warning("Catalog not loaded")
+                return items
+            with zipfile.ZipFile(self.catalog) as zip_file:
+                with zip_file.open(f"{provider_name}.csv", "r") as csv_file:
+                    reader = csv.DictReader(io.TextIOWrapper(csv_file, "utf-8"))
+                    for row in reader:
+                        item = CatalogItem.from_dict(row, provider=provider_name)
+                        if constraints.matches(item, query_filter):
+                            items.append(item)
         return items
 
     def _get_online_provider_items(
