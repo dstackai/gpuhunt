@@ -13,6 +13,7 @@ from google.cloud import tpu_v2
 from google.cloud.billing_v1 import CloudCatalogClient, ListSkusRequest
 from google.cloud.billing_v1.types.cloud_catalog import Sku
 from google.cloud.location import locations_pb2
+from pydantic import BaseModel
 
 from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
@@ -87,6 +88,29 @@ local_ssd_sizes_gib = {
     "z3-standard-88-lssd": 12 * 3000,
     "z3-standard-176-lssd": 12 * 3000,
 }
+
+
+class TPUHardwareSpec(BaseModel):
+    name: str
+    cpu: int
+    memory_gb: int
+    hbm_gb: int
+
+
+# For newer TPUs, the specs are described in the docs: https://cloud.google.com/tpu/docs/v6e
+# For older TPUs, the specs are collected manually from running instances.
+TPU_HARDWARE_SPECS = [
+    TPUHardwareSpec(name="v2-8", cpu=96, memory_gb=334, hbm_gb=64),
+    TPUHardwareSpec(name="v3-8", cpu=96, memory_gb=334, hbm_gb=128),
+    TPUHardwareSpec(name="v5litepod-1", cpu=24, memory_gb=48, hbm_gb=16),
+    TPUHardwareSpec(name="v5litepod-4", cpu=112, memory_gb=192, hbm_gb=16),
+    TPUHardwareSpec(name="v5litepod-8", cpu=224, memory_gb=384, hbm_gb=128),
+    TPUHardwareSpec(name="v5p-8", cpu=208, memory_gb=448, hbm_gb=95),
+    TPUHardwareSpec(name="v6e-1", cpu=44, memory_gb=176, hbm_gb=32),
+    TPUHardwareSpec(name="v6e-4", cpu=180, memory_gb=720, hbm_gb=128),
+    TPUHardwareSpec(name="v6e-8", cpu=180, memory_gb=1440, hbm_gb=256),
+]
+TPU_NAME_TO_HARDWARE_SPEC = {spec.name: spec for spec in TPU_HARDWARE_SPECS}
 
 
 def load_tpu_pricing() -> dict:
@@ -360,16 +384,20 @@ def get_tpu_offers(project_id: str) -> list[RawCatalogItem]:
     # For some TPU offers in some regions, GCP does not list prices at all. Skip such offers.
     filtered_catalog_items = [item for item in catalog_items if item["price"] is not None]
     for item in filtered_catalog_items:
+        hardware_spec = get_tpu_hardware_spec(item["instance_name"])
+        if hardware_spec is None:
+            logger.debug("No TPU hardware spec for %s", item["instance_name"])
+            continue
         on_demand_item = RawCatalogItem(
             instance_name=item["instance_name"],
             location=item["location"],
             price=item["price"],
-            cpu=0,
-            memory=0,
+            cpu=hardware_spec.cpu,
+            memory=hardware_spec.memory_gb,
             gpu_vendor=AcceleratorVendor.GOOGLE.value,
             gpu_count=1,
             gpu_name=item["instance_name"],
-            gpu_memory=0,
+            gpu_memory=hardware_spec.hbm_gb,
             spot=False,
             disk_size=None,
         )
@@ -505,11 +533,11 @@ def get_tpu_prices() -> list[dict]:
 
 
 def find_base_price(
-    instance_name: str, location: str, tpu_prices: list[dict], spot: bool, is_pod: bool
+    tpu_version: str, location: str, tpu_prices: list[dict], spot: bool, is_pod: bool
 ) -> Optional[float]:
     for price_info in tpu_prices:
         if (
-            price_info["instance_name"] == instance_name
+            price_info["instance_name"] == tpu_version
             and any(loc.startswith(location) for loc in price_info["regions"])
             and price_info["spot"] == spot
             and price_info["is_pod"] == is_pod
@@ -549,11 +577,11 @@ def find_tpu_price_static_src(
 
 
 def find_base_price_v5(
-    instance_name: str, location: str, tpu_prices: list[dict], spot: bool
+    tpu_version: str, location: str, tpu_prices: list[dict], spot: bool
 ) -> Optional[float]:
     for price_info in tpu_prices:
         if (
-            price_info["instance_name"] == instance_name
+            price_info["instance_name"] == tpu_version
             and any(loc.startswith(location) for loc in price_info["regions"])
             and price_info["spot"] == spot
         ):
@@ -617,3 +645,7 @@ def extract_tpu_version(input_string: str) -> Optional[str]:
             version = "v5litepod" if version_match.group() == "v5e" else version_match.group()
             return version
     return None
+
+
+def get_tpu_hardware_spec(instance_name: str) -> Optional[TPUHardwareSpec]:
+    return TPU_NAME_TO_HARDWARE_SPEC.get(instance_name)
