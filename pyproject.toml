@@ -57,6 +57,7 @@ dev = [
     "pytest~=7.0",
     "pytest-mock",
     "ruff==0.5.3",  # Should match .pre-commit-config.yaml
+    "requests-mock",
 ]
 
 [tool.setuptools.dynamic]

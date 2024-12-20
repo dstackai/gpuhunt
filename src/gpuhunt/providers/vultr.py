@@ -188,10 +188,3 @@ def _make_request(method: str, path: str, data: Any = None) -> Response:
     )
     response.raise_for_status()
     return response
-
-
-# todo delete
-vultr = VultrProvider()
-# print(len(vultr.get()))
-# print(vultr.get())
-print(get_gpu_memory("A100", 80))
