@@ -127,15 +127,6 @@ def get_instance_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
         )
 
 
-# def get_gpu_memory(gpu_name: str) -> float:
-#     for gpu in KNOWN_NVIDIA_GPUS:
-#         if gpu.name.upper() == gpu_name:
-#             return gpu.memory
-#     for gpu in KNOWN_AMD_GPUS:
-#         if gpu.name.upper() == gpu_name:
-#             return gpu.memory
-#     logger.error(f"GPU {gpu_name} not found in known GPU lists.")
-#     raise ValueError(f"GPU {gpu_name} not found.")
 def get_gpu_memory(gpu_name: str, memory: Optional[int] = None) -> float:
     if memory:
         for gpu in KNOWN_NVIDIA_GPUS:
