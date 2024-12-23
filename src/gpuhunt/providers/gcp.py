@@ -117,7 +117,7 @@ TPU_HARDWARE_SPECS = [
     TPUHardwareSpec(name="v2-8", cpu=96, memory_gb=334, hbm_gb=64),
     TPUHardwareSpec(name="v3-8", cpu=96, memory_gb=334, hbm_gb=128),
     TPUHardwareSpec(name="v5litepod-1", cpu=24, memory_gb=48, hbm_gb=16),
-    TPUHardwareSpec(name="v5litepod-4", cpu=112, memory_gb=192, hbm_gb=16),
+    TPUHardwareSpec(name="v5litepod-4", cpu=112, memory_gb=192, hbm_gb=64),
     TPUHardwareSpec(name="v5litepod-8", cpu=224, memory_gb=384, hbm_gb=128),
     TPUHardwareSpec(name="v5p-8", cpu=208, memory_gb=448, hbm_gb=95),
     TPUHardwareSpec(name="v6e-1", cpu=44, memory_gb=176, hbm_gb=32),
@@ -133,8 +133,9 @@ def load_tpu_pricing() -> dict:
     )
 
 
-# A manually filled TPU pricing table from the pricing page:
-# https://cloud.google.com/tpu/pricing?hl=en.
+# A manually filled TPU pricing table from the pricing page.
+# On-demand TPUs - https://cloud.google.com/tpu/pricing?hl=en.
+# Spot TPUs - https://cloud.google.com/spot-vms/pricing?hl=en.
 # It's needed since the TPU pricing API does not return prices for all regions.
 # The API may also return 1-year Commitment prices instead of on-demand prices.
 TPU_PRICING_TABLE = load_tpu_pricing()
