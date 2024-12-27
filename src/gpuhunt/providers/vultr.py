@@ -70,10 +70,12 @@ def get_bare_metal_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
         return None
     gpu_memory = get_gpu_memory(gpu_name) if gpu_name else None
     gpu_vendor = get_gpu_vendor(gpu_name)
+    if gpu_memory is None:
+        return None
     return RawCatalogItem(
         instance_name=plan["id"],
         location=location,
-        price=round(plan["monthly_cost"] / 730, 2),
+        price=plan["hourly_cost"],
         cpu=plan["cpu_count"],
         memory=plan["ram"] / 1024,
         gpu_count=gpu_count,
@@ -109,7 +111,7 @@ def get_instance_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
         gpu_vendor = get_gpu_vendor(gpu_name)
         gpu_memory_gb = plan["gpu_vram_gb"]
         gpu_count = (
-            max(1, gpu_memory_gb // get_gpu_memory(gpu_name, gpu_memory_gb)) if gpu_name else 0
+            max(1, gpu_memory_gb // get_gpu_memory(gpu_name)) if gpu_name else 0
         )  # For fractional GPU,
         # gpu_count=1
         return RawCatalogItem(
@@ -120,38 +122,34 @@ def get_instance_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
             memory=plan["ram"] / 1024,
             gpu_count=gpu_count,
             gpu_name=gpu_name,
-            gpu_memory=gpu_memory_gb,
+            gpu_memory=gpu_memory_gb / gpu_count,
             gpu_vendor=gpu_vendor,
             spot=False,
             disk_size=plan["disk"],
         )
 
 
-def get_gpu_memory(gpu_name: str, memory: Optional[int] = None) -> float:
-    if memory:
-        for gpu in KNOWN_NVIDIA_GPUS:
-            if gpu.name == gpu_name.upper() and gpu.memory == memory:
-                return gpu.memory
-
+def get_gpu_memory(gpu_name: str) -> float:
+    if gpu_name.upper() == "A100":
+        return 80  # VULTR A100 instances have 80GB
     for gpu in KNOWN_NVIDIA_GPUS:
-        if gpu.name == gpu_name.upper():
+        if gpu.name.upper() == gpu_name.upper():
             return gpu.memory
 
     for gpu in KNOWN_AMD_GPUS:
-        if gpu.name == gpu_name.upper() and (memory is None or gpu.memory == memory):
+        if gpu.name.upper() == gpu_name.upper():
             return gpu.memory
-    logger.error(f"GPU {gpu_name} with memory {memory} not found in known GPU lists.")
-    raise ValueError(f"GPU {gpu_name} with memory {memory} not found.")
+    logger.warning(f"Unknown GPU {gpu_name}")
 
 
 def get_gpu_vendor(gpu_name: Optional[str]) -> Optional[str]:
     if gpu_name is None:
         return None
     for gpu in KNOWN_NVIDIA_GPUS:
-        if gpu.name == gpu_name.upper():
+        if gpu.name.upper() == gpu_name.upper():
             return AcceleratorVendor.NVIDIA.value
     for gpu in KNOWN_AMD_GPUS:
-        if gpu.name == gpu_name.upper():
+        if gpu.name.upper() == gpu_name.upper():
             return AcceleratorVendor.AMD.value
     return None
 
