@@ -64,24 +64,17 @@ def convert_response_to_raw_catalog_items(
 
 
 def get_bare_metal_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
-    gpu_name, gpu_count = extract_gpu_info_from_id(plan["id"])
-    if gpu_name in EXCLUSION_LIST:
-        logger.info(f"Excluding plan with GPU {gpu_name} as it is not supported.")
-        return None
-    gpu_memory = get_gpu_memory(gpu_name) if gpu_name else None
-    gpu_vendor = get_gpu_vendor(gpu_name)
-    if gpu_memory is None:
-        return None
+    gpu_details = BARE_METAL_GPU_DETAILS.get(plan["id"], None)
     return RawCatalogItem(
         instance_name=plan["id"],
         location=location,
         price=plan["hourly_cost"],
-        cpu=plan["cpu_count"],
+        cpu=plan["cpu_threads"],
         memory=plan["ram"] / 1024,
-        gpu_count=gpu_count,
-        gpu_name=gpu_name,
-        gpu_memory=gpu_memory,
-        gpu_vendor=gpu_vendor,
+        gpu_count=gpu_details[0] if gpu_details else 0,
+        gpu_name=gpu_details[1] if gpu_details else None,
+        gpu_memory=gpu_details[2] if gpu_details else None,
+        gpu_vendor=get_gpu_vendor(gpu_details[1]) if gpu_details else None,
         spot=False,
         disk_size=plan["disk"],
     )
@@ -177,3 +170,13 @@ def _make_request(method: str, path: str, data: Any = None) -> Response:
     )
     response.raise_for_status()
     return response
+
+
+BARE_METAL_GPU_DETAILS = {
+    "vbm-48c-1024gb-4-a100-gpu": (4, "A100", 80),
+    "vbm-112c-2048gb-8-h100-gpu": (8, "H100", 80),
+    "vbm-112c-2048gb-8-a100-gpu": (8, "A100", 80),
+    "vbm-64c-2048gb-8-l40-gpu": (8, "L40S", 48),
+    "vbm-72c-480gb-gh200-gpu": (1, "GH200", 480),
+    "vbm-256c-2048gb-8-mi300x-gpu": (8, "MI300X", 192),
+}
