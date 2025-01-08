@@ -64,17 +64,28 @@ def convert_response_to_raw_catalog_items(
 
 
 def get_bare_metal_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
-    gpu_details = BARE_METAL_GPU_DETAILS.get(plan["id"], None)
+    gpu_count, gpu_name, gpu_memory, gpu_vendor = 0, None, None, None
+    if "gpu" in plan["id"]:
+        if plan["id"] not in BARE_METAL_GPU_DETAILS:
+            logger.warning("Skipping unknown GPU plan %s", plan["id"])
+            return None
+        gpu_count, gpu_name, gpu_memory = BARE_METAL_GPU_DETAILS[plan["id"]]
+        if gpu_name in EXCLUSION_LIST:
+            return None
+        gpu_vendor = get_gpu_vendor(gpu_name)
+        if gpu_vendor is None:
+            logger.warning("Unknown GPU vendor for plan %s, skipping", plan["id"])
+            return None
     return RawCatalogItem(
         instance_name=plan["id"],
         location=location,
         price=plan["hourly_cost"],
         cpu=plan["cpu_threads"],
         memory=plan["ram"] / 1024,
-        gpu_count=gpu_details[0] if gpu_details else 0,
-        gpu_name=gpu_details[1] if gpu_details else None,
-        gpu_memory=gpu_details[2] if gpu_details else None,
-        gpu_vendor=get_gpu_vendor(gpu_details[1]) if gpu_details else None,
+        gpu_count=gpu_count,
+        gpu_name=gpu_name,
+        gpu_memory=gpu_memory,
+        gpu_vendor=gpu_vendor,
         spot=False,
         disk_size=plan["disk"],
     )
@@ -147,20 +158,6 @@ def get_gpu_vendor(gpu_name: Optional[str]) -> Optional[str]:
     return None
 
 
-def extract_gpu_info_from_id(id_str: str):
-    parts = id_str.split("-")
-    if "gpu" in parts:
-        gpu_name = parts[-2].upper()
-        try:
-            gpu_count = int(parts[-3])
-        except ValueError:
-            gpu_count = 1  # Default set to 1 if count is not explicitly specified,
-            # for instance in vbm-64c-2048gb-l40-gpu count is not specified but
-            # in vbm-64c-2048gb-8-l40-gpu count is specified as 8
-        return gpu_name, gpu_count
-    return None, 0
-
-
 def _make_request(method: str, path: str, data: Any = None) -> Response:
     response = requests.request(
         method=method,
@@ -177,6 +174,6 @@ BARE_METAL_GPU_DETAILS = {
     "vbm-112c-2048gb-8-h100-gpu": (8, "H100", 80),
     "vbm-112c-2048gb-8-a100-gpu": (8, "A100", 80),
     "vbm-64c-2048gb-8-l40-gpu": (8, "L40S", 48),
-    "vbm-72c-480gb-gh200-gpu": (1, "GH200", 480),
+    "vbm-72c-480gb-gh200-gpu": (1, "GH200", 96),
     "vbm-256c-2048gb-8-mi300x-gpu": (8, "MI300X", 192),
 }
