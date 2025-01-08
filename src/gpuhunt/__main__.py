@@ -21,6 +21,7 @@ def main():
             "runpod",
             "tensordock",
             "vastai",
+            "vultr",
         ],
     )
     parser.add_argument("--output", required=True)
@@ -82,6 +83,10 @@ def main():
         from gpuhunt.providers.vastai import VastAIProvider
 
         provider = VastAIProvider()
+    elif args.provider == "vultr":
+        from gpuhunt.providers.vultr import VultrProvider
+
+        provider = VultrProvider()
     else:
         exit(f"Unknown provider {args.provider}")
 
