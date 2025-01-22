@@ -175,6 +175,7 @@ KNOWN_TPUS: list[TPUInfo] = [TPUInfo(name=version, memory=0) for version in _TPU
 KNOWN_INTEL_ACCELERATORS: list[IntelAcceleratorInfo] = [
     IntelAcceleratorInfo(name="Gaudi", memory=32),  # HL-205
     IntelAcceleratorInfo(name="Gaudi2", memory=96),  # HL-225
+    IntelAcceleratorInfo(name="Gaudi3", memory=128),
 ]
 
 KNOWN_ACCELERATORS: list[Union[NvidiaGPUInfo, AMDGPUInfo, TPUInfo, IntelAcceleratorInfo]] = (
