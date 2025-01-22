@@ -5,6 +5,7 @@ from gpuhunt._internal.catalog import Catalog
 from gpuhunt._internal.constraints import (
     KNOWN_ACCELERATORS,
     KNOWN_AMD_GPUS,
+    KNOWN_INTEL_ACCELERATORS,
     KNOWN_NVIDIA_GPUS,
     KNOWN_TPUS,
     correct_gpu_memory_gib,
@@ -16,6 +17,7 @@ from gpuhunt._internal.models import (
     AcceleratorVendor,
     AMDGPUInfo,
     CatalogItem,
+    IntelAcceleratorInfo,
     NvidiaGPUInfo,
     QueryFilter,
     RawCatalogItem,
