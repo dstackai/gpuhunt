@@ -75,7 +75,7 @@ def build_query_variables(gpu_types: list[dict]) -> list[dict]:
                     "minDisk": None,
                     "minMemoryInGb": None,
                     "minVcpuCount": None,
-                    "secureCloud": None,
+                    "secureCloud": True,
                 }
             )
 
