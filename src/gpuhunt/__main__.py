@@ -1,9 +1,9 @@
 import argparse
 import logging
 import os
-import sys
 
 import gpuhunt._internal.storage as storage
+from gpuhunt._internal.utils import configure_logging
 
 
 def main():
@@ -27,11 +27,7 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--no-filter", action="store_true")
     args = parser.parse_args()
-    logging.basicConfig(
-        level=logging.INFO,
-        stream=sys.stdout,
-        format="%(asctime)s %(levelname)s %(message)s",
-    )
+    configure_logging()
 
     if args.provider == "aws":
         from gpuhunt.providers.aws import AWSProvider

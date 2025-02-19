@@ -1,3 +1,5 @@
+from typing import Optional
+
 import pytest
 
 from gpuhunt import CatalogItem, QueryFilter
@@ -168,6 +170,29 @@ class TestMatches:
         assert matches(cpu_items[0], q)
         q.provider = ["nebius"]
         assert not matches(cpu_items[0], q)
+
+    @pytest.mark.parametrize(
+        ("item_flags", "query_allowed_flags", "should_match"),
+        [
+            pytest.param([], ["a"], True, id="matches-if-no-flags"),
+            pytest.param([], None, True, id="matches-if-no-flags-and-all-flags-allowed"),
+            pytest.param(["a", "b"], None, True, id="matches-if-has-flags-and-all-flags-allowed"),
+            pytest.param(
+                ["a", "b"], ["a", "b", "c"], True, id="matches-if-has-flags-all-of-which-allowed"
+            ),
+            pytest.param(["a", "b"], ["a"], False, id="not-matches-if-some-flags-not-allowed"),
+        ],
+    )
+    def test_flags(
+        self,
+        item: CatalogItem,
+        item_flags: list[str],
+        query_allowed_flags: Optional[list[str]],
+        should_match: bool,
+    ) -> None:
+        item.flags = item_flags
+        q = QueryFilter(allowed_flags=query_allowed_flags)
+        assert matches(item, q) == should_match
 
 
 @pytest.mark.parametrize(

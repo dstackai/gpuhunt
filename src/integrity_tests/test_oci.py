@@ -20,6 +20,15 @@ def test_on_demand_present(data_rows: list[dict]):
     assert "False" in map(itemgetter("spot"), data_rows)
 
 
+def test_spot_present(data_rows: list[dict]):
+    assert "True" in map(itemgetter("spot"), data_rows)
+
+
+def test_spots_contain_flag(data_rows: list[dict]):
+    for row in data_rows:
+        assert (row["spot"] == "True") == ("oci-spot" in row["flags"]), row
+
+
 @pytest.mark.parametrize("prefix", ["VM.Standard", "BM.Standard", "VM.GPU", "BM.GPU"])
 def test_family_present(prefix: str, data_rows: list[dict]):
     assert any(name.startswith(prefix) for name in map(itemgetter("instance_name"), data_rows))
