@@ -1,4 +1,14 @@
+import logging
+import sys
 from typing import Callable, Optional, Union
+
+
+def configure_logging() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        stream=sys.stdout,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
 
 
 def empty_as_none(value: Optional[str], loader: Optional[Callable] = None):

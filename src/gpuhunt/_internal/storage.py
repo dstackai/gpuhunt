@@ -1,10 +1,22 @@
 import csv
 import dataclasses
-from collections.abc import Iterable
 from typing import TypeVar
 
 from gpuhunt._internal.models import RawCatalogItem
 
+CATALOG_V1_FIELDS = [
+    "instance_name",
+    "location",
+    "price",
+    "cpu",
+    "memory",
+    "gpu_count",
+    "gpu_name",
+    "gpu_memory",
+    "spot",
+    "disk_size",
+    "gpu_vendor",
+]
 T = TypeVar("T", bound=RawCatalogItem)
 
 
@@ -16,11 +28,11 @@ def dump(items: list[T], path: str, *, cls: type[T] = RawCatalogItem):
             writer.writerow(item.dict())
 
 
-def load(path: str, *, cls: type[T] = RawCatalogItem) -> list[T]:
-    items = []
-    with open(path, newline="") as f:
-        reader: Iterable[dict[str, str]] = csv.DictReader(f)
+def convert_catalog_v2_to_v1(path_v2: str, path_v1: str) -> None:
+    with open(path_v2) as f_v2, open(path_v1, "w") as f_v1:
+        reader = csv.DictReader(f_v2)
+        writer = csv.DictWriter(f_v1, fieldnames=CATALOG_V1_FIELDS, extrasaction="ignore")
+        writer.writeheader()
         for row in reader:
-            item = cls.from_dict(row)
-            items.append(item)
-    return items
+            if not row.get("flags"):
+                writer.writerow(row)

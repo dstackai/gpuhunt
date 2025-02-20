@@ -1,5 +1,6 @@
 import enum
-from dataclasses import asdict, dataclass, fields
+from collections.abc import Container
+from dataclasses import asdict, dataclass, field, fields
 from typing import (
     ClassVar,
     Optional,
@@ -42,6 +43,11 @@ class AcceleratorVendor(enum.Enum):
 
 @dataclass
 class RawCatalogItem:
+    """
+    An item stored in the catalog.
+    See `CatalogItem` for field descriptions.
+    """
+
     instance_name: Optional[str]
     location: Optional[str]
     price: Optional[float]
@@ -53,6 +59,7 @@ class RawCatalogItem:
     spot: Optional[bool]
     disk_size: Optional[float]
     gpu_vendor: Optional[str] = None
+    flags: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         # This heuristic will be required indefinitely since we support historical catalogs.
@@ -87,15 +94,20 @@ class RawCatalogItem:
             gpu_memory=empty_as_none(v.get("gpu_memory"), loader=float),
             spot=empty_as_none(v.get("spot"), loader=bool_loader),
             disk_size=empty_as_none(v.get("disk_size"), loader=float),
+            flags=v.get("flags", "").split(),
         )
 
     def dict(self) -> dict[str, Union[str, int, float, bool, None]]:
-        return asdict(self)
+        return {
+            **asdict(self),
+            "flags": " ".join(self.flags),
+        }
 
 
 @dataclass
 class CatalogItem:
     """
+    An item returned by `Catalog.query`.
     Attributes:
         instance_name: name of the instance
         location: region or zone
@@ -108,6 +120,11 @@ class CatalogItem:
         spot: whether the instance is a spot instance
         provider: name of the provider
         disk_size: size of disk in GB
+        flags: list of flags. If a catalog item breaks existing dstack versions,
+            add a flag to hide the item from those versions. Newer dstack versions
+            will have to request this flag explicitly to get the catalog item.
+            If you are adding a new provider, leave the flags empty.
+            Flag names should be in kebab-case.
     """
 
     instance_name: str
@@ -122,6 +139,7 @@ class CatalogItem:
     disk_size: Optional[float]
     provider: str
     gpu_vendor: Optional[AcceleratorVendor] = None
+    flags: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         gpu_vendor = self.gpu_vendor
@@ -167,6 +185,7 @@ class QueryFilter:
         min_compute_capability: minimum compute capability of the GPU
         max_compute_capability: maximum compute capability of the GPU
         spot: if `False`, only ondemand offers will be returned. If `True`, only spot offers will be returned
+        allowed_flags: only offers with all flags allowed will be returned. `None` allows all flags
     """
 
     provider: Optional[list[str]] = None  # strings can have mixed case
@@ -189,6 +208,7 @@ class QueryFilter:
     min_compute_capability: Optional[tuple[int, int]] = None
     max_compute_capability: Optional[tuple[int, int]] = None
     spot: Optional[bool] = None
+    allowed_flags: Optional[Container[str]] = None
 
     def __repr__(self) -> str:
         """

@@ -94,6 +94,9 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
     if i.disk_size is not None:
         if not is_between(i.disk_size, q.min_disk_size, q.max_disk_size):
             return False
+    if q.allowed_flags is not None:
+        if any(flag not in q.allowed_flags for flag in i.flags):
+            return False
     return True
 
 
