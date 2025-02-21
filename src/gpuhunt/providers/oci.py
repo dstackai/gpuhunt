@@ -1,3 +1,4 @@
+import copy
 import logging
 import re
 from collections.abc import Iterable
@@ -64,7 +65,7 @@ class OCIProvider(AbstractProvider):
                 )
                 continue
 
-            catalog_item = RawCatalogItem(
+            on_demand_item = RawCatalogItem(
                 instance_name=shape.name,
                 location=None,
                 price=resources.total_price(),
@@ -77,9 +78,23 @@ class OCIProvider(AbstractProvider):
                 spot=False,
                 disk_size=None,
             )
-            result.extend(self._duplicate_item_in_regions(catalog_item, regions))
+            item_variations = [on_demand_item]
+            if shape.allow_preemptible:
+                item_variations.append(self._make_spot_item(on_demand_item))
+            for item in item_variations:
+                result.extend(self._duplicate_item_in_regions(item, regions))
 
         return sorted(result, key=lambda i: i.price)
+
+    @staticmethod
+    def _make_spot_item(item: RawCatalogItem) -> RawCatalogItem:
+        item = copy.deepcopy(item)
+        item.spot = True
+        # > Preemptible capacity costs 50% less than on-demand capacity
+        # https://docs.oracle.com/en-us/iaas/Content/Compute/Concepts/preemptible.htm#howitworks__billing
+        item.price *= 0.5
+        item.flags.append("oci-spot")
+        return item
 
     @staticmethod
     def _duplicate_item_in_regions(
@@ -87,7 +102,7 @@ class OCIProvider(AbstractProvider):
     ) -> list[RawCatalogItem]:
         result = []
         for region in regions:
-            regional_item = RawCatalogItem(**item.dict())
+            regional_item = copy.deepcopy(item)
             regional_item.location = region.name
             result.append(regional_item)
         return result
@@ -110,6 +125,7 @@ class CostEstimatorShape(BaseModel):
     name: str
     hidden: bool
     status: str
+    allow_preemptible: bool
     bundle_memory_qty: int
     gpu_qty: Optional[int]
     gpu_memory_qty: Optional[int]

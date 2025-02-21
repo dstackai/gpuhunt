@@ -7,6 +7,7 @@ import os
 import time
 import urllib.request
 import zipfile
+from collections.abc import Container
 from concurrent.futures import ThreadPoolExecutor, wait
 from pathlib import Path
 from typing import Optional, Union
@@ -17,8 +18,8 @@ from gpuhunt._internal.utils import parse_compute_capability
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
-version_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v1/version"
-catalog_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v1/{version}/catalog.zip"
+version_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v2/version"
+catalog_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v2/{version}/catalog.zip"
 OFFLINE_PROVIDERS = ["aws", "azure", "datacrunch", "gcp", "lambdalabs", "oci", "runpod"]
 ONLINE_PROVIDERS = ["cudo", "tensordock", "vastai", "vultr"]
 RELOAD_INTERVAL = 15 * 60  # 15 minutes
@@ -60,6 +61,7 @@ class Catalog:
         min_compute_capability: Optional[Union[str, tuple[int, int]]] = None,
         max_compute_capability: Optional[Union[str, tuple[int, int]]] = None,
         spot: Optional[bool] = None,
+        allowed_flags: Optional[Container[str]] = None,
     ) -> list[CatalogItem]:
         """
         Query the catalog for matching offers
@@ -84,6 +86,7 @@ class Catalog:
             min_compute_capability: minimum compute capability of the GPU
             max_compute_capability: maximum compute capability of the GPU
             spot: if `False`, only ondemand offers will be returned. If `True`, only spot offers will be returned
+            allowed_flags: only offers with all flags allowed will be returned. `None` allows all flags
 
         Returns:
             list of matching offers
@@ -114,6 +117,7 @@ class Catalog:
             min_compute_capability=parse_compute_capability(min_compute_capability),
             max_compute_capability=parse_compute_capability(max_compute_capability),
             spot=spot,
+            allowed_flags=allowed_flags,
         )
 
         if query_filter.provider is not None:

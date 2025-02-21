@@ -103,3 +103,36 @@ def test_amd_gpu_architecture(model: str, architecture: AMDArchitecture, expecte
             return
     # If we get here, the test should fail since we could not find the GPU in our known list.
     assert False
+
+
+def test_raw_catalog_item_to_from_dict() -> None:
+    item = RawCatalogItem(
+        instance_name="test-instance",
+        location="eu-west-1",
+        price=1.0,
+        cpu=1,
+        memory=32.0,
+        gpu_vendor=AcceleratorVendor.NVIDIA,
+        gpu_count=1,
+        gpu_name="A10",
+        gpu_memory=24.0,
+        spot=False,
+        disk_size=100.0,
+        flags=["f1", "f2", "f3"],
+    )
+    item_dict = item.dict()
+    assert item_dict == {
+        "instance_name": "test-instance",
+        "location": "eu-west-1",
+        "price": 1.0,
+        "cpu": 1,
+        "memory": 32.0,
+        "gpu_vendor": "nvidia",
+        "gpu_count": 1,
+        "gpu_name": "A10",
+        "gpu_memory": 24.0,
+        "spot": False,
+        "disk_size": 100.0,
+        "flags": "f1 f2 f3",
+    }
+    assert RawCatalogItem.from_dict(item_dict) == item
