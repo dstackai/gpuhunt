@@ -20,6 +20,7 @@ def select_row(rows, name: str) -> list[str]:
 
 def test_locations(data_rows):
     expected = {
+        # Secure cloud
         "CA-MTL-1",
         "CA-MTL-2",
         "CA-MTL-3",
@@ -28,12 +29,16 @@ def test_locations(data_rows):
         "EU-SE-1",
         "EUR-IS-1",
         "EUR-IS-2",
-        "US-GA-1",
-        "US-OR-1",
         "US-TX-3",
+        # Community cloud
+        "CA",
+        "CZ",
+        "FR",
+        "US",
     }
     locations = set(select_row(data_rows, "location"))
-    assert len(locations) >= len(expected) - 3
+    # Assert most are present. Some may be missing due to low availability
+    assert len(expected - locations) <= 3
 
 
 def test_spot(data_rows):
