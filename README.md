@@ -64,6 +64,7 @@ print(*items, sep="\n")
 * RunPod
 * TensorDock
 * Vast AI
+* Vultr
 
 ## See also
 
