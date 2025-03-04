@@ -1,6 +1,6 @@
+import copy
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from itertools import chain
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 import requests
@@ -23,32 +23,37 @@ class RunpodProvider(AbstractProvider):
         offers = self.fetch_offers()
         return sorted(offers, key=lambda i: i.price)
 
-    def fetch_offers(self) -> list[RawCatalogItem]:
-        offers = [get_raw_catalog(pod_type) for pod_type in self.list_pods()]
-        return list(chain.from_iterable(offers))
-
     @staticmethod
-    def list_pods() -> list[dict]:
-        payload_gpu_types = {"query": gpu_types_query, "variables": {}}
-        try:
-            gpu_types = make_request(payload_gpu_types)
-        except RequestException as e:
-            logger.exception("Failed to make request for GPU types: %s", e)
-            raise
+    def fetch_offers() -> list[RawCatalogItem]:
+        query_variables = build_query_variables()
 
         with ThreadPoolExecutor(max_workers=10) as executor:
             futures = [
-                executor.submit(get_pods, query_variable)
-                for query_variable in build_query_variables(gpu_types)
+                executor.submit(get_pods, query_variable) for query_variable in query_variables
             ]
-        offers = []
-        for future in as_completed(futures):
+        pods_by_query = []
+        for future in futures:
             try:
-                result = future.result()
-                offers.append(result)
+                pods_by_query.append(future.result())
             except RequestException as e:
                 logger.exception("Failed to get pods data: %s", e)
-        return list(chain.from_iterable(offers))
+
+        catalog_items = []
+        for query_variable, pods in zip(query_variables, pods_by_query):
+            for pod in pods:
+                catalog_items.extend(make_catalog_items(query_variable, pod))
+        return catalog_items
+
+    @classmethod
+    def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
+        return [
+            o
+            for o in offers
+            if o.location
+            not in [
+                "AR",  # network problems, unusable
+            ]
+        ]
 
 
 def gpu_vendor_and_name(gpu_id: str) -> Optional[tuple[AcceleratorVendor, str]]:
@@ -57,25 +62,37 @@ def gpu_vendor_and_name(gpu_id: str) -> Optional[tuple[AcceleratorVendor, str]]:
     return GPU_MAP.get(gpu_id)
 
 
-def build_query_variables(gpu_types: list[dict]) -> list[dict]:
-    # Filter dataCenters by 'listed: True'
-    listed_data_centers = [dc["id"] for dc in gpu_types["data"]["dataCenters"] if dc["listed"]]
+def build_query_variables() -> list[dict]:
+    """Prepare different combinations of API query filters to cover all available GPUs."""
 
-    # Find the maximum of maxGpuCount
+    gpu_types = make_request({"query": gpu_types_query, "variables": {}})
+    data_centers = [dc["id"] for dc in gpu_types["data"]["dataCenters"] if dc["listed"]]
     max_gpu_count = max(gpu["maxGpuCount"] for gpu in gpu_types["data"]["gpuTypes"])
 
-    # Generate the variables list
     variables = []
-    for dc_id in listed_data_centers:
-        for gpu_count in range(1, max_gpu_count + 1):
+    for gpu_count in range(1, max_gpu_count + 1):
+        # Secure cloud is queryable by datacenter ID
+        for dc_id in data_centers:
             variables.append(
                 {
+                    "secureCloud": True,
                     "dataCenterId": dc_id,
-                    "gpuCount": gpu_count,  # gpuCount is mandatory
+                    "gpuCount": gpu_count,
                     "minDisk": None,
                     "minMemoryInGb": None,
                     "minVcpuCount": None,
-                    "secureCloud": True,
+                }
+            )
+        # Community cloud is queryable by country code
+        for country_code in gpu_types["data"]["countryCodes"]:
+            variables.append(
+                {
+                    "secureCloud": False,
+                    "countryCode": country_code,
+                    "gpuCount": gpu_count,
+                    "minDisk": None,
+                    "minMemoryInGb": None,
+                    "minVcpuCount": None,
                 }
             )
 
@@ -83,99 +100,61 @@ def build_query_variables(gpu_types: list[dict]) -> list[dict]:
 
 
 def get_pods(query_variable: dict) -> list[dict]:
-    pods = make_request(get_pods_query_payload(query_variable))["data"]["gpuTypes"]
-    offers = []
-    for pod in pods:
-        listed_gpu_vendor_and_name = gpu_vendor_and_name(pod["id"])
-        availability = pod["lowestPrice"]["stockStatus"]
-        if listed_gpu_vendor_and_name is not None and availability is not None:
-            offers.append(
-                get_offers(
-                    pod,
-                    data_center_id=query_variable["dataCenterId"],
-                    gpu_count=query_variable["gpuCount"],
-                    gpu_vendor=listed_gpu_vendor_and_name[0],
-                    gpu_name=listed_gpu_vendor_and_name[1],
-                )
-            )
-        elif listed_gpu_vendor_and_name is None and availability is not None:
-            logger.warning(f"{pod['id']} missing in runpod GPU_MAP")
-    return offers
+    resp = make_request(
+        {
+            "query": query_pod_types,
+            "variables": {"lowestPriceInput": query_variable},
+        }
+    )
+    return resp["data"]["gpuTypes"]
 
 
-def get_offers(
-    pod: dict, *, data_center_id, gpu_count, gpu_vendor: AcceleratorVendor, gpu_name: str
-) -> dict:
-    return {
-        "id": pod["id"],
-        "data_center_id": data_center_id,
-        "secure_price": pod["securePrice"],
-        "secure_spot_price": pod["secureSpotPrice"],
-        "community_price": pod["communityPrice"],
-        "community_spot_price": pod["communitySpotPrice"],
-        "cpu": pod["lowestPrice"]["minVcpu"],
-        "memory": pod["lowestPrice"]["minMemory"],
-        "gpu": gpu_count,
-        "display_name": pod["displayName"],
-        "gpu_memory": pod["memoryInGb"],
-        "gpu_vendor": gpu_vendor.value,
-        "gpu_name": gpu_name,
-    }
-
-
-def get_pods_query_payload(query_variable: dict) -> dict:
-    payload_secure_gpu_types = {
-        "query": query_pod_types,
-        "variables": {"lowestPriceInput": query_variable},
-    }
-    return payload_secure_gpu_types
+def make_catalog_items(query_variable: dict, pod: dict) -> list[RawCatalogItem]:
+    if pod["lowestPrice"]["stockStatus"] is None:
+        return []
+    listed_gpu_vendor_and_name = gpu_vendor_and_name(pod["id"])
+    if listed_gpu_vendor_and_name is None:
+        logger.warning(f"{pod['id']} missing in runpod GPU_MAP")
+        return []
+    if query_variable["secureCloud"]:
+        location = query_variable["dataCenterId"]
+        on_demand_gpu_price = pod["securePrice"]
+        spot_gpu_price = pod["secureSpotPrice"]
+    else:
+        location = query_variable["countryCode"]
+        on_demand_gpu_price = pod["communityPrice"]
+        spot_gpu_price = pod["communitySpotPrice"]
+    item_template = RawCatalogItem(
+        instance_name=pod["id"],
+        location=location,
+        price=None,  # set below
+        cpu=pod["lowestPrice"]["minVcpu"],
+        memory=pod["lowestPrice"]["minMemory"],
+        gpu_vendor=listed_gpu_vendor_and_name[0],
+        gpu_count=query_variable["gpuCount"],
+        gpu_name=listed_gpu_vendor_and_name[1],
+        gpu_memory=pod["memoryInGb"],
+        spot=None,  # set below
+        disk_size=None,
+    )
+    items = []
+    if on_demand_gpu_price:
+        item = copy.deepcopy(item_template)
+        item.spot = False
+        item.price = item.gpu_count * on_demand_gpu_price
+        items.append(item)
+    if spot_gpu_price:
+        item = copy.deepcopy(item_template)
+        item.spot = True
+        item.price = item.gpu_count * spot_gpu_price
+        items.append(item)
+    return items
 
 
 def make_request(payload: dict):
     resp = requests.post(API_URL, json=payload, timeout=10)
-    if resp.ok:
-        data = resp.json()
-        return data
     resp.raise_for_status()
-
-
-def get_raw_catalog(offer: dict) -> list[RawCatalogItem]:
-    catalog_items = []
-
-    if offer["secure_price"] is not None:
-        catalog_items.append(
-            RawCatalogItem(
-                instance_name=offer["id"],
-                location=offer["data_center_id"],
-                price=float(offer["secure_price"] * offer["gpu"]),
-                cpu=offer["cpu"],
-                memory=offer["memory"],
-                gpu_vendor=offer["gpu_vendor"],
-                gpu_count=offer["gpu"],
-                gpu_name=offer["gpu_name"],
-                gpu_memory=offer["gpu_memory"],
-                spot=False,
-                disk_size=None,
-            )
-        )
-    if (offer["secure_spot_price"] or 0) > 0:
-        catalog_items.append(
-            RawCatalogItem(
-                instance_name=offer["id"],
-                location=offer["data_center_id"],
-                price=float(offer["secure_spot_price"] * offer["gpu"]),
-                cpu=offer["cpu"],
-                memory=offer["memory"],
-                gpu_vendor=offer["gpu_vendor"],
-                gpu_count=offer["gpu"],
-                gpu_name=offer["gpu_name"],
-                gpu_memory=offer["gpu_memory"],
-                spot=True,
-                disk_size=None,
-            )
-        )
-
-    return catalog_items
+    return resp.json()
 
 
 def get_gpu_map() -> dict[str, tuple[AcceleratorVendor, str]]:
