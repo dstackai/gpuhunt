@@ -39,9 +39,6 @@ class DataCrunchProvider(AbstractProvider):
     def _get_instance_types(self) -> list[InstanceType]:
         return self.datacrunch_client.instance_types.get()
 
-    def _get_availabilities(self, spot: bool) -> list[dict]:
-        return self.datacrunch_client.instances.get_availabilities(is_spot=spot)
-
     def _get_locations(self) -> list[dict]:
         return self.datacrunch_client.locations.get()
 
@@ -114,10 +111,10 @@ GPU_MAP = {
     "2x NVIDIA Tesla V100 16GB": "V100",
     "4x NVIDIA Tesla V100 16GB": "V100",
     "8x NVIDIA Tesla V100 16GB": "V100",
-    "1x NVIDIA L40S": "L40S",
-    "2x NVIDIA L40S": "L40S",
-    "4x NVIDIA L40S": "L40S",
-    "8x NVIDIA L40S": "L40S",
+    "1x NVIDIA L40S 48GB": "L40S",
+    "2x NVIDIA L40S 48GB": "L40S",
+    "4x NVIDIA L40S 48GB": "L40S",
+    "8x NVIDIA L40S 48GB": "L40S",
     "1x AMD 7900XTX": AMD_RX7900XTX,
     "2x AMD 7900XTX": AMD_RX7900XTX,
     "4x AMD 7900XTX": AMD_RX7900XTX,
