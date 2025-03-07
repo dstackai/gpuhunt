@@ -41,21 +41,21 @@ def cpu_items() -> list[CatalogItem]:
         provider="datacrunch",
         disk_size=None,
     )
-    nebius = CatalogItem(
-        instance_name="standard-v2",
-        location="eu-north1-c",
-        price=1.4016,
+    aws = CatalogItem(
+        instance_name="c5.12xlarge",
+        location="us-east-2",
+        price=2.04,
         cpu=48,
-        memory=288.0,
+        memory=96.0,
         gpu_vendor=None,
         gpu_count=0,
         gpu_name=None,
         gpu_memory=None,
         spot=False,
-        provider="nebius",
+        provider="aws",
         disk_size=None,
     )
-    return [datacrunch, nebius]
+    return [datacrunch, aws]
 
 
 class TestMatches:
@@ -156,10 +156,10 @@ class TestMatches:
     def test_provider(self, cpu_items):
         assert matches(cpu_items[0], QueryFilter(provider=["datacrunch"]))
         assert matches(cpu_items[0], QueryFilter(provider=["DataCrunch"]))
-        assert not matches(cpu_items[0], QueryFilter(provider=["nebius"]))
+        assert not matches(cpu_items[0], QueryFilter(provider=["aws"]))
 
-        assert matches(cpu_items[1], QueryFilter(provider=["nebius"]))
-        assert matches(cpu_items[1], QueryFilter(provider=["Nebius"]))
+        assert matches(cpu_items[1], QueryFilter(provider=["aws"]))
+        assert matches(cpu_items[1], QueryFilter(provider=["AWS"]))
         assert not matches(cpu_items[1], QueryFilter(provider=["datacrunch"]))
 
     def test_provider_with_filter_setattr(self, cpu_items):
@@ -168,7 +168,7 @@ class TestMatches:
         assert matches(cpu_items[0], q)
         q.provider = ["DataCrunch"]
         assert matches(cpu_items[0], q)
-        q.provider = ["nebius"]
+        q.provider = ["aws"]
         assert not matches(cpu_items[0], q)
 
     @pytest.mark.parametrize(

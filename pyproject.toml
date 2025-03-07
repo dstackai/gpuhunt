@@ -39,11 +39,6 @@ gcp = [
     "google-cloud-compute",
     "google-cloud-tpu"
 ]
-nebius = [
-    "pyjwt",
-    "cryptography",
-    "beautifulsoup4"
-]
 oci = [
     "oci",
     "pydantic>=1.10.10,<2.0.0",
@@ -51,7 +46,7 @@ oci = [
 datacrunch = [
     "datacrunch"
 ]
-all = ["gpuhunt[aws,azure,datacrunch,gcp,nebius,oci]"]
+all = ["gpuhunt[aws,azure,datacrunch,gcp,oci]"]
 dev = [
     "pre-commit",
     "pytest~=7.0",
