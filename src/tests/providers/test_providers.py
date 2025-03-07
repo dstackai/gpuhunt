@@ -26,8 +26,6 @@ def providers():
                 continue
             if member.__name__ == "AbstractProvider":
                 continue
-            if member.NAME == "nebius":  # The provider has been temporarily disabled
-                continue
             members.append(member)
     assert members
     return members
