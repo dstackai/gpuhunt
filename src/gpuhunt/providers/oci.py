@@ -115,7 +115,7 @@ class CostEstimatorTypeField(BaseModel):
 class CostEstimatorShapeProduct(BaseModel):
     type: CostEstimatorTypeField
     part_number: str
-    qty: int
+    qty: Optional[int]
 
     class Config:
         alias_generator = to_camel_case
@@ -126,7 +126,7 @@ class CostEstimatorShape(BaseModel):
     hidden: bool
     status: str
     allow_preemptible: bool
-    bundle_memory_qty: int
+    bundle_memory_qty: Optional[int]
     gpu_qty: Optional[int]
     gpu_memory_qty: Optional[int]
     processor_type: CostEstimatorTypeField
@@ -254,9 +254,13 @@ def shape_to_resources(
 ) -> ResourcesConfiguration:
     cpu = None
     gpu = GPUConfiguration(units_count=0, unit_memory_gb=None, name=None, price=0.0)
-    memory = MemoryConfiguration(gbs=shape.bundle_memory_qty, price=0.0)
+    memory: Optional[MemoryConfiguration] = None
+    if shape.bundle_memory_qty is not None:
+        memory = MemoryConfiguration(gbs=shape.bundle_memory_qty, price=0.0)
 
     for product in shape.products:
+        if product.qty is None:
+            raise CostEstimatorDataError("Product quantity not found")
         product_details = products.find(product.part_number)
         if product_details is None:
             raise CostEstimatorDataError(f"Could not find product {product.part_number!r}")
@@ -283,6 +287,8 @@ def shape_to_resources(
 
     if cpu is None:
         raise CostEstimatorDataError("No ocpu product")
+    if memory is None:
+        raise CostEstimatorDataError("No memory product")
 
     return ResourcesConfiguration(cpu, memory, gpu)
 
