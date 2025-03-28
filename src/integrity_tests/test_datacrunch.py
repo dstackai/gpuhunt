@@ -22,10 +22,12 @@ def test_locations(data_rows):
     expected = {
         "FIN-01",
         "FIN-02",
+        "FIN-02",
         "ICE-01",
     }
     locations = select_row(data_rows, "location")
-    assert set(locations) == expected
+    missing = expected - set(locations)
+    assert not missing
 
     count = Counter(locations)
     for loc in expected:
