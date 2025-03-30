@@ -1,6 +1,7 @@
 import copy
 import itertools
 import logging
+import re
 from collections.abc import Iterable
 from typing import Optional
 
@@ -87,44 +88,19 @@ def transform_instance(instance: InstanceType, spot: bool, location: str) -> Opt
 
 
 GPU_MAP = {
-    "1x H100 SXM5 80GB": "H100",
-    "2x H100 SXM5 80GB": "H100",
-    "4x H100 SXM5 80GB": "H100",
-    "8x H100 SXM5 80GB": "H100",
-    "1x A100 SXM4 80GB": "A100",
-    "2x A100 SXM4 80GB": "A100",
-    "4x A100 SXM4 80GB": "A100",
-    "8x A100 SXM4 80GB": "A100",
-    "1x A100 SXM4 40GB": "A100",
-    "2x A100 SXM4 40GB": "A100",
-    "4x A100 SXM4 40GB": "A100",
-    "8x A100 SXM4 40GB": "A100",
-    "1x NVIDIA RTX6000 Ada 48GB": "RTX6000Ada",
-    "2x NVIDIA RTX6000 Ada 48GB": "RTX6000Ada",
-    "4x NVIDIA RTX6000 Ada 48GB": "RTX6000Ada",
-    "8x NVIDIA RTX6000 Ada 48GB": "RTX6000Ada",
-    "1x NVIDIA RTX A6000 48GB": "A6000",
-    "2x NVIDIA RTX A6000 48GB": "A6000",
-    "4x NVIDIA RTX A6000 48GB": "A6000",
-    "8x NVIDIA RTX A6000 48GB": "A6000",
-    "1x NVIDIA Tesla V100 16GB": "V100",
-    "2x NVIDIA Tesla V100 16GB": "V100",
-    "4x NVIDIA Tesla V100 16GB": "V100",
-    "8x NVIDIA Tesla V100 16GB": "V100",
-    "1x NVIDIA L40S 48GB": "L40S",
-    "2x NVIDIA L40S 48GB": "L40S",
-    "4x NVIDIA L40S 48GB": "L40S",
-    "8x NVIDIA L40S 48GB": "L40S",
-    "1x AMD 7900XTX": AMD_RX7900XTX,
-    "2x AMD 7900XTX": AMD_RX7900XTX,
-    "4x AMD 7900XTX": AMD_RX7900XTX,
-    "8x AMD 7900XTX": AMD_RX7900XTX,
-    "12x AMD 7900XTX": AMD_RX7900XTX,
+    r"\d+x H100 SXM5 80GB": "H100",
+    r"\d+x A100 SXM4 80GB": "A100",
+    r"\d+x A100 SXM4 40GB": "A100",
+    r"\d+x RTX6000 Ada 48GB": "RTX6000Ada",
+    r"\d+x RTX A6000 48GB": "A6000",
+    r"\d+x Tesla V100 16GB": "V100",
+    r"\d+x L40S 48GB": "L40S",
+    r"\d+x AMD 7900XTX": AMD_RX7900XTX,
 }
 
 
 def get_gpu_name(name: str) -> Optional[str]:
-    if not name:
-        return None
-    result = GPU_MAP.get(name)
-    return result
+    for regex, gpu_name in GPU_MAP.items():
+        if re.fullmatch(regex, name):
+            return gpu_name
+    return None
