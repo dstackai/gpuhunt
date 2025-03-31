@@ -44,7 +44,11 @@ jobs:
           pip install '.[all,dev]'
       - name: Run doctest
         run: |
-          pytest --doctest-modules src/gpuhunt
+          IGNORE=
+          if [[ "${{ matrix.python-version }}" == "3.9" ]]; then
+            IGNORE="--ignore src/gpuhunt/providers/nebius.py"
+          fi
+          pytest --doctest-modules src/gpuhunt $IGNORE
       - name: Run pytest
         run: |
           pytest src/tests
