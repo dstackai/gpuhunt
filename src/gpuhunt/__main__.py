@@ -17,6 +17,7 @@ def main():
             "datacrunch",
             "gcp",
             "lambdalabs",
+            "nebius",
             "oci",
             "runpod",
             "tensordock",
@@ -55,6 +56,18 @@ def main():
         from gpuhunt.providers.lambdalabs import LambdaLabsProvider
 
         provider = LambdaLabsProvider(os.getenv("LAMBDALABS_TOKEN"))
+    elif args.provider == "nebius":
+        from nebius.base.service_account.pk_file import Reader as PKReader
+
+        from gpuhunt.providers.nebius import NebiusProvider
+
+        provider = NebiusProvider(
+            credentials=PKReader(
+                filename=os.getenv("NEBIUS_PRIVATE_KEY_FILE"),
+                public_key_id=os.getenv("NEBIUS_PUBLIC_KEY_ID"),
+                service_account_id=os.getenv("NEBIUS_SERVICE_ACCOUNT_ID"),
+            ),
+        )
     elif args.provider == "oci":
         from gpuhunt.providers.oci import OCICredentials, OCIProvider
 

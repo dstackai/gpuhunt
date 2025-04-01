@@ -172,6 +172,33 @@ jobs:
           path: lambdalabs.csv
           retention-days: 1
 
+  catalog-nebius:
+    name: Collect Nebius catalog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: |
+          pip install pip -U
+          pip install -e '.[nebius]'
+      - name: Collect catalog
+        working-directory: src
+        run: |
+          echo "${{ secrets.NEBIUS_PRIVATE_KEY }}" > "${NEBIUS_PRIVATE_KEY_FILE}"
+          python -m gpuhunt nebius --output ../nebius.csv
+        env:
+          NEBIUS_SERVICE_ACCOUNT_ID: ${{ secrets.NEBIUS_SERVICE_ACCOUNT_ID }}
+          NEBIUS_PUBLIC_KEY_ID: ${{ secrets.NEBIUS_PUBLIC_KEY_ID }}
+          NEBIUS_PRIVATE_KEY_FILE: /tmp/nebius.key
+      - uses: actions/upload-artifact@v4
+        with:
+          name: catalogs-nebius
+          path: nebius.csv
+          retention-days: 1
+
   catalog-oci:
     name: Collect OCI catalog
     runs-on: ubuntu-latest
@@ -229,6 +256,7 @@ jobs:
       - catalog-datacrunch
       - catalog-gcp
       - catalog-lambdalabs
+      - catalog-nebius
       - catalog-oci
       - catalog-runpod
     runs-on: ubuntu-latest

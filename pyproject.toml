@@ -39,6 +39,15 @@ gcp = [
     "google-cloud-compute",
     "google-cloud-tpu"
 ]
+# Nebius requires Python 3.10. On 3.9:
+# `pip install gpuhunt[nebius]` is expected to fail
+# `pip install gpuhunt[all]` is expected to ignore Nebius
+nebius = [
+    "nebius>=0.2.18,<0.3",
+]
+maybe_nebius = [
+    'nebius>=0.2.18,<0.3; python_version>="3.10"',
+]
 oci = [
     "oci",
     "pydantic>=1.10.10,<2.0.0",
@@ -46,7 +55,7 @@ oci = [
 datacrunch = [
     "datacrunch"
 ]
-all = ["gpuhunt[aws,azure,datacrunch,gcp,oci]"]
+all = ["gpuhunt[aws,azure,datacrunch,gcp,maybe_nebius,oci]"]
 dev = [
     "pre-commit",
     "pytest~=7.0",
