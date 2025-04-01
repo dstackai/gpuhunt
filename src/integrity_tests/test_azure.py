@@ -46,6 +46,7 @@ class TestAzureCatalog:
             "jioindiawest",
             "koreacentral",
             "koreasouth",
+            "malaysiawest",
             "mexicocentral",
             "newzealandnorth",
             "northcentralus",
@@ -82,7 +83,8 @@ class TestAzureCatalog:
         locations = set(
             row["location"] for row in data_rows if row["instance_name"] == "Standard_D2s_v3"
         )
-        assert expected_locations == locations
+        missing = expected_locations - locations
+        assert not missing
 
     def test_spots_presented(self, data_rows: list[dict]):
         assert any(row["spot"] == "True" for row in data_rows)

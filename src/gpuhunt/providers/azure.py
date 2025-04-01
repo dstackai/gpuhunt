@@ -114,7 +114,6 @@ class AzureProvider(AbstractProvider):
                     res = session.get(
                         prices_url,
                         params={
-                            "api-version": "2023-01-01-preview",
                             "$filter": " and ".join(prices_filters),
                             "$skip": page_id * retail_prices_page_size,
                         },
