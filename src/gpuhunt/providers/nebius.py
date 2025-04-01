@@ -114,7 +114,7 @@ class NebiusProvider(AbstractProvider):
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
-    ) -> None:
+    ) -> list[RawCatalogItem]:
         items: list[RawCatalogItem] = []
         sdk = SDK(credentials=self.credentials)
         try:
