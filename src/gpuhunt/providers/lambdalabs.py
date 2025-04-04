@@ -3,44 +3,31 @@ import logging
 import re
 from typing import Optional
 
-import requests
+from requests import Session
 
 from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
-instance_types_url = "https://cloud.lambdalabs.com/api/v1/instance-types"
-all_regions = [
-    "us-south-1",
-    "us-south-2",
-    "us-south-3",
-    "us-west-2",
-    "us-west-1",
-    "us-midwest-1",
-    "us-west-3",
-    "us-east-1",
-    "us-east-2",
-    "europe-central-1",
-    "asia-south-1",
-    "me-west-1",
-    "asia-northeast-1",
-    "asia-northeast-2",
-]
+INSTANCE_TYPES_URL = "https://cloud.lambdalabs.com/api/v1/instance-types"
+IMAGES_URL = "https://cloud.lambdalabs.com/api/v1/images"
+TIMEOUT = 10
 
 
 class LambdaLabsProvider(AbstractProvider):
     NAME = "lambdalabs"
 
     def __init__(self, token: str):
-        self.token = token
+        self.session = Session()
+        self.session.headers.update({"Authorization": f"Bearer {token}"})
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         offers = []
-        data = requests.get(
-            instance_types_url, headers={"Authorization": f"Bearer {self.token}"}, timeout=10
-        ).json()["data"]
+        resp = self.session.get(INSTANCE_TYPES_URL, timeout=TIMEOUT)
+        resp.raise_for_status()
+        data = resp.json()["data"]
         for instance in data.values():
             instance = instance["instance_type"]
             logger.info(instance["name"])
@@ -50,6 +37,8 @@ class LambdaLabsProvider(AbstractProvider):
                 logger.warning("Can't parse GPU info from description: %s", description)
                 continue
             gpu_count, gpu_name, gpu_memory = result
+            if re.match(r"^g[bh]\d+", gpu_name.lower()):  # NVIDIA Grace CPU (ARM)
+                continue
             offer = RawCatalogItem(
                 instance_name=instance["name"],
                 price=instance["price_cents_per_hour"] / 100,
@@ -70,12 +59,20 @@ class LambdaLabsProvider(AbstractProvider):
     def add_regions(self, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
         # TODO: we don't know which regions are actually available for each instance type
         region_offers = []
-        for region in all_regions:
+        for region in self.list_regions():
             for offer in offers:
                 offer = copy.deepcopy(offer)
                 offer.location = region
                 region_offers.append(offer)
         return region_offers
+
+    def list_regions(self) -> list[str]:
+        resp = self.session.get(IMAGES_URL, timeout=TIMEOUT)
+        resp.raise_for_status()
+        regions = set()
+        for image in resp.json()["data"]:
+            regions.add(image["region"]["name"])
+        return sorted(regions)
 
 
 def parse_description(v: str) -> Optional[tuple[int, str, float]]:
