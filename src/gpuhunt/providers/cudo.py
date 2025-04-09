@@ -43,8 +43,11 @@ class CudoProvider(AbstractProvider):
         else:
             offers = []
             for machine_type in machine_types:
-                gpu_model_name = gpu_name(machine_type["gpuModel"])
+                gpu_model = machine_type["gpuModel"]
+                gpu_model_name = gpu_name(gpu_model)
                 if gpu_model_name is None:
+                    if gpu_model:
+                        logger.warning("Failed to get GPU name from gpuModel: '%s'", gpu_model)
                     continue
                 gpu_memory_size = get_memory(gpu_model_name)
                 if gpu_memory_size is None:
@@ -71,7 +74,9 @@ class CudoProvider(AbstractProvider):
         resp.raise_for_status()
 
     @staticmethod
-    def optimize_offers(machine_types, q: QueryFilter, balance_resource) -> list[RawCatalogItem]:
+    def optimize_offers(
+        machine_types, q: QueryFilter, balance_resource: bool
+    ) -> list[RawCatalogItem]:
         offers = []
 
         # Empty query, example: QureyFilter(provider="cudo")
@@ -107,8 +112,11 @@ class CudoProvider(AbstractProvider):
                 vm for vm in machine_types if vm["maxGpuFree"] != 0 and vm["gpuModelId"]
             ]
             for machine_type in gpu_machine_types:
-                gpu_model_name = gpu_name(machine_type["gpuModel"])
+                gpu_model = machine_type["gpuModel"]
+                gpu_model_name = gpu_name(gpu_model)
                 if gpu_model_name is None:
+                    if gpu_model:
+                        logger.warning("Failed to get GPU name from gpuModel: '%s'", gpu_model)
                     continue
                 gpu_memory_size = get_memory(gpu_model_name)
                 if gpu_memory_size is None:
@@ -193,7 +201,9 @@ def get_min_price_for_location_and_instance(offers: list[RawCatalogItem]) -> lis
     return list(min_price_offers.values())
 
 
-def optimize_offers_with_gpu(q: QueryFilter, machine_type, balance_resources: bool):
+def optimize_offers_with_gpu(
+    q: QueryFilter, machine_type: dict, balance_resources: bool
+) -> list[dict]:
     # Generate ranges for CPU, GPU, and memory based on the specified minimums, maximums, and available resources
     cpu_range = get_cpu_range(q.min_cpu, q.max_cpu, machine_type["maxVcpuFree"])
     gpu_range = get_gpu_range(q.min_gpu_count, q.max_gpu_count, machine_type["maxGpuFree"])
@@ -203,6 +213,7 @@ def optimize_offers_with_gpu(q: QueryFilter, machine_type, balance_resources: bo
     min_vcpu_per_gpu = machine_type.get("minVcpuPerGpu", 0)
     max_vcpu_per_gpu = machine_type.get("maxVcpuPerGpu", float("inf"))
     unbalanced_specs = []
+    # FIXME: this can be an enormously inefficient nested loop
     for cpu in cpu_range:
         for gpu in gpu_range:
             for memory in memory_range:
@@ -228,7 +239,14 @@ def optimize_offers_with_gpu(q: QueryFilter, machine_type, balance_resources: bo
             if spec["memory"]
             == get_balanced_memory(spec["gpu"], machine_type["gpu_memory"], q.max_memory)
         ]
-        balanced_specs = memory_balanced
+        if len(memory_balanced) > 0:
+            balanced_specs = memory_balanced
+        else:
+            # If fail to use balanced memory, use max available memory for every gpu num
+            gpu_num_to_spec = {}
+            for spec in unbalanced_specs:
+                gpu_num_to_spec[spec["gpu"]] = spec
+            balanced_specs = gpu_num_to_spec.values()
         # Add disk
         balanced_specs = [
             {
@@ -245,7 +263,6 @@ def optimize_offers_with_gpu(q: QueryFilter, machine_type, balance_resources: bo
             }
             for spec in balanced_specs
         ]
-        # Return balanced combinations if any; otherwise, return all combinations
         return balanced_specs
 
     disk_size = q.min_disk_size if q.min_disk_size is not None else MIN_DISK_SIZE
@@ -399,11 +416,12 @@ def max_none(*args: Optional[T]) -> T:
 
 
 GPU_MAP = {
-    "RTX A4000": "A4000",
-    "RTX A4500": "A4500",
     "RTX A5000": "A5000",
-    "RTX A6000": "A6000",
-    "NVIDIA A40": "A40",
-    "NVIDIA V100": "V100",
+    "RTX A6000" "V100": "V100",
     "RTX 3080": "RTX3080",
+    "A40 (compute mode)": "A40",
+    "L40S (compute mode)": "L40S",
+    "A100 80GB PCIe": "A100",
+    "H100 SXM": "H100",
+    "H100 NVL": "H100NVL",
 }
