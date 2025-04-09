@@ -43,8 +43,11 @@ class CudoProvider(AbstractProvider):
         else:
             offers = []
             for machine_type in machine_types:
-                gpu_model_name = gpu_name(machine_type["gpuModel"])
+                gpu_model = machine_type["gpuModel"]
+                gpu_model_name = gpu_name(gpu_model)
                 if gpu_model_name is None:
+                    if gpu_model:
+                        logger.warning("Failed to get GPU name from gpuModel: '%s'", gpu_model)
                     continue
                 gpu_memory_size = get_memory(gpu_model_name)
                 if gpu_memory_size is None:
@@ -71,7 +74,9 @@ class CudoProvider(AbstractProvider):
         resp.raise_for_status()
 
     @staticmethod
-    def optimize_offers(machine_types, q: QueryFilter, balance_resource) -> list[RawCatalogItem]:
+    def optimize_offers(
+        machine_types, q: QueryFilter, balance_resource: bool
+    ) -> list[RawCatalogItem]:
         offers = []
 
         # Empty query, example: QureyFilter(provider="cudo")
@@ -107,8 +112,11 @@ class CudoProvider(AbstractProvider):
                 vm for vm in machine_types if vm["maxGpuFree"] != 0 and vm["gpuModelId"]
             ]
             for machine_type in gpu_machine_types:
-                gpu_model_name = gpu_name(machine_type["gpuModel"])
+                gpu_model = machine_type["gpuModel"]
+                gpu_model_name = gpu_name(gpu_model)
                 if gpu_model_name is None:
+                    if gpu_model:
+                        logger.warning("Failed to get GPU name from gpuModel: '%s'", gpu_model)
                     continue
                 gpu_memory_size = get_memory(gpu_model_name)
                 if gpu_memory_size is None:
@@ -399,11 +407,12 @@ def max_none(*args: Optional[T]) -> T:
 
 
 GPU_MAP = {
-    "RTX A4000": "A4000",
-    "RTX A4500": "A4500",
     "RTX A5000": "A5000",
-    "RTX A6000": "A6000",
-    "NVIDIA A40": "A40",
-    "NVIDIA V100": "V100",
+    "RTX A6000" "V100": "V100",
     "RTX 3080": "RTX3080",
+    "A40 (compute mode)": "A40",
+    "L40S (compute mode)": "L40S",
+    "A100 80GB PCIe": "A100",
+    "H100 SXM": "H100",
+    "H100 NVL": "H100NVL",
 }

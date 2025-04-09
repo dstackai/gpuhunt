@@ -70,7 +70,9 @@ def transform_instance(instance: InstanceType, spot: bool, location: str) -> Opt
         gpu_name = get_gpu_name(instance.gpu["description"])
 
     if gpu_count and gpu_name is None:
-        logger.warning("Can't get GPU name from description: '%s'", instance.gpu["description"])
+        logger.warning(
+            "Failed to get GPU name from description: '%s'", instance.gpu["description"]
+        )
         return None
 
     raw = dict(

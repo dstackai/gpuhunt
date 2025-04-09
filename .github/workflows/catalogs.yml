@@ -70,27 +70,6 @@ jobs:
           path: azure.csv
           retention-days: 1
 
-  catalog-cudo:
-    name: Collect Cudo catalog
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
-        run: |
-          pip install pip -U
-          pip install -e '.'
-      - name: Collect catalog
-        working-directory: src
-        run: python -m gpuhunt cudo --output ../cudo.csv
-      - uses: actions/upload-artifact@v4
-        with:
-          name: catalogs-cudo
-          path: cudo.csv
-          retention-days: 1
-
   catalog-datacrunch:
     name: Collect DataCrunch catalog
     runs-on: ubuntu-latest
