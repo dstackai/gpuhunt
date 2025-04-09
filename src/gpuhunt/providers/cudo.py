@@ -201,7 +201,9 @@ def get_min_price_for_location_and_instance(offers: list[RawCatalogItem]) -> lis
     return list(min_price_offers.values())
 
 
-def optimize_offers_with_gpu(q: QueryFilter, machine_type, balance_resources: bool):
+def optimize_offers_with_gpu(
+    q: QueryFilter, machine_type: dict, balance_resources: bool
+) -> list[dict]:
     # Generate ranges for CPU, GPU, and memory based on the specified minimums, maximums, and available resources
     cpu_range = get_cpu_range(q.min_cpu, q.max_cpu, machine_type["maxVcpuFree"])
     gpu_range = get_gpu_range(q.min_gpu_count, q.max_gpu_count, machine_type["maxGpuFree"])
@@ -211,6 +213,7 @@ def optimize_offers_with_gpu(q: QueryFilter, machine_type, balance_resources: bo
     min_vcpu_per_gpu = machine_type.get("minVcpuPerGpu", 0)
     max_vcpu_per_gpu = machine_type.get("maxVcpuPerGpu", float("inf"))
     unbalanced_specs = []
+    # FIXME: this can be an enormously inefficient nested loop
     for cpu in cpu_range:
         for gpu in gpu_range:
             for memory in memory_range:
@@ -236,7 +239,14 @@ def optimize_offers_with_gpu(q: QueryFilter, machine_type, balance_resources: bo
             if spec["memory"]
             == get_balanced_memory(spec["gpu"], machine_type["gpu_memory"], q.max_memory)
         ]
-        balanced_specs = memory_balanced
+        if len(memory_balanced) > 0:
+            balanced_specs = memory_balanced
+        else:
+            # If fail to use balanced memory, use max available memory for every gpu num
+            gpu_num_to_spec = {}
+            for spec in unbalanced_specs:
+                gpu_num_to_spec[spec["gpu"]] = spec
+            balanced_specs = gpu_num_to_spec.values()
         # Add disk
         balanced_specs = [
             {
@@ -253,7 +263,6 @@ def optimize_offers_with_gpu(q: QueryFilter, machine_type, balance_resources: bo
             }
             for spec in balanced_specs
         ]
-        # Return balanced combinations if any; otherwise, return all combinations
         return balanced_specs
 
     disk_size = q.min_disk_size if q.min_disk_size is not None else MIN_DISK_SIZE
