@@ -22,8 +22,6 @@ class TestAzureCatalog:
             "australiaeast",
             "australiasoutheast",
             "australiasoutheast",
-            "bleufrancecentral",
-            "bleufrancesouth",
             "brazilsouth",
             "brazilsoutheast",
             "canadacentral",
