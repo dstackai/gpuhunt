@@ -329,6 +329,7 @@ class Prices:
             family = {
                 "nvidia-tesla-a100-80gb": "nvidia-a100-80gb",
                 "nvidia-h100-80gb-mega": "nvidia-h100-mega-80gb",
+                "nvidia-h100-80gb-plus": "nvidia-h100-mega-80gb",
             }.get(family, family)
         else:
             r = re.match(r"^([a-z]\d.?) ", family.lower())
