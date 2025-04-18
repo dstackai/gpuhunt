@@ -55,7 +55,10 @@ oci = [
 datacrunch = [
     "datacrunch"
 ]
-all = ["gpuhunt[aws,azure,datacrunch,gcp,maybe_nebius,oci]"]
+cloudrift = [
+    "cloudrift>=0.46.3",
+]
+all = ["gpuhunt[aws,azure,datacrunch,cloudrift,gcp,maybe_nebius,oci]"]
 dev = [
     "pre-commit",
     "pytest~=7.0",
