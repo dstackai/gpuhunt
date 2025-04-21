@@ -28,7 +28,7 @@ class AMDArchitecture(enum.Enum):
         return cls(value.upper())
 
 
-class AcceleratorVendor(enum.Enum):
+class AcceleratorVendor(str, enum.Enum):
     NVIDIA = "nvidia"
     AMD = "amd"
     GOOGLE = "google"
