@@ -1,19 +1,19 @@
 import logging
-from typing import Optional
 
-from rift import RiftClient
+import requests
+from typing import Optional, Union
 
 from gpuhunt import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
 
+CLOUDRIFT_SERVER_ADDRESS = "https://api.cloudrift.ai"
+CLOUDRIFT_API_VERSION = "2025-03-21"
+
 
 class CloudRiftProvider(AbstractProvider):
     NAME = "cloudrift"
-
-    def __init__(self) -> None:
-        self.rift_client = RiftClient(server_address="https://api.cloudrift.ai").public()
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
@@ -25,7 +25,9 @@ class CloudRiftProvider(AbstractProvider):
         return sorted(instance_types, key=lambda x: x.price)
 
     def _get_instance_types(self):
-        return self.rift_client.instance_types.list(services=["vm"])
+        request_data = {"selector": {"ByServiceAndLocation": {"services": ["vm"]}}}
+        response_data = _make_request(f"instance-types/list", request_data)
+        return response_data["instance_types"]
 
 
 def generate_instances(instance) -> list[RawCatalogItem]:
@@ -60,3 +62,20 @@ GPU_MAP = {
     r"RTX 5090": "RTX5090",
     r"RTX 6000 Pro": "RTX6000PRO",
 }
+
+
+def _make_request(endpoint: str, request_data: dict) -> Union[dict, str, None]:
+    response = requests.request(
+        "POST",
+        f"{CLOUDRIFT_SERVER_ADDRESS}/api/v1/{endpoint}",
+        json={"version": CLOUDRIFT_API_VERSION, "data": request_data},
+    )
+    if not response.ok:
+        response.raise_for_status()
+    try:
+        response_json = response.json()
+        if isinstance(response_json, str):
+            return response_json
+        return response_json["data"]
+    except requests.exceptions.JSONDecodeError:
+        return None

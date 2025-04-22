@@ -1,19 +1,32 @@
-from gpuhunt.providers.cloudrift import CloudRiftProvider
+import csv
+from operator import itemgetter
+from pathlib import Path
+
+import pytest
 
 
-def test_instance_types():
-    cloudrift_provider = CloudRiftProvider()
-    instance_types = cloudrift_provider.get()
+@pytest.fixture
+def data_rows(catalog_dir: Path) -> list[dict]:
+    with open(catalog_dir / "cloudrift.csv") as f:
+        return list(csv.DictReader(f))
 
-    # check some common instance types
-    has_rtx49_8c_nr = False
-    for instance in instance_types:
-        if instance.instance_name.startswith("rtx49-8c-nr"):
-            has_rtx49_8c_nr = True
-            gpu_count = int(instance.instance_name.split(".")[1])
-            assert instance.gpu_count == gpu_count
-            assert instance.gpu_memory == 24
-            assert instance.cpu == 8 * gpu_count
-            assert instance.memory == 50 * gpu_count
 
-    assert has_rtx49_8c_nr
+# TODO: Add RTX5090 and RTX6000PRO and others after evaluation
+@pytest.mark.parametrize("gpu", ["RTX4090"])
+def test_gpu_present(gpu: str, data_rows: list[dict]):
+    assert gpu in map(itemgetter("gpu_name"), data_rows)
+
+
+# TODO: Add 3, 4, 5, ... 8
+@pytest.mark.parametrize("gpu_count", [1, 2])
+def test_gpu_count_present(gpu_count: int, data_rows: list[dict]):
+    assert str(gpu_count) in map(itemgetter("gpu_count"), data_rows)
+
+
+@pytest.mark.parametrize("location", ["us-east-nc-nr-1"])
+def test_location_is_present(location: str, data_rows: list[dict]):
+    assert location in map(itemgetter("location"), data_rows)
+
+
+def test_non_zero_price(data_rows: list[dict]):
+    assert all(float(p) > 0 for p in map(itemgetter("price"), data_rows))
