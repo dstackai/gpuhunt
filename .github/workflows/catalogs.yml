@@ -226,6 +226,27 @@ jobs:
           path: runpod.csv
           retention-days: 1
 
+  catalog-cloudrift:
+    name: Collect CloudRift catalog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: |
+          pip install pip -U
+          pip install -e '.'
+      - name: Collect catalog
+        working-directory: src
+        run: python -m gpuhunt cloudrift --output ../cloudrift.csv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: catalogs-cloudrift
+          path: cloudrift.csv
+          retention-days: 1
+
   test-catalog:
     name: Test catalogs integrity
     needs:
@@ -237,6 +258,7 @@ jobs:
       - catalog-nebius
       - catalog-oci
       - catalog-runpod
+      - catalog-cloudrift
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

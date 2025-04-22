@@ -20,7 +20,17 @@ from gpuhunt.providers import AbstractProvider
 logger = logging.getLogger(__name__)
 version_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v2/version"
 catalog_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v2/{version}/catalog.zip"
-OFFLINE_PROVIDERS = ["aws", "azure", "datacrunch", "gcp", "lambdalabs", "nebius", "oci", "runpod"]
+OFFLINE_PROVIDERS = [
+    "aws",
+    "azure",
+    "datacrunch",
+    "gcp",
+    "lambdalabs",
+    "nebius",
+    "oci",
+    "runpod",
+    "cloudrift",
+]
 ONLINE_PROVIDERS = ["cudo", "tensordock", "vastai", "vultr"]
 RELOAD_INTERVAL = 15 * 60  # 15 minutes
 

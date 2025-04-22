@@ -13,6 +13,7 @@ def main():
         choices=[
             "aws",
             "azure",
+            "cloudrift",
             "cudo",
             "datacrunch",
             "gcp",
@@ -42,6 +43,10 @@ def main():
         from gpuhunt.providers.cudo import CudoProvider
 
         provider = CudoProvider()
+    elif args.provider == "cloudrift":
+        from gpuhunt.providers.cloudrift import CloudRiftProvider
+
+        provider = CloudRiftProvider()
     elif args.provider == "datacrunch":
         from gpuhunt.providers.datacrunch import DataCrunchProvider
 
