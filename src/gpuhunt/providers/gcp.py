@@ -446,7 +446,6 @@ def get_catalog_items(project_id: str) -> list[dict]:
         no_of_cores = int(no_of_cores)
         if tpu_version in ["v5litepod", "v5p", "v6e"]:
             # For TPU-v5 series, the API provides per chip price.
-            is_pod = True
             on_demand_base_price = find_base_price_v5(
                 tpu_version, location, tpu_prices, spot=False
             )
@@ -467,7 +466,6 @@ def get_catalog_items(project_id: str) -> list[dict]:
             # For TPU-v2 and TPU-v3, the pricing API provides the prices of 8 TPU cores.
             # For TPU-v4, the API provides the price of TPU-v4 pods.
             if no_of_cores > 8 or tpu_version == "v4":
-                is_pod = True
                 base_instance_name = f"{tpu_version}-8"
                 base_no_of_chips = find_no_of_chips(base_instance_name, configs)
                 on_demand_base_price = find_base_price(
@@ -489,16 +487,15 @@ def get_catalog_items(project_id: str) -> list[dict]:
                         tpu_version, no_of_cores, location, no_of_chips, True
                     )
             elif no_of_cores == 8:
-                is_pod = False
-                base_no_of_chips = no_of_chips
-                on_demand_base_price = find_base_price(
+                on_demand_price = find_base_price(
                     tpu_version, location, tpu_prices, spot=False, is_pod=False
                 )
-                on_demand_price = on_demand_base_price
-                spot_base_price = find_base_price(
+                spot_price = find_base_price(
                     tpu_version, location, tpu_prices, spot=True, is_pod=False
                 )
-                spot_price = spot_base_price
+            else:
+                logger.warning("Unknown TPU type %s", instance_name)
+                continue
         else:
             logger.warning("Unknown TPU version %s. Skipping offer.", tpu_version)
             continue
@@ -508,10 +505,6 @@ def get_catalog_items(project_id: str) -> list[dict]:
             logger.debug("Failed to find spot price for %s in %s", instance_name, location)
         config["price"] = on_demand_price
         config["spot"] = spot_price
-        config["is_pod"] = is_pod
-        config["base_price"] = on_demand_base_price
-        config["base_no_of_chips"] = base_no_of_chips
-        config["spot_base_price"] = spot_base_price
     return configs
 
 
@@ -621,7 +614,6 @@ def get_tpu_configs(project_id: str) -> list[dict]:
                     "instance_name": response.type_,
                     "location": location,
                     "no_of_chips": no_of_chips,
-                    "topology": response.accelerator_configs[0].topology,
                 }
             )
     return instances
