@@ -417,7 +417,8 @@ def max_none(*args: Optional[T]) -> T:
 
 GPU_MAP = {
     "RTX A5000": "A5000",
-    "RTX A6000" "V100": "V100",
+    "RTX A6000": "A6000",
+    "V100": "V100",
     "RTX 3080": "RTX3080",
     "A40 (compute mode)": "A40",
     "L40S (compute mode)": "L40S",
