@@ -8,9 +8,9 @@ def test_instance_types():
     # check some common instance types
     has_rtx49_8c_nr = False
     for instance in instance_types:
-        if instance.instance_name.startswith('rtx49-8c-nr'):
+        if instance.instance_name.startswith("rtx49-8c-nr"):
             has_rtx49_8c_nr = True
-            gpu_count = int(instance.instance_name.split('.')[1])
+            gpu_count = int(instance.instance_name.split(".")[1])
             assert instance.gpu_count == gpu_count
             assert instance.gpu_memory == 24
             assert instance.cpu == 8 * gpu_count
