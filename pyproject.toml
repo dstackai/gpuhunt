@@ -55,7 +55,7 @@ oci = [
 datacrunch = [
     "datacrunch"
 ]
-all = ["gpuhunt[aws,azure,datacrunch,cloudrift,gcp,maybe_nebius,oci]"]
+all = ["gpuhunt[aws,azure,datacrunch,gcp,maybe_nebius,oci]"]
 dev = [
     "pre-commit",
     "pytest~=7.0",

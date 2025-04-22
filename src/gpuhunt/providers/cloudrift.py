@@ -1,7 +1,7 @@
 import logging
+from typing import Optional, Union
 
 import requests
-from typing import Optional, Union
 
 from gpuhunt import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
@@ -26,7 +26,7 @@ class CloudRiftProvider(AbstractProvider):
 
     def _get_instance_types(self):
         request_data = {"selector": {"ByServiceAndLocation": {"services": ["vm"]}}}
-        response_data = _make_request(f"instance-types/list", request_data)
+        response_data = _make_request("instance-types/list", request_data)
         return response_data["instance_types"]
 
 
@@ -69,6 +69,7 @@ def _make_request(endpoint: str, request_data: dict) -> Union[dict, str, None]:
         "POST",
         f"{CLOUDRIFT_SERVER_ADDRESS}/api/v1/{endpoint}",
         json={"version": CLOUDRIFT_API_VERSION, "data": request_data},
+        timeout=5.0,
     )
     if not response.ok:
         response.raise_for_status()
