@@ -41,6 +41,17 @@ class AcceleratorVendor(str, enum.Enum):
         return cls(value.lower())
 
 
+class CPUArchitecture(str, enum.Enum):
+    X86 = "x86"  # x86-64 extension support implied
+    ARM = "arm"  # AArch64 (ARM64) execution state support implied
+
+    @classmethod
+    def cast(cls, value: Union["CPUArchitecture", str]) -> "CPUArchitecture":
+        if isinstance(value, CPUArchitecture):
+            return value
+        return cls(value.lower())
+
+
 @dataclass
 class RawCatalogItem:
     """
@@ -60,9 +71,14 @@ class RawCatalogItem:
     disk_size: Optional[float]
     gpu_vendor: Optional[str] = None
     flags: list[str] = field(default_factory=list)
+    cpu_arch: Optional[str] = None
 
     def __post_init__(self) -> None:
-        # This heuristic will be required indefinitely since we support historical catalogs.
+        # These heuristics will be required indefinitely since we support historical catalogs.
+        self._process_gpu_vendor()
+        self._process_cpu_arch()
+
+    def _process_gpu_vendor(self) -> None:
         is_tpu = False
         gpu_name = self.gpu_name
         if gpu_name and gpu_name.startswith("tpu-"):
@@ -80,12 +96,20 @@ class RawCatalogItem:
         elif isinstance(gpu_vendor, AcceleratorVendor):
             self.gpu_vendor = gpu_vendor.value
 
+    def _process_cpu_arch(self) -> None:
+        cpu_arch = self.cpu_arch
+        if cpu_arch is None:
+            self.cpu_arch = CPUArchitecture.X86.value
+        elif isinstance(cpu_arch, CPUArchitecture):
+            self.cpu_arch = cpu_arch.value
+
     @staticmethod
     def from_dict(v: dict) -> "RawCatalogItem":
         return RawCatalogItem(
             instance_name=empty_as_none(v.get("instance_name")),
             location=empty_as_none(v.get("location")),
             price=empty_as_none(v.get("price"), loader=float),
+            cpu_arch=empty_as_none(v.get("cpu_arch")),
             cpu=empty_as_none(v.get("cpu"), loader=int),
             memory=empty_as_none(v.get("memory"), loader=float),
             gpu_vendor=empty_as_none(v.get("gpu_vendor")),
@@ -112,8 +136,10 @@ class CatalogItem:
         instance_name: name of the instance
         location: region or zone
         price: $ per hour
+        cpu_arch: CPU instruction set architecture
         cpu: number of CPUs
         memory: amount of RAM in GB
+        gpu_vendor: GPU/accelerator vendor
         gpu_count: number of GPUs
         gpu_name: name of the GPU
         gpu_memory: amount of GPU VRAM in GB for each GPU
@@ -140,12 +166,16 @@ class CatalogItem:
     provider: str
     gpu_vendor: Optional[AcceleratorVendor] = None
     flags: list[str] = field(default_factory=list)
+    cpu_arch: Optional[CPUArchitecture] = None
 
     def __post_init__(self) -> None:
+        self._process_gpu_vendor()
+        self._process_cpu_arch()
+
+    def _process_gpu_vendor(self) -> None:
+        # This heuristic is only required until we update all providers to always set the vendor.
         gpu_vendor = self.gpu_vendor
         if gpu_vendor is None:
-            # This heuristic is only required until we update all providers to always set
-            # the vendor.
             if not self.gpu_count:
                 # None or 0
                 return
@@ -155,6 +185,14 @@ class CatalogItem:
             # This cast to the enum is always required since RawCatalogItem.gpu_vendor
             # is a string field (for (de)serialization purposes).
             self.gpu_vendor = AcceleratorVendor.cast(gpu_vendor)
+
+    def _process_cpu_arch(self) -> None:
+        # This heuristic is only required until we update all providers to always set the arch.
+        cpu_arch = self.cpu_arch
+        if cpu_arch is None:
+            self.cpu_arch = CPUArchitecture.X86
+        else:
+            self.cpu_arch = CPUArchitecture.cast(cpu_arch)
 
     @staticmethod
     def from_dict(v: dict, *, provider: Optional[str] = None) -> "CatalogItem":
@@ -166,6 +204,7 @@ class QueryFilter:
     """
     Attributes:
         provider: name of the provider to filter by. If not specified, all providers will be used
+        cpu_arch: CPU architecture. If not specified, all architectures will be used
         min_cpu: minimum number of CPUs
         max_cpu: maximum number of CPUs
         min_memory: minimum amount of RAM in GB
@@ -189,6 +228,7 @@ class QueryFilter:
     """
 
     provider: Optional[list[str]] = None  # strings can have mixed case
+    cpu_arch: Optional[CPUArchitecture] = None
     min_cpu: Optional[int] = None
     max_cpu: Optional[int] = None
     min_memory: Optional[float] = None

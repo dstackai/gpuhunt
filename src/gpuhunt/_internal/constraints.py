@@ -62,6 +62,8 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
         return False
     if q.spot is not None and i.spot != q.spot:
         return False
+    if q.cpu_arch and q.cpu_arch != i.cpu_arch:
+        return False
     if not is_between(i.cpu, q.min_cpu, q.max_cpu):
         return False
     if not is_between(i.memory, q.min_memory, q.max_memory):

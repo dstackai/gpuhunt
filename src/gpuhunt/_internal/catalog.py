@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 import gpuhunt._internal.constraints as constraints
-from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, CPUArchitecture, QueryFilter
 from gpuhunt._internal.utils import parse_compute_capability
 from gpuhunt.providers import AbstractProvider
 
@@ -42,6 +42,7 @@ class Catalog:
         self,
         *,
         provider: Optional[Union[str, list[str]]] = None,
+        cpu_arch: Optional[Union[CPUArchitecture, str]] = None,
         min_cpu: Optional[int] = None,
         max_cpu: Optional[int] = None,
         min_memory: Optional[float] = None,
@@ -68,12 +69,14 @@ class Catalog:
 
         Args:
             provider: name of the provider to filter by. If not specified, all providers will be used
+            cpu_arch: CPU architecture to filter by. If not specified, all architectures will be used
             min_cpu: minimum number of CPUs
             max_cpu: maximum number of CPUs
             min_memory: minimum amount of RAM in GB
             max_memory: maximum amount of RAM in GB
             min_gpu_count: minimum number of GPUs
             max_gpu_count: maximum number of GPUs
+            gpu_vendor: accelerator vendor to filter by. If not specified, all vendors will be used
             gpu_name: name of the GPU to filter by. If not specified, all GPUs will be used
             min_gpu_memory: minimum amount of GPU VRAM in GB for each GPU
             max_gpu_memory: maximum amount of GPU VRAM in GB for each GPU
@@ -98,6 +101,7 @@ class Catalog:
 
         query_filter = QueryFilter(
             provider=[provider] if isinstance(provider, str) else provider,
+            cpu_arch=CPUArchitecture.cast(cpu_arch) if cpu_arch else None,
             min_cpu=min_cpu,
             max_cpu=max_cpu,
             min_memory=min_memory,
