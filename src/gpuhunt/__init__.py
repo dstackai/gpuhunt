@@ -17,6 +17,7 @@ from gpuhunt._internal.models import (
     AcceleratorVendor,
     AMDGPUInfo,
     CatalogItem,
+    CPUArchitecture,
     IntelAcceleratorInfo,
     NvidiaGPUInfo,
     QueryFilter,

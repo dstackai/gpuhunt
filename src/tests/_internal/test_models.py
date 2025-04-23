@@ -7,6 +7,7 @@ from gpuhunt._internal.models import (
     AcceleratorVendor,
     AMDArchitecture,
     CatalogItem,
+    CPUArchitecture,
     Optional,
     RawCatalogItem,
 )
@@ -62,7 +63,7 @@ def test_catalog_item_gpu_vendor_heuristic(
     gpu_count: Optional[int],
     gpu_vendor: Union[AcceleratorVendor, str, None],
     gpu_name: Optional[str],
-    expected_gpu_vendor: Optional[str],
+    expected_gpu_vendor: Optional[AcceleratorVendor],
 ):
     item = CatalogItem(
         instance_name="test-instance",
@@ -80,6 +81,40 @@ def test_catalog_item_gpu_vendor_heuristic(
     )
 
     assert item.gpu_vendor == expected_gpu_vendor
+
+
+@pytest.mark.parametrize(
+    ["cpu_arch", "expected_cpu_arch"],
+    [
+        pytest.param(None, CPUArchitecture.X86, id="non-set"),
+        pytest.param(CPUArchitecture.X86, CPUArchitecture.X86, id="enum"),
+        pytest.param("ARM", CPUArchitecture.ARM, id="cast-string-to-enum"),
+    ],
+)
+def test_catalog_item_cpu_arch_heuristic(
+    cpu_arch: Union[CPUArchitecture, str, None],
+    expected_cpu_arch: CPUArchitecture,
+):
+    item = CatalogItem(
+        instance_name="test-instance",
+        location="eu-west-1",
+        price=1.0,
+        cpu_arch=cpu_arch,
+        cpu=1,
+        memory=32.0,
+        gpu_count=0,
+        gpu_name=None,
+        gpu_memory=8.0,
+        spot=False,
+        disk_size=100.0,
+        provider="test",
+    )
+
+    assert item.cpu_arch == expected_cpu_arch
+    if expected_cpu_arch == CPUArchitecture.ARM:
+        assert "arm" in item.flags
+    else:
+        assert "arm" not in item.flags
 
 
 @pytest.mark.parametrize(
@@ -110,6 +145,7 @@ def test_raw_catalog_item_to_from_dict() -> None:
         instance_name="test-instance",
         location="eu-west-1",
         price=1.0,
+        cpu_arch=CPUArchitecture.ARM,
         cpu=1,
         memory=32.0,
         gpu_vendor=AcceleratorVendor.NVIDIA,
@@ -125,6 +161,7 @@ def test_raw_catalog_item_to_from_dict() -> None:
         "instance_name": "test-instance",
         "location": "eu-west-1",
         "price": 1.0,
+        "cpu_arch": "arm",
         "cpu": 1,
         "memory": 32.0,
         "gpu_vendor": "nvidia",
@@ -133,6 +170,6 @@ def test_raw_catalog_item_to_from_dict() -> None:
         "gpu_memory": 24.0,
         "spot": False,
         "disk_size": 100.0,
-        "flags": "f1 f2 f3",
+        "flags": "f1 f2 f3 arm",
     }
     assert RawCatalogItem.from_dict(item_dict) == item
