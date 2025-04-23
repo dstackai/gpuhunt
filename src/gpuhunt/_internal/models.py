@@ -74,11 +74,12 @@ class RawCatalogItem:
     cpu_arch: Optional[str] = None
 
     def __post_init__(self) -> None:
-        # These heuristics will be required indefinitely since we support historical catalogs.
         self._process_gpu_vendor()
         self._process_cpu_arch()
+        self._process_flags()
 
     def _process_gpu_vendor(self) -> None:
+        # This heuristic will be required indefinitely since we support historical catalogs.
         is_tpu = False
         gpu_name = self.gpu_name
         if gpu_name and gpu_name.startswith("tpu-"):
@@ -97,11 +98,16 @@ class RawCatalogItem:
             self.gpu_vendor = gpu_vendor.value
 
     def _process_cpu_arch(self) -> None:
+        # This heuristic will be required indefinitely since we support historical catalogs.
         cpu_arch = self.cpu_arch
         if cpu_arch is None:
             self.cpu_arch = CPUArchitecture.X86.value
         elif isinstance(cpu_arch, CPUArchitecture):
             self.cpu_arch = cpu_arch.value
+
+    def _process_flags(self) -> None:
+        if self.cpu_arch == CPUArchitecture.ARM.value and "arm" not in self.flags:
+            self.flags.append("arm")
 
     @staticmethod
     def from_dict(v: dict) -> "RawCatalogItem":
@@ -171,6 +177,7 @@ class CatalogItem:
     def __post_init__(self) -> None:
         self._process_gpu_vendor()
         self._process_cpu_arch()
+        self._process_flags()
 
     def _process_gpu_vendor(self) -> None:
         # This heuristic is only required until we update all providers to always set the vendor.
@@ -193,6 +200,10 @@ class CatalogItem:
             self.cpu_arch = CPUArchitecture.X86
         else:
             self.cpu_arch = CPUArchitecture.cast(cpu_arch)
+
+    def _process_flags(self) -> None:
+        if self.cpu_arch == CPUArchitecture.ARM and "arm" not in self.flags:
+            self.flags.append("arm")
 
     @staticmethod
     def from_dict(v: dict, *, provider: Optional[str] = None) -> "CatalogItem":

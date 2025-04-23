@@ -111,6 +111,10 @@ def test_catalog_item_cpu_arch_heuristic(
     )
 
     assert item.cpu_arch == expected_cpu_arch
+    if expected_cpu_arch == CPUArchitecture.ARM:
+        assert "arm" in item.flags
+    else:
+        assert "arm" not in item.flags
 
 
 @pytest.mark.parametrize(
@@ -166,6 +170,6 @@ def test_raw_catalog_item_to_from_dict() -> None:
         "gpu_memory": 24.0,
         "spot": False,
         "disk_size": 100.0,
-        "flags": "f1 f2 f3",
+        "flags": "f1 f2 f3 arm",
     }
     assert RawCatalogItem.from_dict(item_dict) == item
