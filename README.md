@@ -21,12 +21,14 @@ print(*items, sep="\n")
 List of all available filters:
 
 * `provider`: name of the provider to filter by. If not specified, all providers will be used. One or many
+* `cpu_arch`: CPU architecture, one of: `x86`, `arm`
 * `min_cpu`: minimum number of CPUs
 * `max_cpu`: maximum number of CPUs
 * `min_memory`: minimum amount of RAM in GB
 * `max_memory`: maximum amount of RAM in GB
 * `min_gpu_count`: minimum number of GPUs
 * `max_gpu_count`: maximum number of GPUs
+* `gpu_vendor`: GPU/accelerator vendor, one of: `nvidia`, `amd`, `google`, `intel`
 * `gpu_name`: name of the GPU to filter by. If not specified, all GPUs will be used. One or many
 * `min_gpu_memory`: minimum amount of GPU VRAM in GB for each GPU
 * `max_gpu_memory`: maximum amount of GPU VRAM in GB for each GPU
