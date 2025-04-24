@@ -13,8 +13,6 @@ logger = logging.getLogger(__name__)
 
 API_URL = "https://api.vultr.com/v2"
 
-FLAG_ARM = "vultr-arm"
-
 
 class VultrProvider(AbstractProvider):
     NAME = "vultr"
@@ -64,7 +62,6 @@ def convert_response_to_raw_catalog_items(
 
 
 def get_bare_metal_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
-    flags: list[str] = []
     cpu_arch = CPUArchitecture.X86
     gpu_count, gpu_name, gpu_memory, gpu_vendor = 0, None, None, None
     if "gpu" in plan["id"]:
@@ -74,7 +71,6 @@ def get_bare_metal_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
         gpu_count, gpu_name, gpu_memory = BARE_METAL_GPU_DETAILS[plan["id"]]
         if is_nvidia_superchip(gpu_name):
             cpu_arch = CPUArchitecture.ARM
-            flags.append(FLAG_ARM)
         gpu_vendor = get_gpu_vendor(gpu_name)
         if gpu_vendor is None:
             logger.warning("Unknown GPU vendor for plan %s, skipping", plan["id"])
@@ -92,12 +88,10 @@ def get_bare_metal_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
         gpu_vendor=gpu_vendor,
         spot=False,
         disk_size=plan["disk"],
-        flags=flags,
     )
 
 
 def get_instance_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
-    flags: list[str] = []
     cpu_arch = CPUArchitecture.X86
     plan_type = plan["type"]
     if plan_type in ["vc2", "vhf", "vhp", "voc"]:
@@ -114,13 +108,11 @@ def get_instance_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
             gpu_vendor=None,
             spot=False,
             disk_size=plan["disk"],
-            flags=flags,
         )
     elif plan_type == "vcg":
         gpu_name = plan["gpu_type"].split("_")[1] if "_" in plan["gpu_type"] else None
         if gpu_name and is_nvidia_superchip(gpu_name):
             cpu_arch = CPUArchitecture.ARM
-            flags.append(FLAG_ARM)
         gpu_vendor = get_gpu_vendor(gpu_name)
         gpu_memory_total = cast(int, plan["gpu_vram_gb"])
         gpu_count = 0
@@ -140,7 +132,6 @@ def get_instance_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
             gpu_vendor=gpu_vendor,
             spot=False,
             disk_size=plan["disk"],
-            flags=flags,
         )
     return None
 
