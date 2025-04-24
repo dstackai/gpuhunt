@@ -1,19 +1,19 @@
 import logging
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import requests
 from requests import Response
 
 from gpuhunt import QueryFilter, RawCatalogItem
-from gpuhunt._internal.constraints import KNOWN_AMD_GPUS, KNOWN_NVIDIA_GPUS
-from gpuhunt._internal.models import AcceleratorVendor
+from gpuhunt._internal.constraints import KNOWN_AMD_GPUS, KNOWN_NVIDIA_GPUS, is_nvidia_superchip
+from gpuhunt._internal.models import AcceleratorVendor, CPUArchitecture
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
 
 API_URL = "https://api.vultr.com/v2"
 
-EXCLUSION_LIST = ["GH200"]
+FLAG_ARM = "vultr-arm"
 
 
 class VultrProvider(AbstractProvider):
@@ -26,7 +26,7 @@ class VultrProvider(AbstractProvider):
         return sorted(offers, key=lambda i: i.price)
 
 
-def fetch_offers() -> Optional[list[RawCatalogItem]]:
+def fetch_offers() -> list[RawCatalogItem]:
     """Fetch plans with types:
     1. Cloud GPU (vcg),
     2. Bare Metal (vbm),
@@ -64,14 +64,17 @@ def convert_response_to_raw_catalog_items(
 
 
 def get_bare_metal_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
+    flags: list[str] = []
+    cpu_arch = CPUArchitecture.X86
     gpu_count, gpu_name, gpu_memory, gpu_vendor = 0, None, None, None
     if "gpu" in plan["id"]:
         if plan["id"] not in BARE_METAL_GPU_DETAILS:
             logger.warning("Skipping unknown GPU plan %s", plan["id"])
             return None
         gpu_count, gpu_name, gpu_memory = BARE_METAL_GPU_DETAILS[plan["id"]]
-        if gpu_name in EXCLUSION_LIST:
-            return None
+        if is_nvidia_superchip(gpu_name):
+            cpu_arch = CPUArchitecture.ARM
+            flags.append(FLAG_ARM)
         gpu_vendor = get_gpu_vendor(gpu_name)
         if gpu_vendor is None:
             logger.warning("Unknown GPU vendor for plan %s, skipping", plan["id"])
@@ -80,6 +83,7 @@ def get_bare_metal_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
         instance_name=plan["id"],
         location=location,
         price=plan["hourly_cost"],
+        cpu_arch=cpu_arch.value,
         cpu=plan["cpu_threads"],
         memory=plan["ram"] / 1024,
         gpu_count=gpu_count,
@@ -88,16 +92,20 @@ def get_bare_metal_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
         gpu_vendor=gpu_vendor,
         spot=False,
         disk_size=plan["disk"],
+        flags=flags,
     )
 
 
 def get_instance_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
+    flags: list[str] = []
+    cpu_arch = CPUArchitecture.X86
     plan_type = plan["type"]
     if plan_type in ["vc2", "vhf", "vhp", "voc"]:
         return RawCatalogItem(
             instance_name=plan["id"],
             location=location,
             price=plan["hourly_cost"],
+            cpu_arch=cpu_arch.value,
             cpu=plan["vcpu_count"],
             memory=plan["ram"] / 1024,
             gpu_count=0,
@@ -106,34 +114,38 @@ def get_instance_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
             gpu_vendor=None,
             spot=False,
             disk_size=plan["disk"],
+            flags=flags,
         )
     elif plan_type == "vcg":
         gpu_name = plan["gpu_type"].split("_")[1] if "_" in plan["gpu_type"] else None
-        if gpu_name in EXCLUSION_LIST:
-            logger.info(f"Excluding plan with GPU {gpu_name} as it is not supported.")
-            return None
+        if gpu_name and is_nvidia_superchip(gpu_name):
+            cpu_arch = CPUArchitecture.ARM
+            flags.append(FLAG_ARM)
         gpu_vendor = get_gpu_vendor(gpu_name)
-        gpu_memory_gb = plan["gpu_vram_gb"]
-        gpu_count = (
-            max(1, gpu_memory_gb // get_gpu_memory(gpu_name)) if gpu_name else 0
-        )  # For fractional GPU,
-        # gpu_count=1
+        gpu_memory_total = cast(int, plan["gpu_vram_gb"])
+        gpu_count = 0
+        if gpu_name and (gpu_memory := get_gpu_memory(gpu_name)):
+            # For fractional GPU, gpu_count=1
+            gpu_count = max(1, gpu_memory_total // gpu_memory)
         return RawCatalogItem(
             instance_name=plan["id"],
             location=location,
             price=plan["hourly_cost"],
+            cpu_arch=cpu_arch.value,
             cpu=plan["vcpu_count"],
             memory=plan["ram"] / 1024,
             gpu_count=gpu_count,
             gpu_name=gpu_name,
-            gpu_memory=gpu_memory_gb / gpu_count,
+            gpu_memory=gpu_memory_total / gpu_count if gpu_count > 0 else None,
             gpu_vendor=gpu_vendor,
             spot=False,
             disk_size=plan["disk"],
+            flags=flags,
         )
+    return None
 
 
-def get_gpu_memory(gpu_name: str) -> float:
+def get_gpu_memory(gpu_name: str) -> Optional[int]:
     if gpu_name.upper() == "A100":
         return 80  # VULTR A100 instances have 80GB
     for gpu in KNOWN_NVIDIA_GPUS:
@@ -144,6 +156,7 @@ def get_gpu_memory(gpu_name: str) -> float:
         if gpu.name.upper() == gpu_name.upper():
             return gpu.memory
     logger.warning(f"Unknown GPU {gpu_name}")
+    return None
 
 
 def get_gpu_vendor(gpu_name: Optional[str]) -> Optional[str]:

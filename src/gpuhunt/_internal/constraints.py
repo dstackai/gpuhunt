@@ -1,3 +1,4 @@
+import re
 from typing import Optional, TypeVar, Union
 
 from gpuhunt._internal.models import (
@@ -13,15 +14,6 @@ from gpuhunt._internal.models import (
 
 # v5litepod = v5e
 _TPU_VERSIONS = ["v2", "v3", "v4", "v5p", "v5litepod", "v6e"]
-
-
-def _is_tpu(name: str) -> bool:
-    parts = name.split("-")
-    if len(parts) == 2:
-        version, cores = parts
-        if version in _TPU_VERSIONS and cores.isdigit():
-            return True
-    return False
 
 
 Comparable = TypeVar("Comparable", bound=Union[int, float, tuple[int, int]])
@@ -130,6 +122,16 @@ def correct_gpu_memory_gib(gpu_name: str, memory_mib: float) -> int:
     return round(memory_gib)
 
 
+def is_nvidia_superchip(gpu_name: str) -> bool:
+    """
+    Check if the given NVIDIA GPU is actually a so-called "superchip" combining GPU with ARM CPU,
+    such as:
+    * GH200 (Grace + Hopper)
+    * GB10, GB200 (Grace + Blackwell)
+    """
+    return re.match(r"^g[bh]\d+", gpu_name.lower()) is not None
+
+
 KNOWN_NVIDIA_GPUS: list[NvidiaGPUInfo] = [
     NvidiaGPUInfo(name="A10", memory=24, compute_capability=(8, 6)),
     NvidiaGPUInfo(name="A16", memory=16, compute_capability=(8, 6)),
@@ -162,6 +164,7 @@ KNOWN_NVIDIA_GPUS: list[NvidiaGPUInfo] = [
     NvidiaGPUInfo(name="T4", memory=16, compute_capability=(7, 5)),
     NvidiaGPUInfo(name="V100", memory=16, compute_capability=(7, 0)),
     NvidiaGPUInfo(name="V100", memory=32, compute_capability=(7, 0)),
+    NvidiaGPUInfo(name="GH200", memory=96, compute_capability=(9, 0)),
 ]
 
 KNOWN_AMD_GPUS: list[AMDGPUInfo] = [

@@ -5,13 +5,20 @@ from typing import Optional
 
 from requests import Session
 
-from gpuhunt._internal.models import QueryFilter, RawCatalogItem
+from gpuhunt._internal.constraints import is_nvidia_superchip
+from gpuhunt._internal.models import (
+    CPUArchitecture,
+    QueryFilter,
+    RawCatalogItem,
+)
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
 INSTANCE_TYPES_URL = "https://cloud.lambdalabs.com/api/v1/instance-types"
 IMAGES_URL = "https://cloud.lambdalabs.com/api/v1/images"
 TIMEOUT = 10
+
+FLAG_ARM = "lambda-arm"
 
 
 class LambdaLabsProvider(AbstractProvider):
@@ -37,11 +44,15 @@ class LambdaLabsProvider(AbstractProvider):
                 logger.warning("Can't parse GPU info from description: %s", description)
                 continue
             gpu_count, gpu_name, gpu_memory = result
-            if re.match(r"^g[bh]\d+", gpu_name.lower()):  # NVIDIA Grace CPU (ARM)
-                continue
+            flags: list[str] = []
+            cpu_arch = CPUArchitecture.X86
+            if is_nvidia_superchip(gpu_name):
+                cpu_arch = CPUArchitecture.ARM
+                flags.append(FLAG_ARM)
             offer = RawCatalogItem(
                 instance_name=instance["name"],
                 price=instance["price_cents_per_hour"] / 100,
+                cpu_arch=cpu_arch.value,
                 cpu=instance["specs"]["vcpus"],
                 memory=float(instance["specs"]["memory_gib"]) * 1.074,
                 gpu_vendor=None,
@@ -51,6 +62,7 @@ class LambdaLabsProvider(AbstractProvider):
                 spot=False,
                 location=None,
                 disk_size=float(instance["specs"]["storage_gib"]) * 1.074,
+                flags=flags,
             )
             offers.append(offer)
         offers = self.add_regions(offers)
