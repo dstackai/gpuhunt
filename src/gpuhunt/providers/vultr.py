@@ -110,15 +110,33 @@ def get_instance_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
             disk_size=plan["disk"],
         )
     elif plan_type == "vcg":
-        gpu_name = plan["gpu_type"].split("_")[1] if "_" in plan["gpu_type"] else None
-        if gpu_name and is_nvidia_superchip(gpu_name):
-            cpu_arch = CPUArchitecture.ARM
+        gpu_type = cast(Optional[str], plan.get("gpu_type"))
+        if not gpu_type:
+            logger.warning("Missing gpu_type for plan %s, skipping", plan["id"])
+            return None
+        if "_" not in gpu_type:
+            logger.warning(
+                "Failed to parse gpu_type %s for plan %s, skipping", gpu_type, plan["id"]
+            )
+            return None
+        gpu_name = gpu_type.split("_")[1]
         gpu_vendor = get_gpu_vendor(gpu_name)
+        if not gpu_vendor:
+            logger.warning(
+                "Failed to detect GPU vendor %s for plan %s, skipping", gpu_type, plan["id"]
+            )
+            return None
+        gpu_memory = get_gpu_memory(gpu_name)
+        if not gpu_memory:
+            logger.warning(
+                "Failed to detect GPU memory %s for plan %s, skipping", gpu_type, plan["id"]
+            )
+            return None
         gpu_memory_total = cast(int, plan["gpu_vram_gb"])
-        gpu_count = 0
-        if gpu_name and (gpu_memory := get_gpu_memory(gpu_name)):
-            # For fractional GPU, gpu_count=1
-            gpu_count = max(1, gpu_memory_total // gpu_memory)
+        # For fractional GPU, gpu_count=1
+        gpu_count = max(1, gpu_memory_total // gpu_memory)
+        if is_nvidia_superchip(gpu_name):
+            cpu_arch = CPUArchitecture.ARM
         return RawCatalogItem(
             instance_name=plan["id"],
             location=location,
@@ -128,7 +146,7 @@ def get_instance_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
             memory=plan["ram"] / 1024,
             gpu_count=gpu_count,
             gpu_name=gpu_name,
-            gpu_memory=gpu_memory_total / gpu_count if gpu_count > 0 else None,
+            gpu_memory=gpu_memory_total / gpu_count,
             gpu_vendor=gpu_vendor,
             spot=False,
             disk_size=plan["disk"],
