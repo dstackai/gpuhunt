@@ -1,5 +1,6 @@
 import copy
 import logging
+import re
 from collections import defaultdict
 from typing import Any, Literal, Optional, Union
 
@@ -93,7 +94,16 @@ class VastAIProvider(AbstractProvider):
             filters["num_gpus"]["gte"] = q.min_gpu_count
         if q.max_gpu_count is not None:
             filters["num_gpus"]["lte"] = q.max_gpu_count
-        # We cannot reliably filter by GPU memory, because it is not the same for a specific GPU model
+        if q.gpu_name:
+            vastai_gpu_names = []
+            for g in q.gpu_name:
+                vastai_gpu_names.extend(get_vastai_gpu_names(g))
+            filters["gpu_name"]["in"] = vastai_gpu_names
+        # See correct_gpu_memory_gib in gpuhunt/_internal/constraints.py
+        if q.min_gpu_memory is not None:
+            filters["gpu_ram"]["gte"] = q.min_gpu_memory * 1024 * 0.93
+        if q.max_gpu_memory is not None:
+            filters["gpu_ram"]["lte"] = q.max_gpu_memory * 1024 * 1.07
         if q.min_disk_size is not None:
             filters["disk_space"]["gte"] = q.min_disk_size
         if q.max_disk_size is not None:
@@ -126,6 +136,17 @@ class VastAIProvider(AbstractProvider):
                 if op == "gt" and offer[key] <= value:
                     return False
         return True
+
+
+def get_vastai_gpu_names(gpu_name: str) -> list[str]:
+    gpu_name = re.sub(r"^RTX(\d)", r"RTX \1", gpu_name)  # RTX4090 -> RTX 4090
+    if gpu_name == "A100":
+        return ["A100 PCIE", "A100 SXM4"]
+    if gpu_name == "H100":
+        return ["H100 SXM"]
+    gpu_name = re.sub(r"^RTX(\d{4})", r"RTX \1", gpu_name)  # A5000 -> RTX A5000
+    gpu_name = re.sub(r"NVL$", " NVL", gpu_name)  # H100NVL -> H100 NVL
+    return [gpu_name]
 
 
 def get_gpu_name(gpu_name: str) -> str:
