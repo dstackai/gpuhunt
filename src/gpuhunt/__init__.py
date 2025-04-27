@@ -8,6 +8,7 @@ from gpuhunt._internal.constraints import (
     KNOWN_INTEL_ACCELERATORS,
     KNOWN_NVIDIA_GPUS,
     KNOWN_TPUS,
+    KNOWN_TT_ACCELERATORS,
     correct_gpu_memory_gib,
     matches,
 )
