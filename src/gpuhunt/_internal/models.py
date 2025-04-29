@@ -299,5 +299,5 @@ class IntelAcceleratorInfo(AcceleratorInfo):
 
 
 @dataclass
-class TTAcceleratorInfo(AcceleratorInfo):
+class TenstorrentAcceleratorInfo(AcceleratorInfo):
     vendor = AcceleratorVendor.TENSTORRENT

@@ -9,8 +9,8 @@ from gpuhunt._internal.models import (
     IntelAcceleratorInfo,
     NvidiaGPUInfo,
     QueryFilter,
+    TenstorrentAcceleratorInfo,
     TPUInfo,
-    TTAcceleratorInfo,
 )
 
 # v5litepod = v5e
@@ -187,17 +187,17 @@ KNOWN_INTEL_ACCELERATORS: list[IntelAcceleratorInfo] = [
     IntelAcceleratorInfo(name="Gaudi3", memory=128),
 ]
 
-KNOWN_TT_ACCELERATORS: list[TTAcceleratorInfo] = [
-    TTAcceleratorInfo(name="n150", memory=12),
-    TTAcceleratorInfo(name="n300", memory=24),
+KNOWN_TENSTORRENT_ACCELERATORS: list[TenstorrentAcceleratorInfo] = [
+    TenstorrentAcceleratorInfo(name="n150", memory=12),
+    TenstorrentAcceleratorInfo(name="n300", memory=24),
 ]
 
 KNOWN_ACCELERATORS: list[
-    Union[NvidiaGPUInfo, AMDGPUInfo, TPUInfo, IntelAcceleratorInfo, TTAcceleratorInfo]
+    Union[NvidiaGPUInfo, AMDGPUInfo, TPUInfo, IntelAcceleratorInfo, TenstorrentAcceleratorInfo]
 ] = (
     KNOWN_NVIDIA_GPUS
     + KNOWN_AMD_GPUS
     + KNOWN_TPUS
     + KNOWN_INTEL_ACCELERATORS
-    + KNOWN_TT_ACCELERATORS
+    + KNOWN_TENSTORRENT_ACCELERATORS
 )
