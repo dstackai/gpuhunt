@@ -7,6 +7,7 @@ from gpuhunt._internal.constraints import (
     KNOWN_AMD_GPUS,
     KNOWN_INTEL_ACCELERATORS,
     KNOWN_NVIDIA_GPUS,
+    KNOWN_TENSTORRENT_ACCELERATORS,
     KNOWN_TPUS,
     correct_gpu_memory_gib,
     is_nvidia_superchip,
@@ -23,6 +24,7 @@ from gpuhunt._internal.models import (
     NvidiaGPUInfo,
     QueryFilter,
     RawCatalogItem,
+    TenstorrentAcceleratorInfo,
     TPUInfo,
 )
 

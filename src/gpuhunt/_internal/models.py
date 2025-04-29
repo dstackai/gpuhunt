@@ -33,6 +33,7 @@ class AcceleratorVendor(str, enum.Enum):
     AMD = "amd"
     GOOGLE = "google"
     INTEL = "intel"
+    TENSTORRENT = "tenstorrent"
 
     @classmethod
     def cast(cls, value: Union["AcceleratorVendor", str]) -> "AcceleratorVendor":
@@ -295,3 +296,8 @@ class TPUInfo(AcceleratorInfo):
 @dataclass
 class IntelAcceleratorInfo(AcceleratorInfo):
     vendor = AcceleratorVendor.INTEL
+
+
+@dataclass
+class TenstorrentAcceleratorInfo(AcceleratorInfo):
+    vendor = AcceleratorVendor.TENSTORRENT
