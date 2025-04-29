@@ -9,6 +9,7 @@ from gpuhunt._internal.constraints import (
     KNOWN_NVIDIA_GPUS,
     KNOWN_TPUS,
     correct_gpu_memory_gib,
+    is_nvidia_superchip,
     matches,
 )
 from gpuhunt._internal.default import default_catalog, query
