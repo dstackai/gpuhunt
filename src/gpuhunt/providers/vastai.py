@@ -304,11 +304,11 @@ def get_vastai_gpu_names(gpu_name: str) -> list[str]:
 
     Examples:
         >>> get_vastai_gpu_names("RTX4090")
-        ["RTX 4090"]
+        ['RTX 4090']
         >>> get_vastai_gpu_names("A100")
-        ["A100 PCIE", "A100 SXM4"]
+        ['A100 PCIE', 'A100 SXM4']
         >>> get_vastai_gpu_names("P100")
-        ["Tesla P100"]
+        ['Tesla P100']
         >>> get_vastai_gpu_names("UnknownGPU")
         []
     """
