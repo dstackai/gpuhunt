@@ -201,9 +201,6 @@ class VastAIProvider(AbstractProvider):
                 logger.warning("Offer %s does not satisfy filters", offer["id"])
                 continue
             gpu_name = get_dstack_gpu_name(offer["gpu_name"])
-            if gpu_mapping_failed and gpu_name not in query_filter.gpu_name:
-                # If GPU name mapping failed, filter the offer locally.
-                continue
             gpu_memory = correct_gpu_memory_gib(gpu_name, offer["gpu_ram"])
             ondemand_offer = RawCatalogItem(
                 instance_name=str(offer["id"]),
@@ -291,26 +288,8 @@ class VastAIProvider(AbstractProvider):
 
 
 def get_vastai_gpu_names(gpu_name: str) -> list[str]:
-    """Convert a GPU name to its VastAI equivalent(s) using predefined mapping rules.
-
-    This function applies a series of mapping rules to transform GPU names into the format
-    expected by the VastAI API. It supports various GPU naming conventions and formats.
-
-    Args:
-        gpu_name: The GPU name to convert (e.g., "RTX4090", "A100", "P100")
-
-    Returns:
-        A list of VastAI-compatible GPU names. Returns an empty list if no matching rule is found.
-
-    Examples:
-        >>> get_vastai_gpu_names("RTX4090")
-        ['RTX 4090']
-        >>> get_vastai_gpu_names("A100")
-        ['A100 PCIE', 'A100 SXM4']
-        >>> get_vastai_gpu_names("P100")
-        ['Tesla P100']
-        >>> get_vastai_gpu_names("UnknownGPU")
-        []
+    """
+    Convert a GPU name to its VastAI equivalent(s) using predefined mapping rules.
     """
     for rule in GPU_MAPPING_RULES:
         if rule.matches(gpu_name):
@@ -319,20 +298,8 @@ def get_vastai_gpu_names(gpu_name: str) -> list[str]:
 
 
 def get_dstack_gpu_name(gpu_name: str) -> str:
-    """Convert VastAI GPU names to a standardized format using essential heuristics.
-
-    The mapping follows these rules:
-    1. Remove 'RTX A' prefix (e.g., 'RTX A5000' -> 'A5000')
-    2. Remove 'Tesla ' prefix (e.g., 'Tesla P100' -> 'P100')
-    3. For A100, strip any suffix (e.g., 'A100 PCIE' -> 'A100')
-    4. For H100, strip suffix unless it's NVL variant
-    5. Remove all spaces from the final name
-
-    Args:
-        gpu_name: The GPU name from VastAI to standardize
-
-    Returns:
-        Standardized GPU name with consistent formatting
+    """
+    Convert VastAI GPU names to a standardized format using essential heuristics
     """
     gpu_name = gpu_name.replace("RTX A", "A").replace("Tesla ", "")
     if gpu_name.startswith("A100 "):
