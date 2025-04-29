@@ -14,6 +14,9 @@ from gpuhunt.providers import AbstractProvider
 logger = logging.getLogger(__name__)
 bundles_url = "https://console.vast.ai/api/v0/bundles/"
 kilo = 1000
+# Maximum number of offers to fetch when GPU name mapping fails.
+# Note: Otherwise, Vast.ai API returns 64 offers by default.
+MAX_OFFERS_LIMIT = 3000
 Operators = Literal["lt", "lte", "eq", "gte", "gt"]
 FilterValue = Union[int, float, str, bool]
 
@@ -178,7 +181,7 @@ class VastAIProvider(AbstractProvider):
             # If GPU name mapping fails, fetch all offers and filter locally.
             # This is less efficient but necessary for unmapped GPUs.
             # See test_real_world_vastai_offers for unmapped GPU names.
-            filters["limit"] = 3000
+            filters["limit"] = MAX_OFFERS_LIMIT
         resp = requests.post(bundles_url, json=filters, timeout=10)
         resp.raise_for_status()
         data = resp.json()

@@ -2,8 +2,7 @@ import warnings
 
 import requests
 
-from gpuhunt._internal.models import QueryFilter
-from gpuhunt.providers.vastai import VastAIProvider, get_dstack_gpu_name, get_vastai_gpu_names
+from gpuhunt.providers.vastai import get_dstack_gpu_name, get_vastai_gpu_names
 
 
 def test_real_world_vastai_offers():
@@ -40,15 +39,3 @@ def test_real_world_vastai_offers():
         for gpu_name in sorted(conversion_issues):
             warning_msg += f"- {gpu_name}\n"
         warnings.warn(warning_msg)
-
-
-def test_gpu_filtering():
-    """This test is used to debug GPU name mapping issues. Do not commit it."""
-    # Create a provider instance
-    provider = VastAIProvider()
-
-    # Create a query
-    query_filter = QueryFilter(gpu_name=["QuadroK2200"], min_gpu_count=1)
-
-    # Get offers
-    print(provider.get(query_filter))
