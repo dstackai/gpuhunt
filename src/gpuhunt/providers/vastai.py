@@ -1,7 +1,6 @@
 import copy
 import logging
 import re
-from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Any, Literal, Optional, Union
 
@@ -15,148 +14,8 @@ logger = logging.getLogger(__name__)
 bundles_url = "https://console.vast.ai/api/v0/bundles/"
 kilo = 1000
 # Maximum number of offers to fetch when GPU name mapping fails.
-# Note: Otherwise, Vast.ai API returns 64 offers by default.
-MAX_OFFERS_LIMIT = 3000
 Operators = Literal["lt", "lte", "eq", "gte", "gt"]
 FilterValue = Union[int, float, str, bool]
-
-
-class GPUMappingRule(ABC):
-    """Abstract base class for GPU name mapping rules."""
-
-    @abstractmethod
-    def matches(self, gpu_name: str) -> bool:
-        pass
-
-    @abstractmethod
-    def map(self, gpu_name: str) -> list[str]:
-        pass
-
-
-class SameGPUMappingRule(GPUMappingRule):
-    """Maps GPU names that are used as-is in VastAI.
-    Examples:
-        L40S -> L40S
-        A10 -> A10
-    """
-
-    SAME_GPU_NAMES = ["L40S", "L40", "A10", "A40", "L4", "A100X", "H200"]
-
-    def __init__(self):
-        self.gpu_names = self.SAME_GPU_NAMES
-
-    def matches(self, gpu_name: str) -> bool:
-        return gpu_name in self.gpu_names
-
-    def map(self, gpu_name: str) -> list[str]:
-        return [gpu_name]
-
-
-class DirectGPUMappingRule(GPUMappingRule):
-    """Maps GPU names to their specific VastAI equivalents.
-    Examples:
-        P100 -> Tesla P100
-        A100 -> [A100 PCIE, A100 SXM4]
-    """
-
-    DIRECT_MAPPING = {
-        "H200NVL": ["H200 NVL"],
-        "P100": ["Tesla P100"],
-        "T4": ["Tesla T4"],
-        "P4": ["Tesla P4"],
-        "P40": ["Tesla P40"],
-        "V100": ["Tesla V100"],
-        "A100": ["A100 PCIE", "A100 SXM4"],
-        "A800PCIE": ["A800 PCIE"],
-        "H100": ["H100 PCIE", "H100 SXM"],
-        "H100NVL": ["H100 NVL"],
-    }
-
-    def __init__(self):
-        self.mapping = self.DIRECT_MAPPING
-
-    def matches(self, gpu_name: str) -> bool:
-        return gpu_name in self.mapping
-
-    def map(self, gpu_name: str) -> list[str]:
-        return self.mapping[gpu_name]
-
-
-class RTXNumberMappingRule(GPUMappingRule):
-    """Maps RTX GPUs with numbers by adding a space.
-    Examples:
-        RTX4090 -> RTX 4090
-        RTX4090S -> RTX 4090S
-    """
-
-    def matches(self, gpu_name: str) -> bool:
-        return bool(re.match(r"^RTX\d{4}\D?$", gpu_name))
-
-    def map(self, gpu_name: str) -> list[str]:
-        return [re.sub(r"^RTX(\d{4}\D?)$", r"RTX \1", gpu_name)]
-
-
-class QRTXNumberMappingRule(GPUMappingRule):
-    """Maps QRTX GPUs by adding spaces.
-    Examples:
-        QRTX8000 -> Q RTX 8000
-    """
-
-    def matches(self, gpu_name: str) -> bool:
-        return bool(re.match(r"^QRTX\d{4}$", gpu_name))
-
-    def map(self, gpu_name: str) -> list[str]:
-        return [re.sub(r"^QRTX(\d{4})$", r"Q RTX \1", gpu_name)]
-
-
-class RTXAdaMappingRule(GPUMappingRule):
-    """Maps RTX Ada GPUs by adding a space.
-    Examples:
-        RTX4090Ada -> RTX 4090Ada
-    """
-
-    def matches(self, gpu_name: str) -> bool:
-        return bool(re.match(r"^RTX\d{4}Ada$", gpu_name))
-
-    def map(self, gpu_name: str) -> list[str]:
-        return [re.sub(r"^RTX(\d{4})Ada$", r"RTX \1Ada", gpu_name)]
-
-
-class RTXTiMappingRule(GPUMappingRule):
-    """Maps RTX Ti GPUs by adding spaces.
-    Examples:
-        RTX4090Ti -> RTX 4090 Ti
-    """
-
-    def matches(self, gpu_name: str) -> bool:
-        return bool(re.match(r"^RTX\d{4}\D?Ti$", gpu_name))
-
-    def map(self, gpu_name: str) -> list[str]:
-        return [re.sub(r"^RTX(\d{4}\D?)Ti$", r"RTX \1 Ti", gpu_name)]
-
-
-class ANumberMappingRule(GPUMappingRule):
-    """Maps A-series GPUs to RTX A-series.
-    Examples:
-        A5000 -> RTX A5000
-    """
-
-    def matches(self, gpu_name: str) -> bool:
-        return bool(re.match(r"^A\d{4}", gpu_name))
-
-    def map(self, gpu_name: str) -> list[str]:
-        return [re.sub(r"^A(\d{4})", r"RTX A\1", gpu_name)]
-
-
-GPU_MAPPING_RULES = [
-    SameGPUMappingRule(),
-    DirectGPUMappingRule(),
-    RTXNumberMappingRule(),
-    QRTXNumberMappingRule(),
-    RTXAdaMappingRule(),
-    RTXTiMappingRule(),
-    ANumberMappingRule(),
-]
 
 
 class VastAIProvider(AbstractProvider):
@@ -173,15 +32,6 @@ class VastAIProvider(AbstractProvider):
             for key, constraints in self.extra_filters.items():
                 for op, value in constraints.items():
                     filters[key][op] = value
-        filters["rentable"]["eq"] = True
-        filters["rented"]["eq"] = False
-        filters["order"] = [["score", "desc"]]
-        gpu_mapping_failed = query_filter.gpu_name and not filters.get("gpu_name", {}).get("in")
-        if gpu_mapping_failed:
-            # If GPU name mapping fails, fetch all offers and filter locally.
-            # This is less efficient but necessary for unmapped GPUs.
-            # See test_real_world_vastai_offers for unmapped GPU names.
-            filters["limit"] = MAX_OFFERS_LIMIT
         resp = requests.post(bundles_url, json=filters, timeout=10)
         resp.raise_for_status()
         data = resp.json()
@@ -221,10 +71,11 @@ class VastAIProvider(AbstractProvider):
             )
             instance_offers.append(ondemand_offer)
 
-            spot_offer = copy.deepcopy(ondemand_offer)
-            spot_offer.price = round(offer["min_bid"], 5)
-            spot_offer.spot = True
-            instance_offers.append(spot_offer)
+            if offer.get("min_bid"):
+                spot_offer = copy.deepcopy(ondemand_offer)
+                spot_offer.price = round(offer["min_bid"], 5)
+                spot_offer.spot = True
+                instance_offers.append(spot_offer)
         return instance_offers
 
     @staticmethod
@@ -248,6 +99,9 @@ class VastAIProvider(AbstractProvider):
                 vastai_gpu_names.extend(get_vastai_gpu_names(g))
             if vastai_gpu_names:
                 filters["gpu_name"]["in"] = vastai_gpu_names
+            else:
+                # If GPU name mapping fails, fetch all offers (to filter locally)
+                filters["limit"] = 3000
         # See correct_gpu_memory_gib in gpuhunt/_internal/constraints.py
         if q.min_gpu_memory is not None:
             filters["gpu_ram"]["gte"] = q.min_gpu_memory * 1024 * 0.93
@@ -266,6 +120,9 @@ class VastAIProvider(AbstractProvider):
             filters["compute_capability"]["gte"] = compute_cap(q.min_compute_capability)
         if q.max_compute_capability is not None:
             filters["compute_capability"]["lte"] = compute_cap(q.max_compute_capability)
+        filters["rentable"]["eq"] = True
+        filters["rented"]["eq"] = False
+        filters["order"] = [["score", "desc"]]
         return filters
 
     @staticmethod
@@ -287,13 +144,41 @@ class VastAIProvider(AbstractProvider):
         return True
 
 
+GPU_MAPPING = {
+    "L40S": ["L40S"],
+    "L40": ["L40"],
+    "A10": ["A10"],
+    "A40": ["A40"],
+    "L4": ["L4"],
+    "A100X": ["A100X"],
+    "H200": ["H200"],
+    "H200NVL": ["H200 NVL"],
+    "P100": ["Tesla P100"],
+    "T4": ["Tesla T4"],
+    "P4": ["Tesla P4"],
+    "P40": ["Tesla P40"],
+    "V100": ["Tesla V100"],
+    "A100": ["A100 PCIE", "A100 SXM4"],
+    "A800PCIE": ["A800 PCIE"],
+    "H100": ["H100 PCIE", "H100 SXM"],
+    "H100NVL": ["H100 NVL"],
+}
+
+GPU_MAPPING_RULES = {
+    r"^RTX(\d{4}\D?)$": r"RTX \1",  # RTX4090 -> RTX 4090, RTX4090S -> RTX 4090S
+    r"^QRTX(\d{4})$": r"Q RTX \1",  # QRTX8000 -> Q RTX 8000
+    r"^RTX(\d{4})Ada$": r"RTX \1Ada",  # RTX4090Ada -> RTX 4090Ada
+    r"^RTX(\d{4}\D?)Ti$": r"RTX \1 Ti",  # RTX4090Ti -> RTX 4090 Ti
+    r"^A(\d{4})": r"RTX A\1",  # A5000 -> RTX A5000
+}
+
+
 def get_vastai_gpu_names(gpu_name: str) -> list[str]:
-    """
-    Convert a GPU name to its VastAI equivalent(s) using predefined mapping rules.
-    """
-    for rule in GPU_MAPPING_RULES:
-        if rule.matches(gpu_name):
-            return rule.map(gpu_name)
+    if gpu_name in GPU_MAPPING:
+        return GPU_MAPPING[gpu_name]
+    for pattern, replacement in GPU_MAPPING_RULES.items():
+        if re.match(pattern, gpu_name):
+            return [re.sub(pattern, replacement, gpu_name)]
     return []
 
 
