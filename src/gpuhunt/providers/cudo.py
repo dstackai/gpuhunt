@@ -65,7 +65,7 @@ class CudoProvider(AbstractProvider):
     def list_vm_machine_types() -> dict:
         resp = requests.request(
             method="GET",
-            url=f"{API_URL}/vms/machine-types-2",
+            url=f"{API_URL}/vms/machine-types",
             timeout=10,
         )
         if resp.ok:
