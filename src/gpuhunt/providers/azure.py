@@ -214,9 +214,9 @@ class AzureProvider(AbstractProvider):
     @classmethod
     def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
         vm_series = [
-            VMSeries(r"D(\d+)s_v3", None, None),  # Dsv3-series
-            VMSeries(r"E(\d+)i?s_v4", None, None),  # Esv4-series
-            VMSeries(r"E(\d+)-(\d+)s_v4", None, None),  # Esv4-series (constrained vCPU)
+            VMSeries(r"D(\d+)s_v6", None, None),  # Dsv6-series
+            VMSeries(r"E(\d+)i?s_v6", None, None),  # Esv6-series
+            VMSeries(r"F(\d+)s_v2", None, None),  # Fsv2-series
             VMSeries(r"NC(\d+)s_v3", "V100", 16 * 1024),  # NCv3-series [V100 16GB]
             VMSeries(r"NC(\d+)as_T4_v3", "T4", 16 * 1024),  # NCasT4_v3-series [T4]
             VMSeries(r"ND(\d+)rs_v2", "V100", 32 * 1024),  # NDv2-series [8xV100 32GB]
@@ -226,6 +226,16 @@ class AzureProvider(AbstractProvider):
             VMSeries(
                 r"ND(\d+)amsr_A100_v4", "A100", 80 * 1024
             ),  # NDm A100 v4-series [8xA100 80GB]
+            # The deprecated series are collected for older dstack versions
+            VMSeries(
+                r"D(\d+)s_v3", None, None
+            ),  # Dsv3-series (deprecated in favor of Dsv6-series, dstack <= 0.19.9)
+            VMSeries(
+                r"E(\d+)i?s_v4", None, None
+            ),  # Esv4-series (deprecated in favor of Esv6-series, dstack <= 0.19.9)
+            VMSeries(
+                r"E(\d+)-(\d+)s_v4", None, None
+            ),  # Esv4-series (constrained vCPU, deprecated in favor of Esv6-series, dstack <= 0.19.9)
         ]
         vm_series_pattern = re.compile(
             f"^Standard_({'|'.join(series.pattern for series in vm_series)})$"
