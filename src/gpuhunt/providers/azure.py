@@ -214,7 +214,7 @@ class AzureProvider(AbstractProvider):
     @classmethod
     def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
         vm_series = [
-            VMSeries(r"D(\d+)s_v6", None, None),  # Dsv6-series
+            VMSeries(r"D(\d+)s_v5", None, None),  # Dsv5-series
             VMSeries(r"E(\d+)i?s_v5", None, None),  # Esv5-series
             VMSeries(r"F(\d+)s_v2", None, None),  # Fsv2-series
             VMSeries(r"NC(\d+)s_v3", "V100", 16 * 1024),  # NCv3-series [V100 16GB]
@@ -229,7 +229,7 @@ class AzureProvider(AbstractProvider):
             # The deprecated series are collected for older dstack versions
             VMSeries(
                 r"D(\d+)s_v3", None, None
-            ),  # Dsv3-series (deprecated in favor of Dsv6-series, dstack <= 0.19.9)
+            ),  # Dsv3-series (deprecated in favor of Dsv5-series, dstack <= 0.19.9)
             VMSeries(
                 r"E(\d+)i?s_v4", None, None
             ),  # Esv4-series (deprecated in favor of Esv5-series, dstack <= 0.19.9)
