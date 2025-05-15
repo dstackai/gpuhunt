@@ -18,8 +18,9 @@ from gpuhunt._internal.utils import parse_compute_capability
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
-version_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v2/version"
-catalog_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v2/{version}/catalog.zip"
+
+VERSION_URL = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v2/version"
+CATALOG_URL = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v2/{version}/catalog.zip"
 OFFLINE_PROVIDERS = [
     "aws",
     "azure",
@@ -181,10 +182,13 @@ class Catalog:
         Args:
             version: specific version of the catalog to download. If not specified, the latest version will be used
         """
-        if version is None:
-            version = self.get_latest_version()
+        catalog_url = os.getenv("GPUHUNT_CATALOG_URL")
+        if catalog_url is None:
+            if version is None:
+                version = self.get_latest_version()
+            catalog_url = CATALOG_URL.format(version=version)
         logger.debug("Downloading catalog %s...", version)
-        with urllib.request.urlopen(catalog_url.format(version=version)) as f:
+        with urllib.request.urlopen(catalog_url) as f:
             self.loaded_at = time.monotonic()
             self.catalog = io.BytesIO(f.read())
 
@@ -193,7 +197,7 @@ class Catalog:
         """
         Get the latest version of the catalog from the S3 bucket
         """
-        with urllib.request.urlopen(version_url) as f:
+        with urllib.request.urlopen(VERSION_URL) as f:
             return f.read().decode("utf-8").strip()
 
     def add_provider(self, provider: AbstractProvider):
