@@ -214,10 +214,10 @@ class AzureProvider(AbstractProvider):
     @classmethod
     def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
         vm_series = [
-            VMSeries(r"D(\d+)d?s_v6", None, None),  # Dsv6/Ddsv6-series
+            VMSeries(r"D(\d+)s_v6", None, None),  # Dsv6-series
             VMSeries(
-                r"E(2|4|8|16|20|32|48|64|96)d?s_v6", None, None
-            ),  # Esv6/Edsv6-series (E128 and E192i are not yet GA)
+                r"E(2|4|8|16|20|32|48|64|96)s_v6", None, None
+            ),  # Esv6-series (E128 and E192i are not yet GA)
             VMSeries(r"F(\d+)s_v2", None, None),  # Fsv2-series
             VMSeries(r"NC(\d+)s_v3", "V100", 16 * 1024),  # NCv3-series [V100 16GB]
             VMSeries(r"NC(\d+)as_T4_v3", "T4", 16 * 1024),  # NCasT4_v3-series [T4]
