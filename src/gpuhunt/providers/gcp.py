@@ -602,6 +602,10 @@ def get_tpu_configs(project_id: str) -> list[dict]:
     instances: list[dict] = []
     client = tpu_v2.TpuClient()
     for location in get_locations(project_id):
+        if location in ["us-east1-b"]:
+            # These locations return
+            # google.api_core.exceptions.ServiceUnavailable: 503 502:Bad Gateway
+            continue
         parent = f"projects/{project_id}/locations/{location}"
         request = tpu_v2.ListAcceleratorTypesRequest(
             parent=parent,
