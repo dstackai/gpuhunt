@@ -5,6 +5,7 @@ import logging
 import re
 from collections import defaultdict, namedtuple
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Optional
 
@@ -153,59 +154,58 @@ class GCPProvider(AbstractProvider):
         self.cloud_catalog_client = billing_v1.CloudCatalogClient()
 
     def list_preconfigured_instances(self) -> list[RawCatalogItem]:
-        instances = []
-        for region in self.regions_client.list(project=self.project):
-            for zone_url in region.zones:
-                zone = zone_url.split("/")[-1]
-                logger.info("Fetching instances for zone %s", zone)
-                for machine_type in self.machine_types_client.list(
-                    project=self.project, zone=zone
-                ):
-                    if (
-                        machine_type.deprecated.state
-                        == compute_v1.DeprecationStatus.State.DEPRECATED
-                    ):
+        def _list_zone_instances(zone: str) -> list[RawCatalogItem]:
+            zone_instances = []
+            logger.info("Fetching instances for zone %s", zone)
+            for machine_type in self.machine_types_client.list(project=self.project, zone=zone):
+                if machine_type.deprecated.state == compute_v1.DeprecationStatus.State.DEPRECATED:
+                    continue
+                gpu = None
+                if machine_type.accelerators:
+                    accelerator = machine_type.accelerators[0].guest_accelerator_type
+                    gpu = accelerator_details.get(accelerator)
+                    if gpu is None:
+                        logger.warning("Unknown accelerator type: %s", accelerator)
                         continue
-                    gpu = None
-                    if machine_type.accelerators:
-                        accelerator = machine_type.accelerators[0].guest_accelerator_type
-                        gpu = accelerator_details.get(accelerator)
-                        if gpu is None:
-                            logger.warning("Unknown accelerator type: %s", accelerator)
-                            continue
 
-                    instance = RawCatalogItem(
-                        instance_name=machine_type.name,
-                        location=zone,
-                        cpu=machine_type.guest_cpus,
-                        memory=round(machine_type.memory_mb / 1024, 1),
-                        gpu_count=(
-                            machine_type.accelerators[0].guest_accelerator_count if gpu else 0
-                        ),
-                        # gpu_name is canonicalized and gpu_vendor is set later
-                        # in fill_gpu_vendors_and_names(), for now we use AcceleratorType.name
-                        # as a name (it contains a vendor prefix like "nvidia-")
-                        gpu_name=(
-                            machine_type.accelerators[0].guest_accelerator_type if gpu else None
-                        ),
-                        gpu_vendor=None,
-                        gpu_memory=gpu.memory if gpu else None,
-                        price=None,
-                        spot=None,
-                        disk_size=None,
-                    )
-                    instances.append(instance)
+                instance = RawCatalogItem(
+                    instance_name=machine_type.name,
+                    location=zone,
+                    cpu=machine_type.guest_cpus,
+                    memory=round(machine_type.memory_mb / 1024, 1),
+                    gpu_count=(machine_type.accelerators[0].guest_accelerator_count if gpu else 0),
+                    # gpu_name is canonicalized and gpu_vendor is set later
+                    # in fill_gpu_vendors_and_names(), for now we use AcceleratorType.name
+                    # as a name (it contains a vendor prefix like "nvidia-")
+                    gpu_name=(
+                        machine_type.accelerators[0].guest_accelerator_type if gpu else None
+                    ),
+                    gpu_vendor=None,
+                    gpu_memory=gpu.memory if gpu else None,
+                    price=None,
+                    spot=None,
+                    disk_size=None,
+                )
+                zone_instances.append(instance)
+            return zone_instances
+
+        instances = []
+        futures = []
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for region in self.regions_client.list(project=self.project):
+                for zone_url in region.zones:
+                    zone = zone_url.split("/")[-1]
+                    futures.append(ex.submit(_list_zone_instances, zone))
+        for future in as_completed(futures):
+            instances.extend(future.result())
         return instances
 
     def add_gpus(self, instances: list[RawCatalogItem]):
-        n1_instances = defaultdict(list)
-        for instance in instances:
-            if instance.instance_name.startswith("n1-"):
-                n1_instances[instance.location].append(instance)
-
-        instances_with_gpus = []
-        for zone, zone_n1_instances in n1_instances.items():
+        def _list_zone_instances(
+            zone: str, zone_n1_instances: list[RawCatalogItem]
+        ) -> list[RawCatalogItem]:
             logger.info("Fetching GPUs for zone %s", zone)
+            zone_instances = []
             for accelerator in self.accelerator_types_client.list(project=self.project, zone=zone):
                 if accelerator.name not in accelerator_limits:
                     continue
@@ -217,7 +217,21 @@ class GCPProvider(AbstractProvider):
                         i.gpu_count = n
                         i.gpu_name = accelerator.name
                         i.gpu_memory = accelerator_details[accelerator.name].memory
-                        instances_with_gpus.append(i)
+                        zone_instances.append(i)
+            return zone_instances
+
+        n1_instances = defaultdict(list)
+        for instance in instances:
+            if instance.instance_name.startswith("n1-"):
+                n1_instances[instance.location].append(instance)
+
+        instances_with_gpus = []
+        futures = []
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for zone, zone_n1_instances in n1_instances.items():
+                futures.append(ex.submit(_list_zone_instances, zone, zone_n1_instances))
+        for future in as_completed(futures):
+            instances_with_gpus.extend(future.result())
         instances += instances_with_gpus
 
     def fill_prices(self, instances: list[RawCatalogItem]) -> list[RawCatalogItem]:
@@ -599,27 +613,36 @@ def find_base_price_v5(
 
 
 def get_tpu_configs(project_id: str) -> list[dict]:
-    instances: list[dict] = []
-    client = tpu_v2.TpuClient()
-    for location in get_locations(project_id):
-        if location in ["us-east1-b"]:
-            # These locations return
+    def _list_zone_configs(zone: str) -> list[dict]:
+        zone_instances = []
+        if zone in ["us-east1-b"]:
+            # These zones return
             # google.api_core.exceptions.ServiceUnavailable: 503 502:Bad Gateway
-            continue
-        parent = f"projects/{project_id}/locations/{location}"
+            return []
+        parent = f"projects/{project_id}/locations/{zone}"
         request = tpu_v2.ListAcceleratorTypesRequest(
             parent=parent,
         )
         page_result = client.list_accelerator_types(request=request)
         for response in page_result:
             no_of_chips = get_no_of_chips(response.accelerator_configs[0].topology)
-            instances.append(
+            zone_instances.append(
                 {
                     "instance_name": response.type_,
-                    "location": location,
+                    "location": zone,
                     "no_of_chips": no_of_chips,
                 }
             )
+        return zone_instances
+
+    client = tpu_v2.TpuClient()
+    instances: list[dict] = []
+    futures = []
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        for zone in get_locations(project_id):
+            futures.append(ex.submit(_list_zone_configs, zone))
+    for future in as_completed(futures):
+        instances.extend(future.result())
     return instances
 
 
