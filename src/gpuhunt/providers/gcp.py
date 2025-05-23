@@ -283,6 +283,11 @@ class GCPProvider(AbstractProvider):
             if any(
                 i.instance_name.startswith(family)
                 for family in [
+                    "m4-",
+                    "c4-",
+                    "n4-",
+                    "h3-",
+                    "n2-",
                     "e2-medium",
                     "e2-standard-",
                     "e2-highmem-",
