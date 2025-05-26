@@ -220,19 +220,23 @@ class AWSProvider(AbstractProvider):
             if any(
                 i.instance_name.startswith(family)
                 for family in [
+                    "m7i.",
+                    "c7i.",
+                    "r7i.",
+                    "t3.",
                     "t2.small",
                     "c5.",
                     "m5.",
-                    "p3.",
                     "p5.",
                     "p5e.",
-                    "g5.",
+                    "p4d.",
+                    "p4de.",
+                    "p3.",
                     "g6.",
                     "g6e.",
                     "gr6.",
+                    "g5.",
                     "g4dn.",
-                    "p4d.",
-                    "p4de.",
                 ]
             )
         ]
