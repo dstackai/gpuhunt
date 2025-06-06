@@ -177,6 +177,14 @@ class AzureProvider(AbstractProvider):
             if is_retired(resource.name):
                 continue
             capabilities = {pair.name: pair.value for pair in resource.capabilities}
+            cpu = capabilities.get("vCPUs")
+            memory = capabilities.get("MemoryGB")
+            if not cpu:
+                logger.warning("Instance CPU is missing: %s", resource.name)
+                continue
+            if not memory:
+                logger.warning("Instance memory is missing: %s", resource.name)
+                continue
             gpu_count, gpu_name, gpu_memory = 0, None, None
             if "GPUs" in capabilities:
                 gpu_count = int(capabilities["GPUs"])
@@ -186,8 +194,8 @@ class AzureProvider(AbstractProvider):
                     continue
             instances[resource.name] = RawCatalogItem(
                 instance_name=resource.name,
-                cpu=capabilities["vCPUs"],
-                memory=float(capabilities["MemoryGB"]),
+                cpu=cpu,
+                memory=float(memory),
                 gpu_vendor=None,
                 gpu_count=gpu_count,
                 gpu_name=gpu_name,
@@ -198,10 +206,8 @@ class AzureProvider(AbstractProvider):
                 disk_size=None,
             )
         with_details = []
-        without_details = []
         for offer in offers:
             if (resources := instances.get(offer.instance_name)) is None:
-                without_details.append(offer)
                 continue
             offer.cpu = resources.cpu
             offer.memory = resources.memory
@@ -209,7 +215,7 @@ class AzureProvider(AbstractProvider):
             offer.gpu_name = resources.gpu_name
             offer.gpu_memory = resources.gpu_memory
             with_details.append(offer)
-        return with_details + without_details
+        return with_details
 
     @classmethod
     def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
