@@ -183,6 +183,8 @@ def get_gpu_name(vendor: AcceleratorVendor, name: str) -> Optional[str]:
 
 
 def get_nvidia_gpu_name(name: str) -> Optional[str]:
+    if "B200" in name:
+        return "B200"
     if "V100" in name:
         return "V100"
     if name == "H100 NVL":
