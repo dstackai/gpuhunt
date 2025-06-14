@@ -11,8 +11,7 @@ def data_rows(catalog_dir: Path) -> list[dict]:
         return list(csv.DictReader(f))
 
 
-# TODO: Add RTX5090 and RTX6000PRO and others after evaluation
-@pytest.mark.parametrize("gpu", ["RTX4090"])
+@pytest.mark.parametrize("gpu", ["RTX4090", "RTX5090"])
 def test_gpu_present(gpu: str, data_rows: list[dict]):
     assert gpu in map(itemgetter("gpu_name"), data_rows)
 
