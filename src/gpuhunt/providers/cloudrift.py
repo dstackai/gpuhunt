@@ -41,7 +41,7 @@ def generate_instances(instance) -> list[RawCatalogItem]:
 
     instance_types = []
     for variant in instance["variants"]:
-        for location, _count in variant["available_nodes_per_dc"].items():
+        for location, _count in variant["nodes_per_dc"].items():
             raw = RawCatalogItem(
                 instance_name=variant["name"],
                 location=location,
