@@ -32,14 +32,16 @@ class CloudRiftProvider(AbstractProvider):
 
 def generate_instances(instance) -> list[RawCatalogItem]:
     instance_gpu_brand = instance["brand_short"]
-    dstack_gpu_name = GPU_MAP.get(instance_gpu_brand)
+    dstack_gpu_name = next(
+        iter(gpu_record[1] for gpu_record in GPU_MAP if gpu_record[0] in instance_gpu_brand), None
+    )
     if dstack_gpu_name is None:
         logger.warning(f"Failed to find GPU name matching '{instance_gpu_brand}'")
         return []
 
     instance_types = []
     for variant in instance["variants"]:
-        for location, _count in variant["available_nodes_per_dc"].items():
+        for location, _count in variant["nodes_per_dc"].items():
             raw = RawCatalogItem(
                 instance_name=variant["name"],
                 location=location,
@@ -57,11 +59,11 @@ def generate_instances(instance) -> list[RawCatalogItem]:
     return instance_types
 
 
-GPU_MAP = {
-    r"RTX 4090": "RTX4090",
-    r"RTX 5090": "RTX5090",
-    r"RTX 6000 Pro": "RTX6000PRO",
-}
+GPU_MAP = [
+    ("RTX 4090", "RTX4090"),
+    ("RTX 5090", "RTX5090"),
+    ("RTX PRO 6000", "RTXPRO6000"),
+]
 
 
 def _make_request(endpoint: str, request_data: dict) -> Union[dict, str, None]:
