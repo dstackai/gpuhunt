@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from gpuhunt.providers.cloudrift import GPU_MAP
+
 
 @pytest.fixture
 def data_rows(catalog_dir: Path) -> list[dict]:
@@ -11,9 +13,17 @@ def data_rows(catalog_dir: Path) -> list[dict]:
         return list(csv.DictReader(f))
 
 
-@pytest.mark.parametrize("gpu", ["RTX4090", "RTX5090"])
-def test_gpu_present(gpu: str, data_rows: list[dict]):
-    assert gpu in map(itemgetter("gpu_name"), data_rows)
+def select_row(rows, name: str) -> list[str]:
+    return [r[name] for r in rows if r[name]]
+
+
+def test_gpu_present(data_rows: list[dict]):
+    expected_gpus = [gpu for _, gpu in GPU_MAP]
+    gpus = select_row(data_rows, "gpu_name")
+    gpus = list(dict.fromkeys(gpus))
+    assert set(gpus).issubset(
+        set(expected_gpus)
+    ), f"Found unexpected GPUs: {set(gpus) - set(expected_gpus)}"
 
 
 # TODO: Add 3, 4, 5, ... 8
