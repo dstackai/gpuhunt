@@ -1,0 +1,116 @@
+import logging
+from typing import Optional
+
+import requests
+from requests import Response
+
+from gpuhunt._internal.constraints import KNOWN_AMD_GPUS
+from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
+from gpuhunt.providers import AbstractProvider
+
+logger = logging.getLogger(__name__)
+
+API_URL = "https://admin.hotaisle.app/api"
+
+
+class HotAisleProvider(AbstractProvider):
+    NAME = "hotaisle"
+
+    def __init__(self, api_key: str, team_name: str):
+        """Hotaisle requries an API key and team name to access the API."""
+        if not api_key:
+            raise ValueError("Set the HOTAISLE_API_KEY environment variable.")
+        if not team_name:
+            raise ValueError("Set the HOTAISLE_TEAM_NAME environment variable.")
+        self.api_key = api_key
+        self.team_name = team_name
+        self._validate_user_and_team()
+
+    def _validate_user_and_team(self) -> None:
+        response = self._make_request("GET", "/user/")
+        user_data = response.json()
+
+        # Check if teams are available.
+        teams = user_data["teams"]
+        if not teams:
+            raise ValueError("No Hotaisle teams found for this user")
+
+        # Verify the user provided team exists.
+        available_teams = [team["handle"] for team in teams]
+        if self.team_name not in available_teams:
+            raise ValueError(f"Hotaisle Team '{self.team_name}' not found.")
+
+    def get(
+        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+    ) -> list[RawCatalogItem]:
+        offers = self.fetch_offers()
+        return sorted(offers, key=lambda i: i.price)
+
+    def fetch_offers(self) -> list[RawCatalogItem]:
+        """Fetch available virtual machines from HotAisle API.
+        See API documentation(https://admin.hotaisle.app/api/docs)
+        for details."""
+        url = f"/teams/{self.team_name}/virtual_machines/available/"
+        response = self._make_request("GET", url)
+        return convert_response_to_raw_catalog_items(response)
+
+    def _make_request(self, method: str, url: str) -> Response:
+        full_url = f"{API_URL}{url}"
+        headers = {
+            "accept": "application/json",
+            "Authorization": self.api_key,
+        }
+
+        response = requests.request(method=method, url=full_url, headers=headers, timeout=30)
+        response.raise_for_status()
+        return response
+
+
+def get_gpu_memory(gpu_name: str) -> Optional[int]:
+    for gpu in KNOWN_AMD_GPUS:
+        if gpu.name.upper() == gpu_name.upper():
+            return gpu.memory
+    logger.warning(f"Unknown AMD GPU {gpu_name}")
+    return None
+
+
+def convert_response_to_raw_catalog_items(response: Response) -> list[RawCatalogItem]:
+    data = response.json()
+    offers = []
+    for item in data:
+        quantity = item["Quantity"]
+        price_in_cents = item["OnDemandPrice"]
+        price = float(price_in_cents) / 100
+        specs = item["Specs"]
+        cpu_cores = specs["cpu_cores"]
+        ram_capacity_bytes = specs["ram_capacity"]
+        memory_gb = ram_capacity_bytes / (1024**3)
+        disk_capacity_bytes = specs["disk_capacity"]
+        disk_gb = disk_capacity_bytes / (1024**3)
+        gpus = specs["gpus"]
+        gpu = gpus[0]
+        gpu_count = gpu["count"]
+        gpu_name = gpu["model"]
+        gpu_vendor = AcceleratorVendor.AMD.value  # All GPUs are AMD with HotAisle.
+        gpu_memory = get_gpu_memory(gpu_name)
+
+        # Create instance name: cores-ram-gpucount-gpu
+        instance_name = f"{cpu_cores}c-{int(memory_gb)}gb-{gpu_count}-{gpu_name.lower()}"
+
+        for _ in range(quantity):
+            offer = RawCatalogItem(
+                instance_name=instance_name,
+                location=None,  # HotAisle doesn't specify location/regions in the API
+                price=price,
+                cpu=cpu_cores,
+                memory=memory_gb,
+                gpu_count=gpu_count,
+                gpu_name=gpu_name,
+                gpu_memory=gpu_memory,
+                gpu_vendor=gpu_vendor,
+                spot=False,
+                disk_size=disk_gb,
+            )
+            offers.append(offer)
+
+    return offers

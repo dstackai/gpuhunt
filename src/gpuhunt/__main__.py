@@ -17,6 +17,7 @@ def main():
             "cudo",
             "datacrunch",
             "gcp",
+            "hotaisle",
             "lambdalabs",
             "nebius",
             "oci",
@@ -57,6 +58,12 @@ def main():
         from gpuhunt.providers.gcp import GCPProvider
 
         provider = GCPProvider(os.getenv("GCP_PROJECT_ID"))
+    elif args.provider == "hotaisle":
+        from gpuhunt.providers.hotaisle import HotAisleProvider
+
+        provider = HotAisleProvider(
+            api_key=os.getenv("HOTAISLE_API_KEY"), team_name=os.getenv("HOTAISLE_TEAM_NAME")
+        )
     elif args.provider == "lambdalabs":
         from gpuhunt.providers.lambdalabs import LambdaLabsProvider
 
