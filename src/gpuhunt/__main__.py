@@ -62,7 +62,7 @@ def main():
         from gpuhunt.providers.hotaisle import HotAisleProvider
 
         provider = HotAisleProvider(
-            api_key=os.getenv("HOTAISLE_API_KEY"), team_name=os.getenv("HOTAISLE_TEAM_NAME")
+            api_key=os.getenv("HOTAISLE_API_KEY"), team_handle=os.getenv("HOTAISLE_TEAM_HANDLE")
         )
     elif args.provider == "lambdalabs":
         from gpuhunt.providers.lambdalabs import LambdaLabsProvider

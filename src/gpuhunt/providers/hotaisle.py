@@ -16,14 +16,14 @@ API_URL = "https://admin.hotaisle.app/api"
 class HotAisleProvider(AbstractProvider):
     NAME = "hotaisle"
 
-    def __init__(self, api_key: str, team_name: str):
-        """Hotaisle requries an API key and team name to access the API."""
+    def __init__(self, api_key: str, team_handle: str):
+        """Hotaisle requries an API key and team handle to access the API."""
         if not api_key:
             raise ValueError("Set the HOTAISLE_API_KEY environment variable.")
-        if not team_name:
-            raise ValueError("Set the HOTAISLE_TEAM_NAME environment variable.")
+        if not team_handle:
+            raise ValueError("Set the HOTAISLE_TEAM_HANDLE environment variable.")
         self.api_key = api_key
-        self.team_name = team_name
+        self.team_handle = team_handle
         self._validate_user_and_team()
 
     def _validate_user_and_team(self) -> None:
@@ -37,8 +37,8 @@ class HotAisleProvider(AbstractProvider):
 
         # Verify the user provided team exists.
         available_teams = [team["handle"] for team in teams]
-        if self.team_name not in available_teams:
-            raise ValueError(f"Hotaisle Team '{self.team_name}' not found.")
+        if self.team_handle not in available_teams:
+            raise ValueError(f"Hotaisle Team '{self.team_handle}' not found.")
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
@@ -50,7 +50,7 @@ class HotAisleProvider(AbstractProvider):
         """Fetch available virtual machines from HotAisle API.
         See API documentation(https://admin.hotaisle.app/api/docs)
         for details."""
-        url = f"/teams/{self.team_name}/virtual_machines/available/"
+        url = f"/teams/{self.team_handle}/virtual_machines/available/"
         response = self._make_request("GET", url)
         return convert_response_to_raw_catalog_items(response)
 
@@ -66,10 +66,10 @@ class HotAisleProvider(AbstractProvider):
         return response
 
 
-def get_gpu_memory(gpu_name: str) -> Optional[int]:
+def get_gpu_memory(gpu_name: str) -> Optional[float]:
     for gpu in KNOWN_AMD_GPUS:
         if gpu.name.upper() == gpu_name.upper():
-            return gpu.memory
+            return float(gpu.memory)
     logger.warning(f"Unknown AMD GPU {gpu_name}")
     return None
 
@@ -78,7 +78,6 @@ def convert_response_to_raw_catalog_items(response: Response) -> list[RawCatalog
     data = response.json()
     offers = []
     for item in data:
-        quantity = item["Quantity"]
         price_in_cents = item["OnDemandPrice"]
         price = float(price_in_cents) / 100
         specs = item["Specs"]
@@ -97,20 +96,19 @@ def convert_response_to_raw_catalog_items(response: Response) -> list[RawCatalog
         # Create instance name: cores-ram-gpucount-gpu
         instance_name = f"{cpu_cores}c-{int(memory_gb)}gb-{gpu_count}-{gpu_name.lower()}"
 
-        for _ in range(quantity):
-            offer = RawCatalogItem(
-                instance_name=instance_name,
-                location=None,  # HotAisle doesn't specify location/regions in the API
-                price=price,
-                cpu=cpu_cores,
-                memory=memory_gb,
-                gpu_count=gpu_count,
-                gpu_name=gpu_name,
-                gpu_memory=gpu_memory,
-                gpu_vendor=gpu_vendor,
-                spot=False,
-                disk_size=disk_gb,
-            )
-            offers.append(offer)
+        offer = RawCatalogItem(
+            instance_name=instance_name,
+            location="us-michigan-1",  # Hardcoded for now, as HotAisle only has one location.
+            price=price,
+            cpu=cpu_cores,
+            memory=memory_gb,
+            gpu_count=gpu_count,
+            gpu_name=gpu_name,
+            gpu_memory=gpu_memory,
+            gpu_vendor=gpu_vendor,
+            spot=False,
+            disk_size=disk_gb,
+        )
+        offers.append(offer)
 
     return offers
