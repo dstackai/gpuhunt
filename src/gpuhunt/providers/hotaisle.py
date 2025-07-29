@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Optional
 
 import requests
@@ -16,14 +17,16 @@ API_URL = "https://admin.hotaisle.app/api"
 class HotAisleProvider(AbstractProvider):
     NAME = "hotaisle"
 
-    def __init__(self, api_key: str, team_handle: str):
+    def __init__(self, api_key: Optional[str] = None, team_handle: Optional[str] = None):
         """Hotaisle requries an API key and team handle to access the API."""
-        if not api_key:
+        self.api_key = api_key or os.getenv("HOTAISLE_API_KEY")
+        self.team_handle = team_handle or os.getenv("HOTAISLE_TEAM_HANDLE")
+
+        if not self.api_key:
             raise ValueError("Set the HOTAISLE_API_KEY environment variable.")
-        if not team_handle:
+        if not self.team_handle:
             raise ValueError("Set the HOTAISLE_TEAM_HANDLE environment variable.")
-        self.api_key = api_key
-        self.team_handle = team_handle
+
         self._validate_user_and_team()
 
     def _validate_user_and_team(self) -> None:
@@ -86,6 +89,8 @@ def convert_response_to_raw_catalog_items(response: Response) -> list[RawCatalog
         memory_gb = ram_capacity_bytes / (1024**3)
         disk_capacity_bytes = specs["disk_capacity"]
         disk_gb = disk_capacity_bytes / (1024**3)
+        cpus = specs["cpus"]
+        cpu_model = cpus["model"]
         gpus = specs["gpus"]
         gpu = gpus[0]
         gpu_count = gpu["count"]
@@ -93,8 +98,10 @@ def convert_response_to_raw_catalog_items(response: Response) -> list[RawCatalog
         gpu_vendor = AcceleratorVendor.AMD.value  # All GPUs are AMD with HotAisle.
         gpu_memory = get_gpu_memory(gpu_name)
 
-        # Create instance name: cores-ram-gpucount-gpu
-        instance_name = f"{cpu_cores}c-{int(memory_gb)}gb-{gpu_count}-{gpu_name.lower()}"
+        # Create instance name: cpu_model-cores-ram-gpucount-gpu
+        instance_name = (
+            f"{cpu_model}-{cpu_cores}c-{int(memory_gb)}gb-{gpu_count}-{gpu_name.lower()}"
+        )
 
         offer = RawCatalogItem(
             instance_name=instance_name,
