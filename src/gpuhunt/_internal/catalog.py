@@ -153,7 +153,7 @@ class Catalog:
                 if provider_name in map(str.lower, query_filter.provider):
                     futures.append(
                         executor.submit(
-                            self._get_online_provider_items_safe,
+                            self._get_online_provider_items,
                             provider_name,
                             query_filter,
                         )
@@ -255,16 +255,3 @@ class Catalog:
         if not found:
             raise ValueError(f"Provider is not loaded: {provider_name}")
         return items
-
-    def _get_online_provider_items_safe(
-        self, provider_name: str, query_filter: QueryFilter
-    ) -> list[CatalogItem]:
-        """Safe wrapper for _get_online_provider_items that handles missing providers gracefully"""
-        try:
-            return self._get_online_provider_items(provider_name, query_filter)
-        except ValueError as e:
-            if "not loaded" in str(e):
-                logger.warning("Skipping online provider %s: %s", provider_name, e)
-                return []
-            else:
-                raise
