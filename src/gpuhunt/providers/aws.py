@@ -95,14 +95,17 @@ class AWSProvider(AbstractProvider):
             for row in reader:
                 if self.skip(row):
                     continue
+                gpu_count = _parse_gpu_count(row["GPU"])
+                if gpu_count is None:
+                    continue
                 offer = RawCatalogItem(
                     instance_name=row["Instance Type"],
                     location=row["Region Code"],
                     price=float(row["PricePerUnit"]),
                     cpu=int(row["vCPU"]),
-                    memory=parse_memory(row["Memory"]),
+                    memory=_parse_memory(row["Memory"]),
                     gpu_vendor=None,
-                    gpu_count=parse_optional_count(row["GPU"]),
+                    gpu_count=gpu_count,
                     spot=False,
                     gpu_name=None,
                     gpu_memory=None,
@@ -258,12 +261,16 @@ def _get_gpu_memory_gib(gpu_name: str, reported_memory_mib: int) -> float:
     return 24
 
 
-def parse_memory(s: str) -> float:
+def _parse_memory(s: str) -> float:
     r = re.match(r"^([0-9.]+) GiB$", s)
     return float(r.group(1))
 
 
-def parse_optional_count(s: str) -> int:
+def _parse_gpu_count(s: str) -> Optional[int]:
     if not s:
         return 0
-    return int(s)
+    count = float(s)
+    if count < 1:
+        # AWS fractional GPUs not supported
+        return None
+    return int(count)
