@@ -116,7 +116,7 @@ PLATFORMS = [
         name="gpu-b200-sxm",
         gpu=PlatformGPU(
             name="B200",
-            memory_gib=141,
+            memory_gib=193,
             price_hour=4.5432,
         ),
         cpu_price_hour=0.012,
