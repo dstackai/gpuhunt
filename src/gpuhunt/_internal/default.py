@@ -23,6 +23,7 @@ def default_catalog() -> Catalog:
         ("gpuhunt.providers.vastai", "VastAIProvider"),
         ("gpuhunt.providers.cudo", "CudoProvider"),
         ("gpuhunt.providers.vultr", "VultrProvider"),
+        ("gpuhunt.providers.hotaisle", "HotAisleProvider"),
     ]:
         try:
             module = importlib.import_module(module)
@@ -30,6 +31,9 @@ def default_catalog() -> Catalog:
             catalog.add_provider(provider)
         except ImportError:
             logger.warning("Failed to import provider %s", provider)
+        except ValueError as e:
+            # Skip providers that require missing environment variables. Eg: HotAisleProvider
+            logger.warning("Skipping provider %s: %s", provider, e)
     return catalog
 
 
