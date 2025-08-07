@@ -27,22 +27,6 @@ class HotAisleProvider(AbstractProvider):
         if not self.team_handle:
             raise ValueError("Set the HOTAISLE_TEAM_HANDLE environment variable.")
 
-        self._validate_user_and_team()
-
-    def _validate_user_and_team(self) -> None:
-        response = self._make_request("GET", "/user/")
-        user_data = response.json()
-
-        # Check if teams are available.
-        teams = user_data["teams"]
-        if not teams:
-            raise ValueError("No Hotaisle teams found for this user")
-
-        # Verify the user provided team exists.
-        available_teams = [team["handle"] for team in teams]
-        if self.team_handle not in available_teams:
-            raise ValueError(f"Hotaisle Team '{self.team_handle}' not found.")
-
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
@@ -61,7 +45,7 @@ class HotAisleProvider(AbstractProvider):
         full_url = f"{API_URL}{url}"
         headers = {
             "accept": "application/json",
-            "Authorization": self.api_key,
+            "Authorization": f"Token {self.api_key}",
         }
 
         response = requests.request(method=method, url=full_url, headers=headers, timeout=30)
@@ -99,9 +83,7 @@ def convert_response_to_raw_catalog_items(response: Response) -> list[RawCatalog
         gpu_memory = get_gpu_memory(gpu_name)
 
         # Create instance name: cpu_model-cores-ram-gpucount-gpu
-        instance_name = (
-            f"{cpu_model}-{cpu_cores}c-{int(memory_gb)}gb-{gpu_count}-{gpu_name.lower()}"
-        )
+        instance_name = f"{gpu_count}x {gpu_name} {cpu_cores}x {cpu_model}"
 
         offer = RawCatalogItem(
             instance_name=instance_name,
