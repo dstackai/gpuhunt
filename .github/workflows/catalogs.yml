@@ -276,6 +276,8 @@ jobs:
           merge-multiple: true
       - name: Run integrity tests
         env:
+          HOTAISLE_API_KEY: ${{ secrets.HOTAISLE_API_KEY }}
+          HOTAISLE_TEAM_HANDLE: ${{ secrets.HOTAISLE_TEAM_HANDLE }}
           CATALOG_DIR: .
         run: pytest src/integrity_tests
 
