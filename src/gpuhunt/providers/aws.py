@@ -144,11 +144,12 @@ class AWSProvider(AbstractProvider):
                 )
                 for page in pages:
                     for i in page["InstanceTypes"]:
-                        gpu = i["GpuInfo"]["Gpus"][0]
-                        gpus[i["InstanceType"]] = (
-                            gpu["Name"],
-                            _get_gpu_memory_gib(gpu["Name"], gpu["MemoryInfo"]["SizeInMiB"]),
-                        )
+                        if "GpuInfo" in i:
+                            gpu = i["GpuInfo"]["Gpus"][0]
+                            gpus[i["InstanceType"]] = (
+                                gpu["Name"],
+                                _get_gpu_memory_gib(gpu["Name"], gpu["MemoryInfo"]["SizeInMiB"]),
+                            )
 
             regions = {
                 region: left
@@ -158,7 +159,14 @@ class AWSProvider(AbstractProvider):
 
         for offer in offers:
             if offer.gpu_count > 0:
-                offer.gpu_name, offer.gpu_memory = gpus[offer.instance_name]
+                if offer.instance_name in gpus:
+                    offer.gpu_name, offer.gpu_memory = gpus[offer.instance_name]
+                else:
+                    logger.warning(
+                        "GPU info not available for instance type %s, skipping GPU details",
+                        offer.instance_name,
+                    )
+                    offer.gpu_count = 0
 
     def _add_spots_worker(
         self, region: str, instance_types: set[str]
