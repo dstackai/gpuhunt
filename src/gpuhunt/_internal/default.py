@@ -24,6 +24,7 @@ def default_catalog() -> Catalog:
         ("gpuhunt.providers.cudo", "CudoProvider"),
         ("gpuhunt.providers.vultr", "VultrProvider"),
         ("gpuhunt.providers.hotaisle", "HotAisleProvider"),
+        ("gpuhunt.providers.digitalocean", "DigitalOceanProvider"),
     ]:
         try:
             module = importlib.import_module(module)

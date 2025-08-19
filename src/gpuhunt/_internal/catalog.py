@@ -25,6 +25,7 @@ OFFLINE_PROVIDERS = [
     "aws",
     "azure",
     "datacrunch",
+    "digitalocean",
     "gcp",
     "lambdalabs",
     "nebius",
