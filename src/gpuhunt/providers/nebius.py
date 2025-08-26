@@ -165,12 +165,14 @@ def get_regions_map(sdk: SDK) -> dict[str, str]:
     Returns:
         `{"e00": "eu-north1", "e01": "eu-west1", ...}`
     """
-    tenants = TenantServiceClient(sdk).list(ListTenantsRequest(), timeout=TIMEOUT).wait()
+    tenants = TenantServiceClient(sdk).list(ListTenantsRequest(), per_retry_timeout=TIMEOUT).wait()
     if len(tenants.items) != 1:
         raise ValueError(f"Expected to find 1 tenant, found {(len(tenants.items))}")
     projects = (
         ProjectServiceClient(sdk)
-        .list(ListProjectsRequest(parent_id=tenants.items[0].metadata.id), timeout=TIMEOUT)
+        .list(
+            ListProjectsRequest(parent_id=tenants.items[0].metadata.id), per_retry_timeout=TIMEOUT
+        )
         .wait()
     )
     result = {}
@@ -188,7 +190,7 @@ def list_platforms(sdk: SDK, region_code: str) -> ListPlatformsResponse:
         page_size=999,
         parent_id=f"project-{region_code}public-images",
     )
-    return PlatformServiceClient(sdk).list(req, timeout=TIMEOUT).wait()
+    return PlatformServiceClient(sdk).list(req, per_retry_timeout=TIMEOUT).wait()
 
 
 def make_item(
