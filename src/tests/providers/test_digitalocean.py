@@ -71,11 +71,13 @@ sizes_response = {
 def test_fetch_offers(requests_mock):
     requests_mock.get("https://api.digitalocean.com/v2/sizes", json=sizes_response)
 
-    provider = DigitalOceanProvider(flavor="standard", token="test-token")
+    provider = DigitalOceanProvider(api_key="test-token", api_url="https://api.digitalocean.com")
     offers = provider.fetch_offers()
     assert len(offers) == 10  # 8 CPU offers (8 regions) + 1 NVIDIA + 1 AMD (1 region each)
     catalog = Catalog(balance_resources=False, auto_reload=False)
-    digitalocean = DigitalOceanProvider(token="test-token")
+    digitalocean = DigitalOceanProvider(
+        api_key="test-token", api_url="https://api.digitalocean.com"
+    )
     internal_catalog.ONLINE_PROVIDERS = ["digitalocean"]
     internal_catalog.OFFLINE_PROVIDERS = []
     catalog.add_provider(digitalocean)

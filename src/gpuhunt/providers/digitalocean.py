@@ -10,23 +10,19 @@ from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
 
-# DigitalOcean API endpoints
+# DigitalOcean Default API endpoints
 STANDARD_CLOUD_API_URL = "https://api.digitalocean.com"
-AMD_CLOUD_API_URL = "https://api-amd.digitalocean.com"
 
 
 class DigitalOceanProvider(AbstractProvider):
     NAME = "digitalocean"
 
-    def __init__(self, token: Optional[str] = None, flavor: Optional[str] = None):
-        self.token = token or os.getenv("DIGITAL_OCEAN_TOKEN")
-        if not self.token:
-            raise ValueError("Set the DIGITAL_OCEAN_TOKEN environment variable.")
+    def __init__(self, api_key: Optional[str] = None, api_url: Optional[str] = None):
+        self.api_key = api_key or os.getenv("DIGITAL_OCEAN_API_KEY")
+        if not self.api_key:
+            raise ValueError("Set the DIGITAL_OCEAN_API_KEY environment variable.")
 
-        flavor = flavor or os.getenv("DIGITAL_OCEAN_FLAVOR", "standard").lower()
-        if flavor not in ("amd", "standard"):
-            flavor = "standard"
-        self.api_url = AMD_CLOUD_API_URL if flavor == "amd" else STANDARD_CLOUD_API_URL
+        self.api_url = api_url or os.getenv("DIGITAL_OCEAN_API_URL", STANDARD_CLOUD_API_URL)
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
@@ -43,8 +39,8 @@ class DigitalOceanProvider(AbstractProvider):
         full_url = f"{self.api_url}{url}"
         params = {"per_page": 500}
         headers = {}
-        if self.token:
-            headers["Authorization"] = f"Bearer {self.token}"
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
 
         response = requests.request(
             method=method, url=full_url, params=params, headers=headers, timeout=30

@@ -7,15 +7,15 @@ import requests
 
 from gpuhunt._internal.constraints import KNOWN_AMD_GPUS, KNOWN_NVIDIA_GPUS
 
-skip_if_no_token = pytest.mark.skipif(
-    "DIGITAL_OCEAN_TOKEN" not in os.environ, reason="DIGITAL_OCEAN_TOKEN not set"
+skip_if_no_api_key = pytest.mark.skipif(
+    "DIGITAL_OCEAN_API_KEY" not in os.environ, reason="DIGITAL_OCEAN_API_KEY not set"
 )
 
 
-def fetch_digitalocean_sizes(api_url: str, token: str) -> list[dict]:
+def fetch_digitalocean_sizes(api_url: str, api_key: str) -> list[dict]:
     response = requests.get(
         f"{api_url}/v2/sizes",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": f"Bearer {api_key}"},
         params={"per_page": 500},
         timeout=30,
     )
@@ -43,19 +43,19 @@ def validate_gpu_model_names(gpu_sizes: list[dict]) -> None:
         assert gpu_found_in_nvidia or gpu_found_in_amd, f"GPU '{gpu_name}' not found in known GPUs"
 
 
-@skip_if_no_token
+@skip_if_no_api_key
 def test_standard_cloud_gpu_model_names():
-    token = os.environ["DIGITAL_OCEAN_TOKEN"]
-    sizes = fetch_digitalocean_sizes("https://api.digitalocean.com", token)
+    api_key = os.environ["DIGITAL_OCEAN_API_KEY"]
+    sizes = fetch_digitalocean_sizes("https://api.digitalocean.com", api_key)
 
     gpu_sizes = [size for size in sizes if size.get("gpu_info")]
     validate_gpu_model_names(gpu_sizes)
 
 
-@skip_if_no_token
+@skip_if_no_api_key
 def test_amd_cloud_gpu_model_names():
-    token = os.environ["DIGITAL_OCEAN_TOKEN"]
-    sizes = fetch_digitalocean_sizes("https://api-amd.digitalocean.com", token)
+    api_key = os.environ["DIGITAL_OCEAN_API_KEY"]
+    sizes = fetch_digitalocean_sizes("https://api-amd.digitalocean.com", api_key)
 
     gpu_sizes = [size for size in sizes if size.get("gpu_info")]
     validate_gpu_model_names(gpu_sizes)

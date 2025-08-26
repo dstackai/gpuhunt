@@ -59,7 +59,7 @@ def main():
         from gpuhunt.providers.digitalocean import DigitalOceanProvider
 
         provider = DigitalOceanProvider(
-            token=os.getenv("DIGITAL_OCEAN_TOKEN"), flavor=os.getenv("DIGITAL_OCEAN_FLAVOR")
+            api_key=os.getenv("DIGITAL_OCEAN_API_KEY"), api_url=os.getenv("DIGITAL_OCEAN_API_URL")
         )
     elif args.provider == "gcp":
         from gpuhunt.providers.gcp import GCPProvider
