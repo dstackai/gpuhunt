@@ -64,6 +64,11 @@ def convert_response_to_raw_catalog_items(response) -> list[RawCatalogItem]:
             model_parts = gpu_model.split("_")
             gpu_name = "".join(part.upper() for part in model_parts[1:])
             gpu_vendor = get_gpu_vendor(gpu_name)
+            if gpu_vendor is None:
+                logger.warning(
+                    f"Could not determine GPU vendor for model '{gpu_model}'. Skipping droplet '{size['slug']}'."
+                )
+                continue
         else:
             gpu_count = 0
             gpu_vendor = None
