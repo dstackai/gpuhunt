@@ -81,7 +81,6 @@ def convert_response_to_raw_catalog_items(response) -> list[RawCatalogItem]:
             gpu_vendor = None
             gpu_name = ""
             gpu_memory = 0
-            gpu_model = ""
 
         # Aggregate disk sizes (local and scratch).
         total_disk_size = 0.0
