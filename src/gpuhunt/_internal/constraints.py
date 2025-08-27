@@ -102,6 +102,18 @@ def get_compute_capability(gpu_name: str) -> Optional[tuple[int, int]]:
     return None
 
 
+def get_gpu_vendor(gpu_name: Optional[str]) -> Optional[str]:
+    if gpu_name is None:
+        return None
+    for gpu in KNOWN_NVIDIA_GPUS:
+        if gpu.name.upper() == gpu_name.upper():
+            return AcceleratorVendor.NVIDIA.value
+    for gpu in KNOWN_AMD_GPUS:
+        if gpu.name.upper() == gpu_name.upper():
+            return AcceleratorVendor.AMD.value
+    return None
+
+
 def correct_gpu_memory_gib(gpu_name: str, memory_mib: float) -> int:
     """
     Round to whole number of gibibytes and attempt correcting the reported GPU

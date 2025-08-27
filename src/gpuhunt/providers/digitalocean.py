@@ -4,8 +4,8 @@ from typing import Optional
 
 import requests
 
-from gpuhunt._internal.constraints import KNOWN_AMD_GPUS, KNOWN_NVIDIA_GPUS
-from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
+from gpuhunt._internal.constraints import get_gpu_vendor
+from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -49,18 +49,6 @@ class DigitalOceanProvider(AbstractProvider):
         return response
 
 
-def get_gpu_vendor(gpu_name: Optional[str]) -> Optional[str]:
-    if gpu_name is None:
-        return None
-    for gpu in KNOWN_NVIDIA_GPUS:
-        if gpu.name.upper() == gpu_name.upper():
-            return AcceleratorVendor.NVIDIA.value
-    for gpu in KNOWN_AMD_GPUS:
-        if gpu.name.upper() == gpu_name.upper():
-            return AcceleratorVendor.AMD.value
-    return None
-
-
 def convert_response_to_raw_catalog_items(response) -> list[RawCatalogItem]:
     data = response.json()
     offers = []
@@ -82,10 +70,9 @@ def convert_response_to_raw_catalog_items(response) -> list[RawCatalogItem]:
             gpu_name = ""
             gpu_memory = 0
 
-        # Aggregate disk sizes (local and scratch).
-        total_disk_size = 0.0
-        for disk in size["disk_info"]:
-            total_disk_size += float(disk["size"]["amount"])
+        total_disk_size = sum(
+            float(disk["size"]["amount"]) for disk in size["disk_info"] if disk["type"] == "local"
+        )
 
         memory_gb = float(size["memory"]) / 1024  # MB -> GB
 
