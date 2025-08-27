@@ -74,12 +74,7 @@ def convert_response_to_raw_catalog_items(response) -> list[RawCatalogItem]:
             gpu_model = gpu_info["model"]
             # gpu_model uses patterns like "amd_mi300x", "nvidia_h100", "nvidia_rtx6000_ada"
             model_parts = gpu_model.split("_")
-            if len(model_parts) >= 3:
-                # Handle cases like "nvidia_rtx6000_ada" -> "RTX6000ADA"
-                gpu_name = "".join(part.upper() for part in model_parts[1:])
-            else:
-                # Handle cases like "amd_mi300x" -> "MI300X"
-                gpu_name = model_parts[1].upper()
+            gpu_name = "".join(part.upper() for part in model_parts[1:])
             gpu_vendor = get_gpu_vendor(gpu_name)
         else:
             gpu_count = 0
