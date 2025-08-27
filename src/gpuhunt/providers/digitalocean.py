@@ -28,7 +28,7 @@ class DigitalOceanProvider(AbstractProvider):
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         offers = self.fetch_offers()
-        return sorted(offers, key=lambda i: (i.price is None, i.price))
+        return sorted(offers, key=lambda i: i.price)
 
     def fetch_offers(self) -> list[RawCatalogItem]:
         url = "/v2/sizes"
