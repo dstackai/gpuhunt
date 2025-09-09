@@ -9,7 +9,7 @@ from gpuhunt.providers import AbstractProvider
 logger = logging.getLogger(__name__)
 
 CLOUDRIFT_SERVER_ADDRESS = "https://api.cloudrift.ai"
-CLOUDRIFT_API_VERSION = "2025-03-21"
+CLOUDRIFT_API_VERSION = "2025-08-07"
 
 
 class CloudRiftProvider(AbstractProvider):
