@@ -102,6 +102,18 @@ def get_compute_capability(gpu_name: str) -> Optional[tuple[int, int]]:
     return None
 
 
+def get_gpu_vendor(gpu_name: Optional[str]) -> Optional[str]:
+    if gpu_name is None:
+        return None
+    for gpu in KNOWN_NVIDIA_GPUS:
+        if gpu.name.upper() == gpu_name.upper():
+            return AcceleratorVendor.NVIDIA.value
+    for gpu in KNOWN_AMD_GPUS:
+        if gpu.name.upper() == gpu_name.upper():
+            return AcceleratorVendor.AMD.value
+    return None
+
+
 def correct_gpu_memory_gib(gpu_name: str, memory_mib: float) -> int:
     """
     Round to whole number of gibibytes and attempt correcting the reported GPU
@@ -146,6 +158,7 @@ KNOWN_NVIDIA_GPUS: list[NvidiaGPUInfo] = [
     NvidiaGPUInfo(name="A6000", memory=48, compute_capability=(8, 6)),
     NvidiaGPUInfo(name="H100", memory=80, compute_capability=(9, 0)),
     NvidiaGPUInfo(name="H100NVL", memory=94, compute_capability=(9, 0)),
+    NvidiaGPUInfo(name="H200", memory=141, compute_capability=(9, 0)),
     NvidiaGPUInfo(name="L4", memory=24, compute_capability=(8, 9)),
     NvidiaGPUInfo(name="L40", memory=48, compute_capability=(8, 9)),
     NvidiaGPUInfo(name="L40S", memory=48, compute_capability=(8, 9)),

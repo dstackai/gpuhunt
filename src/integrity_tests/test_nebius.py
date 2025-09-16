@@ -20,8 +20,9 @@ def test_on_demand_present(data_rows: list[dict]):
     assert "False" in map(itemgetter("spot"), data_rows)
 
 
-def test_spot_not_present(data_rows: list[dict]):
-    assert "True" not in map(itemgetter("spot"), data_rows)
+def test_spots_presented(data_rows: list[dict]):
+    spot_rows = [row for row in data_rows if row["spot"] == "True"]
+    assert len(spot_rows) > 0
 
 
 @pytest.mark.parametrize("location", ["eu-north1", "eu-west1"])

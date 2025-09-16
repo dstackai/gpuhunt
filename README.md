@@ -58,6 +58,7 @@ print(*items, sep="\n")
 
 * AWS
 * Azure
+* CloudRift
 * Cudo Compute
 * DataCrunch
 * GCP

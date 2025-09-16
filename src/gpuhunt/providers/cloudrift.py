@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Optional, Union
 
 import requests
@@ -67,9 +68,10 @@ GPU_MAP = [
 
 
 def _make_request(endpoint: str, request_data: dict) -> Union[dict, str, None]:
+    server = os.environ.get("CLOUDRIFT_SERVER_ADDRESS", CLOUDRIFT_SERVER_ADDRESS)
     response = requests.request(
         "POST",
-        f"{CLOUDRIFT_SERVER_ADDRESS}/api/v1/{endpoint}",
+        f"{server}/api/v1/{endpoint}",
         json={"version": CLOUDRIFT_API_VERSION, "data": request_data},
         timeout=5.0,
     )
