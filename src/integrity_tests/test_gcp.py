@@ -140,6 +140,7 @@ class TestGCPCatalog:
 
     def test_gpu_presented(self, data: str):
         gpus = [
+            "B200",
             "H100",
             "A100",
             "L4",

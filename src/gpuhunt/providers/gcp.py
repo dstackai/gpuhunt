@@ -25,6 +25,7 @@ AcceleratorDetails = namedtuple("AcceleratorDetails", ["name", "memory"])
 # As of 2024-14-08, this mapping contains only Nvidia accelerators; update gpu_vendor
 # inferring code in fill_gpu_vendors_and_names() if a non-Nvidia accelerator is added
 accelerator_details = {
+    "nvidia-b200": AcceleratorDetails("B200", 180.0),
     "nvidia-a100-80gb": AcceleratorDetails("A100", 80.0),
     "nvidia-h100-80gb": AcceleratorDetails("H100", 80.0),
     "nvidia-h100-mega-80gb": AcceleratorDetails("H100", 80.0),
@@ -273,6 +274,7 @@ class GCPProvider(AbstractProvider):
         offers = self.fill_prices(instances)
         self.fill_gpu_vendors_and_names(offers)
         offers.extend(get_tpu_offers(self.project))
+        set_flags(offers)
         return sorted(offers, key=lambda i: i.price)
 
     @classmethod
@@ -280,24 +282,40 @@ class GCPProvider(AbstractProvider):
         return [
             i
             for i in offers
-            if any(
-                i.instance_name.startswith(family)
-                for family in [
-                    "m4-",
-                    "c4-",
-                    "n4-",
-                    "h3-",
-                    "n2-",
-                    "e2-medium",
-                    "e2-standard-",
-                    "e2-highmem-",
-                    "e2-highcpu-",
-                    "m1-",
-                    "a2-",
-                    "g2-",
-                ]
+            if (
+                any(
+                    i.instance_name.startswith(family)
+                    for family in [
+                        "m4-",
+                        "c4-",
+                        "n4-",
+                        "h3-",
+                        "n2-",
+                        "e2-medium",
+                        "e2-standard-",
+                        "e2-highmem-",
+                        "e2-highcpu-",
+                        "m1-",
+                        "a2-",
+                        "g2-",
+                    ]
+                )
+                or (i.gpu_name and i.gpu_name not in ["K80", "P4"])
             )
-            or (i.gpu_name and i.gpu_name not in ["K80", "P4"])
+            and not (
+                # Filter out on-demand offers that are not actually available on demand.
+                # https://cloud.google.com/compute/docs/accelerator-optimized-machines#consumption_option_availability_by_machine_type
+                i.spot == False
+                and (
+                    i.instance_name.startswith("a4x-")
+                    or i.instance_name.startswith("a4-")
+                    or i.instance_name.startswith("a3-ultragpu-")
+                    or (
+                        i.instance_name.startswith("a3-highgpu-")
+                        and (i.gpu_count is None or i.gpu_count < 8)
+                    )
+                )
+            )
         ]
 
 
@@ -311,6 +329,7 @@ class Prices:
         self.gpu: defaultdict[str, PricePerRegionSpot] = defaultdict(dict)
         self.ram: defaultdict[str, PricePerRegionSpot] = defaultdict(dict)
         self.local_ssd: PricePerRegionSpot = dict()
+        self.gpu_slice: defaultdict[str, PricePerRegionSpot] = defaultdict(dict)
 
     def add_skus(self, skus: Iterable[Sku]) -> None:
         for sku in skus:
@@ -333,6 +352,10 @@ class Prices:
                 self.add_storage_sku(sku)
 
     def add_compute_sku(self, sku: Sku) -> None:
+        if "(1 gpu slice)" in sku.description:
+            self.add_compute_gpu_slice_sku(sku)
+            return
+
         r = re.match(
             r"^(?:spot preemptible )?(.+) (gpu|ram|core)",
             sku.description,
@@ -362,8 +385,7 @@ class Prices:
                     "A3Plus Instance": "a3-megagpu",
                 }.get(family, family)
 
-        price = sku.pricing_info[0].pricing_expression.tiered_rates[0].unit_price
-        price = price.units + price.nanos / 1e9
+        price = self._calculate_sku_price(sku)
         resource_prices = {
             "core": self.cpu,
             "gpu": self.gpu,
@@ -371,11 +393,23 @@ class Prices:
         }[resource]
         self._add_price(sku, resource_prices[family], price)
 
+    def add_compute_gpu_slice_sku(self, sku: Sku) -> None:
+        if sku.description.startswith("Spot Preemptible A4 Nvidia B200"):
+            gpu = "nvidia-b200"
+        else:
+            return
+        price = self._calculate_sku_price(sku)
+        self._add_price(sku, self.gpu_slice[gpu], price)
+
     def add_storage_sku(self, sku: Sku) -> None:
         if sku.description.lower().startswith("ssd backed local storage"):
-            price = sku.pricing_info[0].pricing_expression.tiered_rates[0].unit_price
-            price = price.units + price.nanos / 1e9 / hours_in_month
+            price = self._calculate_sku_price(sku) / hours_in_month
             self._add_price(sku, self.local_ssd, price)
+
+    @staticmethod
+    def _calculate_sku_price(sku: Sku) -> float:
+        price = sku.pricing_info[0].pricing_expression.tiered_rates[0].unit_price
+        return price.units + price.nanos / 1e9
 
     @staticmethod
     def _add_price(sku: Sku, family_prices: PricePerRegionSpot, price: float) -> None:
@@ -389,10 +423,15 @@ class Prices:
             return None
 
         region_spot = (instance.location[:-2], spot)
+
+        # For some instances, the price is proportional to the number of GPUs
+        if instance.gpu_name and region_spot in self.gpu_slice[instance.gpu_name]:
+            return instance.gpu_count * self.gpu_slice[instance.gpu_name][region_spot]
+
+        # For others, the price consists of several components
+        price = 0
         if region_spot not in self.cpu[vm_family]:
             return None
-
-        price = 0
         price += instance.cpu * self.cpu[vm_family][region_spot]
         price += instance.memory * self.ram[vm_family][region_spot]
         if instance.gpu_name:
@@ -410,6 +449,12 @@ class Prices:
             if instance_name.startswith(family):
                 return family
         return instance_name.split("-")[0]
+
+
+def set_flags(catalog_items: list[RawCatalogItem]) -> None:
+    for item in catalog_items:
+        if item.instance_name.startswith("a4-"):
+            item.flags.append("gcp-a4")
 
 
 def get_tpu_offers(project_id: str) -> list[RawCatalogItem]:
