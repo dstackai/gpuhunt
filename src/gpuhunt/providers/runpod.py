@@ -85,6 +85,8 @@ def build_query_variables() -> list[dict]:
             )
         # Community cloud is queryable by country code
         for country_code in gpu_types["data"]["countryCodes"]:
+            if country_code is None:
+                continue
             variables.append(
                 {
                     "secureCloud": False,
@@ -124,6 +126,8 @@ def make_catalog_items(query_variable: dict, pod: dict) -> list[RawCatalogItem]:
         location = query_variable["countryCode"]
         on_demand_gpu_price = pod["communityPrice"]
         spot_gpu_price = pod["communitySpotPrice"]
+    if not location:
+        print("here")
     item_template = RawCatalogItem(
         instance_name=pod["id"],
         location=location,
