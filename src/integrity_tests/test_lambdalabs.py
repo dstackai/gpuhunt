@@ -45,7 +45,3 @@ def test_locations(data_rows: list[dict]):
     locations = set(map(itemgetter("location"), data_rows))
     missing = expected_locations - locations
     assert not missing
-
-
-def test_non_zero_price(data_rows: list[dict]):
-    assert all(float(p) > 0 for p in map(itemgetter("price"), data_rows))

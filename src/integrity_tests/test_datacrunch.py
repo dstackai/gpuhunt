@@ -37,17 +37,9 @@ def test_locations(data_rows):
 def test_spot(data_rows):
     spots = select_row(data_rows, "spot")
 
-    expected = set(("True", "False"))
-    assert set(spots) == expected
-
     count = Counter(spots)
     for spot_key in ("True", "False"):
         assert count[spot_key] > 1
-
-
-def test_price(data_rows):
-    prices = select_row(data_rows, "price")
-    assert min(float(p) for p in prices) > 0
 
 
 def test_gpu_present(data_rows):

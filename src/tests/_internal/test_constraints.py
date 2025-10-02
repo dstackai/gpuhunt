@@ -36,7 +36,7 @@ def cpu_items() -> list[CatalogItem]:
         gpu_vendor=None,
         gpu_count=0,
         gpu_name=None,
-        gpu_memory=0.0,
+        gpu_memory=None,
         spot=False,
         provider="datacrunch",
         disk_size=None,
