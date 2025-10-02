@@ -61,7 +61,7 @@ def generate_instances(
 
 
 def transform_instance(instance: InstanceType, spot: bool, location: str) -> Optional[dict]:
-    gpu_memory = 0
+    gpu_memory = None
     gpu_count = instance.gpu["number_of_gpus"]
     gpu_name = None
 

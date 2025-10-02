@@ -330,7 +330,7 @@ def test_cpu_instance(raw_instance_types):
         gpu_vendor=None,
         gpu_count=0,
         gpu_name=None,
-        gpu_memory=0,
+        gpu_memory=None,
         spot=False,
         disk_size=None,
     )

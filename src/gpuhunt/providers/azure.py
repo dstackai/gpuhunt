@@ -214,6 +214,7 @@ class AzureProvider(AbstractProvider):
             offer.gpu_count = resources.gpu_count
             offer.gpu_name = resources.gpu_name
             offer.gpu_memory = resources.gpu_memory
+            offer.gpu_vendor = resources.gpu_vendor
             with_details.append(offer)
         return with_details
 

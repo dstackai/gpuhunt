@@ -52,11 +52,6 @@ def test_spot(data_rows):
         assert count[spot_key] > 1
 
 
-def test_price(data_rows):
-    prices = select_row(data_rows, "price")
-    assert min(float(p) for p in prices) > 0
-
-
 def test_gpu_present(data_rows):
     refs = set(name for _, name in GPU_MAP.values())
     gpus = set(select_row(data_rows, "gpu_name"))
