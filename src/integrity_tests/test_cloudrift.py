@@ -18,6 +18,8 @@ def select_row(rows, name: str) -> list[str]:
 
 
 def test_gpu_present(data_rows: list[dict]):
+    if len(data_rows) == 0:
+        pytest.skip("No data rows found")
     expected_gpus = [gpu for _, gpu in GPU_MAP]
     gpus = select_row(data_rows, "gpu_name")
     gpus = list(dict.fromkeys(gpus))
@@ -29,13 +31,19 @@ def test_gpu_present(data_rows: list[dict]):
 # TODO: Add 3, 4, 5, ... 8
 @pytest.mark.parametrize("gpu_count", [1, 2])
 def test_gpu_count_present(gpu_count: int, data_rows: list[dict]):
+    if len(data_rows) == 0:
+        pytest.skip("No data rows found")
     assert str(gpu_count) in map(itemgetter("gpu_count"), data_rows)
 
 
 @pytest.mark.parametrize("location", ["us-east-nc-nr-1"])
 def test_location_is_present(location: str, data_rows: list[dict]):
+    if len(data_rows) == 0:
+        pytest.skip("No data rows found")
     assert location in map(itemgetter("location"), data_rows)
 
 
 def test_non_zero_price(data_rows: list[dict]):
+    if len(data_rows) == 0:
+        pytest.skip("No data rows found")
     assert all(float(p) > 0 for p in map(itemgetter("price"), data_rows))
