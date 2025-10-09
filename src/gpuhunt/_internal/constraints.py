@@ -181,15 +181,59 @@ KNOWN_NVIDIA_GPUS: list[NvidiaGPUInfo] = [
     NvidiaGPUInfo(name="GH200", memory=96, compute_capability=(9, 0)),
 ]
 
+# For device ids check https://gitlab.freedesktop.org/mesa/libdrm/-/blob/main/data/amdgpu.ids
 KNOWN_AMD_GPUS: list[AMDGPUInfo] = [
-    AMDGPUInfo(name="MI100", memory=32, architecture=AMDArchitecture.CDNA),
-    AMDGPUInfo(name="MI210", memory=64, architecture=AMDArchitecture.CDNA2),
-    AMDGPUInfo(name="MI250", memory=128, architecture=AMDArchitecture.CDNA2),
-    AMDGPUInfo(name="MI250X", memory=128, architecture=AMDArchitecture.CDNA2),
-    AMDGPUInfo(name="MI300A", memory=128, architecture=AMDArchitecture.CDNA3),
-    AMDGPUInfo(name="MI300X", memory=192, architecture=AMDArchitecture.CDNA3),
-    AMDGPUInfo(name="MI308X", memory=128, architecture=AMDArchitecture.CDNA3),
-    AMDGPUInfo(name="MI325X", memory=288, architecture=AMDArchitecture.CDNA3),
+    AMDGPUInfo(
+        name="MI100",
+        memory=32,
+        architecture=AMDArchitecture.CDNA,
+        device_ids=(0x738C,),
+    ),
+    AMDGPUInfo(
+        name="MI210",
+        memory=64,
+        architecture=AMDArchitecture.CDNA2,
+        device_ids=(0x740F,),
+    ),
+    # TODO: recheck MI250/MI250X device ids on real devices, as the source is ambiguous:
+    # 7408, 00, AMD Instinct MI250X
+    # 740C, 01, AMD Instinct MI250X / MI250
+    AMDGPUInfo(
+        name="MI250",
+        memory=128,
+        architecture=AMDArchitecture.CDNA2,
+        device_ids=(0x740C,),
+    ),
+    AMDGPUInfo(
+        name="MI250X",
+        memory=128,
+        architecture=AMDArchitecture.CDNA2,
+        device_ids=(0x7408,),
+    ),
+    AMDGPUInfo(
+        name="MI300A",
+        memory=128,
+        architecture=AMDArchitecture.CDNA3,
+        device_ids=(0x74A0,),
+    ),
+    AMDGPUInfo(
+        name="MI300X",
+        memory=192,
+        architecture=AMDArchitecture.CDNA3,
+        device_ids=(0x74A1, 0x74A9, 0x74B5, 0x74BD),
+    ),
+    AMDGPUInfo(
+        name="MI308X",
+        memory=128,
+        architecture=AMDArchitecture.CDNA3,
+        device_ids=(0x74A2, 0x74B6),
+    ),
+    AMDGPUInfo(
+        name="MI325X",
+        memory=288,
+        architecture=AMDArchitecture.CDNA3,
+        device_ids=(0x74A5,),
+    ),
 ]
 
 KNOWN_TPUS: list[TPUInfo] = [TPUInfo(name=version, memory=0) for version in _TPU_VERSIONS]
