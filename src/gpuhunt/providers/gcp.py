@@ -274,6 +274,7 @@ class GCPProvider(AbstractProvider):
         offers = self.fill_prices(instances)
         self.fill_gpu_vendors_and_names(offers)
         offers.extend(get_tpu_offers(self.project))
+        offers.extend(get_preview_offers())
         set_flags(offers)
         return sorted(offers, key=lambda i: i.price)
 
@@ -455,6 +456,26 @@ def set_flags(catalog_items: list[RawCatalogItem]) -> None:
     for item in catalog_items:
         if item.instance_name.startswith("a4-"):
             item.flags.append("gcp-a4")
+        elif item.instance_name in ["g4-standard-"] and item.price == 0:
+            item.flags.append("gcp-g4-preview")
+
+
+def get_preview_offers() -> list[RawCatalogItem]:
+    return [
+        RawCatalogItem(
+            instance_name="g4-standard-48",
+            location="us-central1-b",
+            price=0,
+            cpu=48,
+            memory=180,
+            gpu_vendor=AcceleratorVendor.GOOGLE.value,
+            gpu_count=1,
+            gpu_name="RTXPRO6000",
+            gpu_memory=96,
+            spot=False,
+            disk_size=None,
+        )
+    ]
 
 
 def get_tpu_offers(project_id: str) -> list[RawCatalogItem]:
