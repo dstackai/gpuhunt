@@ -456,7 +456,7 @@ def set_flags(catalog_items: list[RawCatalogItem]) -> None:
     for item in catalog_items:
         if item.instance_name.startswith("a4-"):
             item.flags.append("gcp-a4")
-        elif item.instance_name in ["g4-standard-"] and item.price == 0:
+        elif item.instance_name.startswith("g4-standard-") and item.price == 0:
             item.flags.append("gcp-g4-preview")
 
 
