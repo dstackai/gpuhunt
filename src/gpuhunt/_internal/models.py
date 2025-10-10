@@ -286,6 +286,7 @@ class NvidiaGPUInfo(AcceleratorInfo):
 class AMDGPUInfo(AcceleratorInfo):
     vendor = AcceleratorVendor.AMD
     architecture: AMDArchitecture
+    device_ids: tuple[int, ...]
 
 
 @dataclass
