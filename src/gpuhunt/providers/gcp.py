@@ -468,7 +468,7 @@ def get_preview_offers() -> list[RawCatalogItem]:
             price=0,
             cpu=48,
             memory=180,
-            gpu_vendor=AcceleratorVendor.GOOGLE.value,
+            gpu_vendor=AcceleratorVendor.NVIDIA.value,
             gpu_count=1,
             gpu_name="RTXPRO6000",
             gpu_memory=96,
