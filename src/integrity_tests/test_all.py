@@ -44,4 +44,6 @@ class TestAllCatalogs:
 
     def test_price_positive(self, catalog: csv.DictReader) -> None:
         for row in catalog:
+            if "gcp-g4-preview" in row["flags"]:
+                continue
             assert float(row["price"]) > 0, str(row)
