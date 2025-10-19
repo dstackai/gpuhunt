@@ -19,7 +19,8 @@ keywords = ["gpu", "cloud", "pricing"]
 dynamic = ["version"]
 dependencies = [
     "requests",
-    "typing-extensions"
+    "typing-extensions",
+    "pydantic>=1.10.10,<2.0.0",
 ]
 
 [project.urls]
@@ -50,7 +51,6 @@ maybe_nebius = [
 ]
 oci = [
     "oci",
-    "pydantic>=1.10.10,<2.0.0",
 ]
 datacrunch = [
     "datacrunch"

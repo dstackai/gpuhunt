@@ -11,6 +11,7 @@ from gpuhunt._internal.models import (
     Optional,
     RawCatalogItem,
 )
+from gpuhunt._internal.provider_models import GCPCatalogItemData
 
 NVIDIA = AcceleratorVendor.NVIDIA
 GOOGLE = AcceleratorVendor.GOOGLE
@@ -43,7 +44,7 @@ def test_raw_catalog_item_gpu_vendor_heuristic(
     if gpu_name is not None:
         dct["gpu_name"] = gpu_name
 
-    item = RawCatalogItem.from_dict(dct)
+    item = RawCatalogItem.from_dict(dct, provider="gcp")
 
     assert item.gpu_vendor == expected_gpu_vendor
     assert item.gpu_name == expected_gpu_name
@@ -151,8 +152,9 @@ def test_raw_catalog_item_to_from_dict() -> None:
         spot=False,
         disk_size=100.0,
         flags=["f1", "f2", "f3"],
+        provider_data=GCPCatalogItemData(is_dws_calendar_mode=True),
     )
-    item_dict = item.dict()
+    item_dict = item.dict(provider="gcp")
     assert item_dict == {
         "instance_name": "test-instance",
         "location": "eu-west-1",
@@ -167,5 +169,6 @@ def test_raw_catalog_item_to_from_dict() -> None:
         "spot": False,
         "disk_size": 100.0,
         "flags": "f1 f2 f3",
+        "provider_data": '{"is_dws_calendar_mode": true}',
     }
-    assert RawCatalogItem.from_dict(item_dict) == item
+    assert RawCatalogItem.from_dict(item_dict, provider="gcp") == item

@@ -27,6 +27,7 @@ from gpuhunt._internal.models import (
     TenstorrentAcceleratorInfo,
     TPUInfo,
 )
+from gpuhunt._internal.provider_models import CatalogItemProviderData
 
 # Deprecated aliases
 GPUInfo: type[NvidiaGPUInfo]

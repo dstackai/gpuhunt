@@ -56,7 +56,7 @@ def generate_instances(
         item = transform_instance(copy.copy(instance), spot, location)
         if item is None:
             continue
-        instances.append(RawCatalogItem.from_dict(item))
+        instances.append(RawCatalogItem.from_dict(item, provider="datacrunch"))
     return instances
 
 

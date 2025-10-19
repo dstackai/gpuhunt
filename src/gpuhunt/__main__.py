@@ -122,7 +122,7 @@ def main():
     offers = provider.get()
     if not args.no_filter:
         offers = provider.filter(offers)
-    storage.dump(offers, args.output)
+    storage.dump(offers, args.output, provider.NAME)
 
 
 if __name__ == "__main__":

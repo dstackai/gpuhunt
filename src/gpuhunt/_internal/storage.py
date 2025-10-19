@@ -20,12 +20,12 @@ CATALOG_V1_FIELDS = [
 T = TypeVar("T", bound=RawCatalogItem)
 
 
-def dump(items: list[T], path: str, *, cls: type[T] = RawCatalogItem):
+def dump(items: list[T], path: str, provider: str, *, cls: type[T] = RawCatalogItem):
     with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=[field.name for field in dataclasses.fields(cls)])
         writer.writeheader()
         for item in items:
-            writer.writerow(item.dict())
+            writer.writerow(item.dict(provider))
 
 
 def convert_catalog_v2_to_v1(path_v2: str, path_v1: str) -> None:

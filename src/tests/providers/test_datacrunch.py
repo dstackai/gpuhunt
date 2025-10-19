@@ -313,7 +313,7 @@ def test_transform_instance(raw_instance_types):
         disk_size=None,
     )
 
-    assert RawCatalogItem.from_dict(item) == expected
+    assert RawCatalogItem.from_dict(item, provider="datacrunch") == expected
 
 
 def test_cpu_instance(raw_instance_types):
@@ -335,7 +335,7 @@ def test_cpu_instance(raw_instance_types):
         disk_size=None,
     )
 
-    assert RawCatalogItem.from_dict(item) == expected
+    assert RawCatalogItem.from_dict(item, provider="datacrunch") == expected
 
 
 def test_order(mocker, raw_instance_types):

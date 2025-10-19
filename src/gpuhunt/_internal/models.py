@@ -7,6 +7,10 @@ from typing import (
     Union,
 )
 
+from gpuhunt._internal.provider_models import (
+    CATALOG_ITEM_PROVIDER_DATA_MODELS,
+    CatalogItemProviderData,
+)
 from gpuhunt._internal.utils import empty_as_none
 
 
@@ -73,6 +77,7 @@ class RawCatalogItem:
     gpu_vendor: Optional[str] = None
     flags: list[str] = field(default_factory=list)
     cpu_arch: Optional[str] = None
+    provider_data: CatalogItemProviderData = field(default_factory=CatalogItemProviderData)
 
     def __post_init__(self) -> None:
         self._process_gpu_vendor()
@@ -106,7 +111,10 @@ class RawCatalogItem:
             self.cpu_arch = cpu_arch.value
 
     @staticmethod
-    def from_dict(v: dict) -> "RawCatalogItem":
+    def from_dict(v: dict, provider: str) -> "RawCatalogItem":
+        provider_data_model = CATALOG_ITEM_PROVIDER_DATA_MODELS.get(
+            provider, CatalogItemProviderData
+        )
         return RawCatalogItem(
             instance_name=empty_as_none(v.get("instance_name")),
             location=empty_as_none(v.get("location")),
@@ -121,12 +129,23 @@ class RawCatalogItem:
             spot=empty_as_none(v.get("spot"), loader=bool_loader),
             disk_size=empty_as_none(v.get("disk_size"), loader=float),
             flags=v.get("flags", "").split(),
+            provider_data=(provider_data_model.parse_raw(v.get("provider_data") or "{}")),
         )
 
-    def dict(self) -> dict[str, Union[str, int, float, bool, None]]:
+    def dict(self, provider: str) -> dict[str, Union[str, int, float, bool, None]]:
+        if provider_data_model := CATALOG_ITEM_PROVIDER_DATA_MODELS.get(provider):
+            # validate that provider produced offers with correct provider_data
+            # TODO: validate that provider_data is None if the model is missing
+            # TODO: validate for online providers
+            if not isinstance(self.provider_data, provider_data_model):
+                raise TypeError(
+                    f"Invalid provider_data type for provider {provider}:"
+                    f" expected {provider_data_model}, got {type(self.provider_data)}"
+                )
         return {
             **asdict(self),
             "flags": " ".join(self.flags),
+            "provider_data": self.provider_data.json(),
         }
 
 
@@ -153,6 +172,7 @@ class CatalogItem:
             will have to request this flag explicitly to get the catalog item.
             If you are adding a new provider, leave the flags empty.
             Flag names should be in kebab-case.
+        provider_data: provider-specific properties
     """
 
     instance_name: str
@@ -169,6 +189,7 @@ class CatalogItem:
     gpu_vendor: Optional[AcceleratorVendor] = None
     flags: list[str] = field(default_factory=list)
     cpu_arch: Optional[CPUArchitecture] = None
+    provider_data: CatalogItemProviderData = field(default_factory=CatalogItemProviderData)
 
     def __post_init__(self) -> None:
         self._process_gpu_vendor()
@@ -198,7 +219,7 @@ class CatalogItem:
 
     @staticmethod
     def from_dict(v: dict, *, provider: Optional[str] = None) -> "CatalogItem":
-        return CatalogItem(provider=provider, **asdict(RawCatalogItem.from_dict(v)))
+        return CatalogItem(provider=provider, **asdict(RawCatalogItem.from_dict(v, provider)))
 
 
 @dataclass
