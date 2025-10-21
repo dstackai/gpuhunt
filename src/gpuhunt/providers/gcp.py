@@ -1,4 +1,5 @@
 import copy
+import enum
 import importlib.resources
 import json
 import logging
@@ -7,7 +8,7 @@ from collections import defaultdict, namedtuple
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, cast
 
 import google.cloud.billing_v1 as billing_v1
 import google.cloud.compute_v1 as compute_v1
@@ -15,6 +16,7 @@ from google.cloud import tpu_v2
 from google.cloud.billing_v1 import CloudCatalogClient, ListSkusRequest
 from google.cloud.billing_v1.types.cloud_catalog import Sku
 from google.cloud.location import locations_pb2
+from typing_extensions import NotRequired, TypedDict
 
 from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
@@ -243,14 +245,17 @@ class GCPProvider(AbstractProvider):
 
         offers = []
         for instance in instances:
-            for spot in (False, True):
-                price = prices.get_instance_price(instance, spot)
+            for capacity_type in CapacityType:
+                price = prices.get_instance_price(instance, capacity_type)
                 if price is None:
                     continue
 
                 offer = copy.deepcopy(instance)
                 offer.price = round(price, 6)
-                offer.spot = spot
+                offer.spot = capacity_type is CapacityType.SPOT
+                cast(GCPCatalogItemProviderData, offer.provider_data)["is_dws_calendar_mode"] = (
+                    capacity_type is CapacityType.DWS_CALENDAR_MODE
+                )
                 offers.append(offer)
         return offers
 
@@ -307,6 +312,9 @@ class GCPProvider(AbstractProvider):
                 # Filter out on-demand offers that are not actually available on demand.
                 # https://cloud.google.com/compute/docs/accelerator-optimized-machines#consumption_option_availability_by_machine_type
                 i.spot == False
+                and not cast(GCPCatalogItemProviderData, i.provider_data).get(
+                    "is_dws_calendar_mode"
+                )
                 and (
                     i.instance_name.startswith("a4x-")
                     or i.instance_name.startswith("a4-")
@@ -320,17 +328,27 @@ class GCPProvider(AbstractProvider):
         ]
 
 
-RegionSpot = tuple[str, bool]
-PricePerRegionSpot = dict[RegionSpot, float]
+class GCPCatalogItemProviderData(TypedDict):
+    is_dws_calendar_mode: NotRequired[bool]
+
+
+class CapacityType(enum.Enum):
+    ON_DEMAND = enum.auto()
+    SPOT = enum.auto()
+    DWS_CALENDAR_MODE = enum.auto()
+
+
+RegionCapacityType = tuple[str, CapacityType]
+PricePerRegionCapacityType = dict[RegionCapacityType, float]
 
 
 class Prices:
     def __init__(self):
-        self.cpu: defaultdict[str, PricePerRegionSpot] = defaultdict(dict)
-        self.gpu: defaultdict[str, PricePerRegionSpot] = defaultdict(dict)
-        self.ram: defaultdict[str, PricePerRegionSpot] = defaultdict(dict)
-        self.local_ssd: PricePerRegionSpot = dict()
-        self.gpu_slice: defaultdict[str, PricePerRegionSpot] = defaultdict(dict)
+        self.cpu: defaultdict[str, PricePerRegionCapacityType] = defaultdict(dict)
+        self.gpu: defaultdict[str, PricePerRegionCapacityType] = defaultdict(dict)
+        self.ram: defaultdict[str, PricePerRegionCapacityType] = defaultdict(dict)
+        self.local_ssd: PricePerRegionCapacityType = dict()
+        self.gpu_slice: defaultdict[str, PricePerRegionCapacityType] = defaultdict(dict)
 
     def add_skus(self, skus: Iterable[Sku]) -> None:
         for sku in skus:
@@ -395,7 +413,9 @@ class Prices:
         self._add_price(sku, resource_prices[family], price)
 
     def add_compute_gpu_slice_sku(self, sku: Sku) -> None:
-        if sku.description.startswith("Spot Preemptible A4 Nvidia B200"):
+        if sku.description.startswith(
+            "Spot Preemptible A4 Nvidia B200"
+        ) or sku.description.startswith("DWS Calendar Mode A4 Nvidia B200"):
             gpu = "nvidia-b200"
         else:
             return
@@ -413,34 +433,43 @@ class Prices:
         return price.units + price.nanos / 1e9
 
     @staticmethod
-    def _add_price(sku: Sku, family_prices: PricePerRegionSpot, price: float) -> None:
-        spot = sku.category.usage_type == "Preemptible"
+    def _add_price(sku: Sku, family_prices: PricePerRegionCapacityType, price: float) -> None:
+        if sku.category.usage_type == "Preemptible":
+            capacity_type = CapacityType.SPOT
+        elif "DWS Calendar Mode" in sku.description:
+            capacity_type = CapacityType.DWS_CALENDAR_MODE
+        else:
+            capacity_type = CapacityType.ON_DEMAND
         for region in sku.service_regions:
-            family_prices[(region, spot)] = price
+            family_prices[(region, capacity_type)] = price
 
-    def get_instance_price(self, instance: RawCatalogItem, spot: bool) -> Optional[float]:
+    def get_instance_price(
+        self, instance: RawCatalogItem, capacity_type: CapacityType
+    ) -> Optional[float]:
         vm_family = self.get_vm_family(instance.instance_name)
         if vm_family in ["g1", "f1", "m2"]:  # shared-core and reservation-only
             return None
 
-        region_spot = (instance.location[:-2], spot)
+        region_capacity_type = (instance.location[:-2], capacity_type)
 
         # For some instances, the price is proportional to the number of GPUs
-        if instance.gpu_name and region_spot in self.gpu_slice[instance.gpu_name]:
-            return instance.gpu_count * self.gpu_slice[instance.gpu_name][region_spot]
+        if instance.gpu_name and region_capacity_type in self.gpu_slice[instance.gpu_name]:
+            return instance.gpu_count * self.gpu_slice[instance.gpu_name][region_capacity_type]
 
         # For others, the price consists of several components
         price = 0
-        if region_spot not in self.cpu[vm_family]:
+        if region_capacity_type not in self.cpu[vm_family]:
             return None
-        price += instance.cpu * self.cpu[vm_family][region_spot]
-        price += instance.memory * self.ram[vm_family][region_spot]
+        price += instance.cpu * self.cpu[vm_family][region_capacity_type]
+        price += instance.memory * self.ram[vm_family][region_capacity_type]
         if instance.gpu_name:
-            if region_spot not in self.gpu[instance.gpu_name]:
+            if region_capacity_type not in self.gpu[instance.gpu_name]:
                 return None
-            price += instance.gpu_count * self.gpu[instance.gpu_name][region_spot]
+            price += instance.gpu_count * self.gpu[instance.gpu_name][region_capacity_type]
         if instance.instance_name in local_ssd_sizes_gib:
-            price += local_ssd_sizes_gib[instance.instance_name] * self.local_ssd[region_spot]
+            price += (
+                local_ssd_sizes_gib[instance.instance_name] * self.local_ssd[region_capacity_type]
+            )
 
         return price
 
@@ -454,6 +483,8 @@ class Prices:
 
 def set_flags(catalog_items: list[RawCatalogItem]) -> None:
     for item in catalog_items:
+        if cast(GCPCatalogItemProviderData, item.provider_data).get("is_dws_calendar_mode"):
+            item.flags.append("gcp-dws-calendar-mode")
         if item.instance_name.startswith("a4-"):
             item.flags.append("gcp-a4")
         elif item.instance_name.startswith("g4-standard-") and item.price == 0:
