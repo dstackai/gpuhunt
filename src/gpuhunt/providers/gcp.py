@@ -38,6 +38,7 @@ accelerator_details = {
     "nvidia-tesla-p4": AcceleratorDetails("P4", 8.0),
     "nvidia-tesla-t4": AcceleratorDetails("T4", 16.0),
     "nvidia-tesla-v100": AcceleratorDetails("V100", 16.0),
+    "nvidia-rtx-pro-6000": AcceleratorDetails("RTXPRO6000", 96.0),
 }
 CpuMemory = namedtuple("CpuMemory", ["cpu", "memory"])
 accelerator_limits = {
@@ -279,7 +280,6 @@ class GCPProvider(AbstractProvider):
         offers = self.fill_prices(instances)
         self.fill_gpu_vendors_and_names(offers)
         offers.extend(get_tpu_offers(self.project))
-        offers.extend(get_preview_offers())
         set_flags(offers)
         return sorted(offers, key=lambda i: i.price)
 
@@ -362,6 +362,7 @@ class Prices:
                     "Premium",
                     "Custom",
                     "suspended",
+                    # Should we filter out "Commitment" too?
                 ]
             ):
                 continue
@@ -371,7 +372,7 @@ class Prices:
                 self.add_storage_sku(sku)
 
     def add_compute_sku(self, sku: Sku) -> None:
-        if "(1 gpu slice)" in sku.description:
+        if "(1 gpu slice)" in sku.description or sku.description.startswith("RTX"):
             self.add_compute_gpu_slice_sku(sku)
             return
 
@@ -417,6 +418,8 @@ class Prices:
             "Spot Preemptible A4 Nvidia B200"
         ) or sku.description.startswith("DWS Calendar Mode A4 Nvidia B200"):
             gpu = "nvidia-b200"
+        elif sku.description.startswith("RTX"):
+            gpu = "nvidia-rtx-pro-6000"
         else:
             return
         price = self._calculate_sku_price(sku)
@@ -487,26 +490,6 @@ def set_flags(catalog_items: list[RawCatalogItem]) -> None:
             item.flags.append("gcp-dws-calendar-mode")
         if item.instance_name.startswith("a4-"):
             item.flags.append("gcp-a4")
-        elif item.instance_name.startswith("g4-standard-") and item.price == 0:
-            item.flags.append("gcp-g4-preview")
-
-
-def get_preview_offers() -> list[RawCatalogItem]:
-    return [
-        RawCatalogItem(
-            instance_name="g4-standard-48",
-            location="us-central1-b",
-            price=0,
-            cpu=48,
-            memory=180,
-            gpu_vendor=AcceleratorVendor.NVIDIA.value,
-            gpu_count=1,
-            gpu_name="RTXPRO6000",
-            gpu_memory=96,
-            spot=False,
-            disk_size=None,
-        )
-    ]
 
 
 def get_tpu_offers(project_id: str) -> list[RawCatalogItem]:
