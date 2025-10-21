@@ -151,6 +151,7 @@ def test_raw_catalog_item_to_from_dict() -> None:
         spot=False,
         disk_size=100.0,
         flags=["f1", "f2", "f3"],
+        provider_data={"custom_prop": 42},
     )
     item_dict = item.dict()
     assert item_dict == {
@@ -167,5 +168,6 @@ def test_raw_catalog_item_to_from_dict() -> None:
         "spot": False,
         "disk_size": 100.0,
         "flags": "f1 f2 f3",
+        "provider_data": '{"custom_prop": 42}',
     }
     assert RawCatalogItem.from_dict(item_dict) == item

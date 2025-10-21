@@ -1,4 +1,5 @@
 import enum
+import json
 from collections.abc import Container
 from dataclasses import asdict, dataclass, field, fields
 from typing import (
@@ -8,6 +9,17 @@ from typing import (
 )
 
 from gpuhunt._internal.utils import empty_as_none
+
+JSONType = Union[
+    None,
+    bool,
+    int,
+    float,
+    str,
+    list["JSONType"],
+    "JSONObject",
+]
+JSONObject = dict[str, JSONType]
 
 
 def bool_loader(x: Union[bool, str]) -> bool:
@@ -73,6 +85,7 @@ class RawCatalogItem:
     gpu_vendor: Optional[str] = None
     flags: list[str] = field(default_factory=list)
     cpu_arch: Optional[str] = None
+    provider_data: JSONObject = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self._process_gpu_vendor()
@@ -121,12 +134,14 @@ class RawCatalogItem:
             spot=empty_as_none(v.get("spot"), loader=bool_loader),
             disk_size=empty_as_none(v.get("disk_size"), loader=float),
             flags=v.get("flags", "").split(),
+            provider_data=json.loads(v.get("provider_data", "{}")),
         )
 
     def dict(self) -> dict[str, Union[str, int, float, bool, None]]:
         return {
             **asdict(self),
             "flags": " ".join(self.flags),
+            "provider_data": json.dumps(self.provider_data),
         }
 
 
@@ -153,6 +168,8 @@ class CatalogItem:
             will have to request this flag explicitly to get the catalog item.
             If you are adding a new provider, leave the flags empty.
             Flag names should be in kebab-case.
+        provider_data: dict with provider-specific properties.
+            Prefer defining a TypedDict within provider implementation.
     """
 
     instance_name: str
@@ -169,6 +186,7 @@ class CatalogItem:
     gpu_vendor: Optional[AcceleratorVendor] = None
     flags: list[str] = field(default_factory=list)
     cpu_arch: Optional[CPUArchitecture] = None
+    provider_data: JSONObject = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self._process_gpu_vendor()
