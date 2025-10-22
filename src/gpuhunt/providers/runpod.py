@@ -204,8 +204,10 @@ def fetch_cluster_offers() -> list[RawCatalogItem]:
                 spot=False,
                 disk_size=None,
                 flags=["runpod-cluster"],
-                # The API does not return supported pod counts but it's always 2 for now.
-                provider_data=cast(dict, RunpodCatalogItemProviderData(pod_counts=[2])),
+                # The API does not return supported pod counts but for now it's always 2-8 for all offers.
+                provider_data=cast(
+                    dict, RunpodCatalogItemProviderData(pod_counts=list(range(2, 9)))
+                ),
             )
             cluster_catalog_items.append(catalog_item)
     return cluster_catalog_items
