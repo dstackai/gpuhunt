@@ -5,7 +5,7 @@ from typing import Optional
 import requests
 from requests import Response
 
-from gpuhunt._internal.constraints import KNOWN_AMD_GPUS
+from gpuhunt._internal.constraints import find_accelerators
 from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
@@ -54,9 +54,8 @@ class HotAisleProvider(AbstractProvider):
 
 
 def get_gpu_memory(gpu_name: str) -> Optional[float]:
-    for gpu in KNOWN_AMD_GPUS:
-        if gpu.name.upper() == gpu_name.upper():
-            return float(gpu.memory)
+    if accelerators := find_accelerators(names=[gpu_name], vendors=[AcceleratorVendor.AMD]):
+        return float(accelerators[0].memory)
     logger.warning(f"Unknown AMD GPU {gpu_name}")
     return None
 

@@ -1,7 +1,9 @@
 import re
+from collections.abc import Container, Iterable
 from typing import Optional, TypeVar, Union
 
 from gpuhunt._internal.models import (
+    AcceleratorInfo,
     AcceleratorVendor,
     AMDArchitecture,
     AMDGPUInfo,
@@ -95,22 +97,32 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
     return True
 
 
+def find_accelerators(
+    names: Optional[Iterable[str]] = None, vendors: Optional[Container[AcceleratorVendor]] = None
+) -> list[AcceleratorInfo]:
+    if names is not None:
+        names = {n.lower() for n in names}
+    result = []
+    for accelerator in KNOWN_ACCELERATORS:
+        if (names is None or accelerator.name.lower() in names) and (
+            vendors is None or accelerator.vendor in vendors
+        ):
+            result.append(accelerator)
+    return result
+
+
 def get_compute_capability(gpu_name: str) -> Optional[tuple[int, int]]:
-    for gpu in KNOWN_NVIDIA_GPUS:
-        if gpu.name.lower() == gpu_name.lower():
-            return gpu.compute_capability
+    if accelerators := find_accelerators(names=[gpu_name], vendors=AcceleratorVendor.NVIDIA):
+        assert isinstance(accelerators[0], NvidiaGPUInfo)
+        return accelerators[0].compute_capability
     return None
 
 
-def get_gpu_vendor(gpu_name: Optional[str]) -> Optional[str]:
+def get_gpu_vendor(gpu_name: Optional[str]) -> Optional[AcceleratorVendor]:
     if gpu_name is None:
         return None
-    for gpu in KNOWN_NVIDIA_GPUS:
-        if gpu.name.upper() == gpu_name.upper():
-            return AcceleratorVendor.NVIDIA.value
-    for gpu in KNOWN_AMD_GPUS:
-        if gpu.name.upper() == gpu_name.upper():
-            return AcceleratorVendor.AMD.value
+    if accelerators := find_accelerators(names=[gpu_name]):
+        return accelerators[0].vendor
     return None
 
 
@@ -126,7 +138,7 @@ def correct_gpu_memory_gib(gpu_name: str, memory_mib: float) -> int:
     """
 
     memory_gib = memory_mib / 1024
-    known_memories_gib = {gpu.memory for gpu in KNOWN_ACCELERATORS if gpu.name == gpu_name}
+    known_memories_gib = {gpu.memory for gpu in find_accelerators(names=[gpu_name])}
     if known_memories_gib:
         closest_known_memory_gib = min(known_memories_gib, key=lambda x: abs(x - memory_gib))
         difference_gib = abs(closest_known_memory_gib - memory_gib)

@@ -8,7 +8,12 @@ from typing import Optional, TypeVar, Union
 import requests
 
 from gpuhunt import QueryFilter, RawCatalogItem
-from gpuhunt._internal.constraints import KNOWN_NVIDIA_GPUS, get_compute_capability, is_between
+from gpuhunt._internal.constraints import (
+    find_accelerators,
+    get_compute_capability,
+    is_between,
+)
+from gpuhunt._internal.models import AcceleratorVendor
 from gpuhunt.providers import AbstractProvider
 
 CpuMemoryGpu = namedtuple("CpuMemoryGpu", ["cpu", "memory", "gpu"])
@@ -387,9 +392,9 @@ def gpu_name(name: str) -> Optional[str]:
 def get_memory(gpu_name: str) -> Optional[int]:
     if not gpu_name:
         return None
-    for gpu in KNOWN_NVIDIA_GPUS:
-        if gpu.name.lower() == gpu_name.lower():
-            return gpu.memory
+    if accelerators := find_accelerators(names=[gpu_name], vendors=[AcceleratorVendor.NVIDIA]):
+        return accelerators[0].memory
+    return None
 
 
 def round_up(value: Optional[Union[int, float]], step: int) -> Optional[int]:

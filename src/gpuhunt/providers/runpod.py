@@ -7,7 +7,7 @@ import requests
 from requests import RequestException
 from typing_extensions import NotRequired, TypedDict
 
-from gpuhunt._internal.constraints import KNOWN_AMD_GPUS
+from gpuhunt._internal.constraints import find_accelerators
 from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
@@ -262,9 +262,8 @@ def get_nvidia_gpu_name(name: str) -> Optional[str]:
 
 
 def get_amd_gpu_name(name: str) -> Optional[str]:
-    for gpu in KNOWN_AMD_GPUS:
-        if gpu.name == name:
-            return name
+    if accelerators := find_accelerators(names=[name], vendors=[AcceleratorVendor.AMD]):
+        return accelerators[0].name
     return None
 
 
