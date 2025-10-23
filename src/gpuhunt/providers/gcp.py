@@ -38,6 +38,7 @@ accelerator_details = {
     "nvidia-tesla-p4": AcceleratorDetails("P4", 8.0),
     "nvidia-tesla-t4": AcceleratorDetails("T4", 16.0),
     "nvidia-tesla-v100": AcceleratorDetails("V100", 16.0),
+    "nvidia-rtx-pro-6000": AcceleratorDetails("RTXPRO6000", 96.0),
 }
 CpuMemory = namedtuple("CpuMemory", ["cpu", "memory"])
 accelerator_limits = {
@@ -279,8 +280,8 @@ class GCPProvider(AbstractProvider):
         offers = self.fill_prices(instances)
         self.fill_gpu_vendors_and_names(offers)
         offers.extend(get_tpu_offers(self.project))
-        offers.extend(get_preview_offers())
         set_flags(offers)
+        offers = add_legacy_g4_preview(offers)
         return sorted(offers, key=lambda i: i.price)
 
     @classmethod
@@ -375,15 +376,19 @@ class Prices:
             self.add_compute_gpu_slice_sku(sku)
             return
 
-        r = re.match(
-            r"^(?:spot preemptible )?(.+) (gpu|ram|core)",
-            sku.description,
-            flags=re.IGNORECASE,
-        )
-        if not r:
-            return
-        family, resource = r.groups()
-        resource = resource.lower()
+        if "RTX 6000 96GB" in sku.description:
+            family = "nvidia-rtx-pro-6000"
+            resource = "gpu"
+        else:
+            r = re.match(
+                r"^(?:spot preemptible )?(.+) (gpu|ram|core)",
+                sku.description,
+                flags=re.IGNORECASE,
+            )
+            if not r:
+                return
+            family, resource = r.groups()
+            resource = resource.lower()
 
         if resource == "gpu":
             family = family.replace(" ", "-").lower()
@@ -487,26 +492,27 @@ def set_flags(catalog_items: list[RawCatalogItem]) -> None:
             item.flags.append("gcp-dws-calendar-mode")
         if item.instance_name.startswith("a4-"):
             item.flags.append("gcp-a4")
-        elif item.instance_name.startswith("g4-standard-") and item.price == 0:
-            item.flags.append("gcp-g4-preview")
+        elif item.instance_name.startswith("g4-standard-"):
+            item.flags.append("gcp-g4")
 
 
-def get_preview_offers() -> list[RawCatalogItem]:
-    return [
-        RawCatalogItem(
-            instance_name="g4-standard-48",
-            location="us-central1-b",
-            price=0,
-            cpu=48,
-            memory=180,
-            gpu_vendor=AcceleratorVendor.NVIDIA.value,
-            gpu_count=1,
-            gpu_name="RTXPRO6000",
-            gpu_memory=96,
-            spot=False,
-            disk_size=None,
-        )
-    ]
+# TODO: drop when dstack 0.19.33 is no longer relevant
+def add_legacy_g4_preview(catalog_items: list[RawCatalogItem]) -> list[RawCatalogItem]:
+    """
+    For each g4-standard-* instance, add a duplicate item with the "gcp-g4-preview" flag.
+
+    This is only needed for dstack 0.19.33, where the flag "gcp-g4-preview"
+    is used instead of "gcp-g4".
+    """
+    new_items = []
+    for item in catalog_items:
+        new_items.append(item)
+        if item.instance_name.startswith("g4-standard-"):
+            preview_item = copy.deepcopy(item)
+            preview_item.flags.remove("gcp-g4")
+            preview_item.flags.append("gcp-g4-preview")
+            new_items.append(preview_item)
+    return new_items
 
 
 def get_tpu_offers(project_id: str) -> list[RawCatalogItem]:
