@@ -144,6 +144,7 @@ class TestGCPCatalog:
             "H100",
             "A100",
             "L4",
+            "RTXPRO6000",
             "T4",
             "V100",
             "P100",
