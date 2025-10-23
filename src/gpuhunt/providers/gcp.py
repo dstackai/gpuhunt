@@ -371,19 +371,23 @@ class Prices:
                 self.add_storage_sku(sku)
 
     def add_compute_sku(self, sku: Sku) -> None:
-        if "(1 gpu slice)" in sku.description or sku.description.startswith("RTX"):
+        if "(1 gpu slice)" in sku.description:
             self.add_compute_gpu_slice_sku(sku)
             return
 
-        r = re.match(
-            r"^(?:spot preemptible )?(.+) (gpu|ram|core)",
-            sku.description,
-            flags=re.IGNORECASE,
-        )
-        if not r:
-            return
-        family, resource = r.groups()
-        resource = resource.lower()
+        if "RTX 6000 96GB" in sku.description:
+            family = "nvidia-rtx-pro-6000"
+            resource = "gpu"
+        else:
+            r = re.match(
+                r"^(?:spot preemptible )?(.+) (gpu|ram|core)",
+                sku.description,
+                flags=re.IGNORECASE,
+            )
+            if not r:
+                return
+            family, resource = r.groups()
+            resource = resource.lower()
 
         if resource == "gpu":
             family = family.replace(" ", "-").lower()
@@ -417,8 +421,6 @@ class Prices:
             "Spot Preemptible A4 Nvidia B200"
         ) or sku.description.startswith("DWS Calendar Mode A4 Nvidia B200"):
             gpu = "nvidia-b200"
-        elif sku.description.startswith("RTX"):
-            gpu = "nvidia-rtx-pro-6000"
         else:
             return
         price = self._calculate_sku_price(sku)
@@ -489,6 +491,9 @@ def set_flags(catalog_items: list[RawCatalogItem]) -> None:
             item.flags.append("gcp-dws-calendar-mode")
         if item.instance_name.startswith("a4-"):
             item.flags.append("gcp-a4")
+        elif item.instance_name.startswith("g4-standard-"):
+            item.flags.append("gcp-g4-preview")  # only for dstack 0.19.33
+            item.flags.append("gcp-g4")
 
 
 def get_tpu_offers(project_id: str) -> list[RawCatalogItem]:
