@@ -281,6 +281,7 @@ class GCPProvider(AbstractProvider):
         self.fill_gpu_vendors_and_names(offers)
         offers.extend(get_tpu_offers(self.project))
         set_flags(offers)
+        offers = add_legacy_g4_preview(offers)
         return sorted(offers, key=lambda i: i.price)
 
     @classmethod
@@ -492,8 +493,26 @@ def set_flags(catalog_items: list[RawCatalogItem]) -> None:
         if item.instance_name.startswith("a4-"):
             item.flags.append("gcp-a4")
         elif item.instance_name.startswith("g4-standard-"):
-            item.flags.append("gcp-g4-preview")  # only for dstack 0.19.33
             item.flags.append("gcp-g4")
+
+
+# TODO: drop when dstack 0.19.33 is no longer relevant
+def add_legacy_g4_preview(catalog_items: list[RawCatalogItem]) -> list[RawCatalogItem]:
+    """
+    For each g4-standard-* instance, add a duplicate item with the "gcp-g4-preview" flag.
+
+    This is only needed for dstack 0.19.33, where the flag "gcp-g4-preview"
+    is used instead of "gcp-g4".
+    """
+    new_items = []
+    for item in catalog_items:
+        new_items.append(item)
+        if item.instance_name.startswith("g4-standard-"):
+            preview_item = copy.deepcopy(item)
+            preview_item.flags.remove("gcp-g4")
+            preview_item.flags.append("gcp-g4-preview")
+            new_items.append(preview_item)
+    return new_items
 
 
 def get_tpu_offers(project_id: str) -> list[RawCatalogItem]:
