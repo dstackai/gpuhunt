@@ -11,8 +11,8 @@ from pydantic import BaseModel, Field
 from requests import Session
 from typing_extensions import TypedDict
 
-from gpuhunt._internal.constraints import KNOWN_NVIDIA_GPUS
-from gpuhunt._internal.models import QueryFilter, RawCatalogItem
+from gpuhunt._internal.constraints import find_accelerators
+from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
 from gpuhunt._internal.utils import to_camel_case
 from gpuhunt.providers import AbstractProvider
 
@@ -332,7 +332,8 @@ def get_gpu_name(shape_name: str) -> Optional[str]:
         if gpu_name_index < len(parts):
             gpu_name = parts[gpu_name_index]
 
-            for gpu in KNOWN_NVIDIA_GPUS:
-                if gpu.name.upper() == gpu_name:
-                    return gpu.name
+            if accelerators := find_accelerators(
+                names=[gpu_name], vendors=[AcceleratorVendor.NVIDIA]
+            ):
+                return accelerators[0].name
     return None

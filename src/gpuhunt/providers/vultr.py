@@ -6,12 +6,11 @@ from requests import Response
 
 from gpuhunt import QueryFilter, RawCatalogItem
 from gpuhunt._internal.constraints import (
-    KNOWN_AMD_GPUS,
-    KNOWN_NVIDIA_GPUS,
+    find_accelerators,
     get_gpu_vendor,
     is_nvidia_superchip,
 )
-from gpuhunt._internal.models import CPUArchitecture
+from gpuhunt._internal.models import AcceleratorVendor, CPUArchitecture
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -162,13 +161,10 @@ def get_instance_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
 def get_gpu_memory(gpu_name: str) -> Optional[int]:
     if gpu_name.upper() == "A100":
         return 80  # VULTR A100 instances have 80GB
-    for gpu in KNOWN_NVIDIA_GPUS:
-        if gpu.name.upper() == gpu_name.upper():
-            return gpu.memory
-
-    for gpu in KNOWN_AMD_GPUS:
-        if gpu.name.upper() == gpu_name.upper():
-            return gpu.memory
+    if accelerators := find_accelerators(
+        names=[gpu_name], vendors=[AcceleratorVendor.NVIDIA, AcceleratorVendor.AMD]
+    ):
+        return accelerators[0].memory
     logger.warning(f"Unknown GPU {gpu_name}")
     return None
 
