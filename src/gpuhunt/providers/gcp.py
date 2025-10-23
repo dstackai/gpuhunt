@@ -362,7 +362,6 @@ class Prices:
                     "Premium",
                     "Custom",
                     "suspended",
-                    # Should we filter out "Commitment" too?
                 ]
             ):
                 continue
