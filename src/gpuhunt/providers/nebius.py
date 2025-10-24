@@ -1,14 +1,23 @@
 import logging
 import re
-from dataclasses import dataclass
 from typing import Optional
 
 from nebius.aio.channel import Credentials
+from nebius.api.nebius.billing.v1alpha1 import (
+    CalculatorServiceClient,
+    EstimateRequest,
+    ResourceSpec,
+)
+from nebius.api.nebius.common.v1 import ResourceMetadata
 from nebius.api.nebius.compute.v1 import (
+    CreateInstanceRequest,
+    InstanceSpec,
     ListPlatformsRequest,
     ListPlatformsResponse,
     PlatformServiceClient,
+    PreemptibleSpec,
     Preset,
+    ResourcesSpec,
 )
 from nebius.api.nebius.iam.v1 import (
     ListProjectsRequest,
@@ -18,112 +27,16 @@ from nebius.api.nebius.iam.v1 import (
 )
 from nebius.sdk import SDK
 
-from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
+from gpuhunt._internal.constraints import find_accelerators
+from gpuhunt._internal.models import (
+    AcceleratorInfo,
+    AcceleratorVendor,
+    QueryFilter,
+    RawCatalogItem,
+)
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class PlatformGPU:
-    name: str
-    memory_gib: int
-    price_hour: float
-    price_hour_spot: Optional[float] = None
-    vendor: AcceleratorVendor = AcceleratorVendor.NVIDIA
-
-
-@dataclass
-class Platform:
-    name: str
-    gpu: Optional[PlatformGPU]
-    cpu_price_hour: float
-    memory_gib_price_hour: float
-    cpu_price_hour_spot: Optional[float] = None
-    memory_gib_price_hour_spot: Optional[float] = None
-
-
-# Until Nebius provides a pricing API, prices are taken from
-# https://docs.nebius.com/compute/resources/pricing
-# TODO: https://github.com/nebius/api/blob/main/nebius/billing/v1alpha1/calculator_service.proto
-PLATFORMS = [
-    Platform(
-        # NVIDIA® H100 NVLink with Intel Sapphire Rapids
-        name="gpu-h100-sxm",
-        gpu=PlatformGPU(
-            name="H100",
-            memory_gib=80,
-            price_hour=2.118,
-            price_hour_spot=0.834,
-        ),
-        cpu_price_hour=0.012,
-        cpu_price_hour_spot=0.006,
-        memory_gib_price_hour=0.0032,
-        memory_gib_price_hour_spot=0.0016,
-    ),
-    Platform(
-        # NVIDIA® H200 NVLink with Intel Sapphire Rapids
-        name="gpu-h200-sxm",
-        gpu=PlatformGPU(
-            name="H200",
-            memory_gib=141,
-            price_hour=2.668,
-            price_hour_spot=1.034,
-        ),
-        cpu_price_hour=0.012,
-        cpu_price_hour_spot=0.006,
-        memory_gib_price_hour=0.0032,
-        memory_gib_price_hour_spot=0.0016,
-    ),
-    Platform(
-        # NVIDIA® L40S PCIe with Intel Ice Lake
-        name="gpu-l40s-a",
-        gpu=PlatformGPU(
-            name="L40S",
-            memory_gib=48,
-            price_hour=1.35,
-        ),
-        cpu_price_hour=0.012,
-        memory_gib_price_hour=0.0032,
-    ),
-    Platform(
-        # NVIDIA® L40S PCIe with AMD Epyc Genoa
-        name="gpu-l40s-d",
-        gpu=PlatformGPU(
-            name="L40S",
-            memory_gib=48,
-            price_hour=1.35,
-        ),
-        cpu_price_hour=0.01,
-        memory_gib_price_hour=0.0032,
-    ),
-    Platform(
-        # Non-GPU AMD EPYC Genoa
-        name="cpu-d3",
-        gpu=None,
-        cpu_price_hour=0.012,
-        memory_gib_price_hour=0.0032,
-    ),
-    Platform(
-        # Non-GPU Intel Ice Lake
-        name="cpu-e2",
-        gpu=None,
-        cpu_price_hour=0.012,
-        memory_gib_price_hour=0.0032,
-    ),
-    Platform(
-        # NVIDIA® B200 NVLink with Intel Emerald Rapids
-        name="gpu-b200-sxm",
-        gpu=PlatformGPU(
-            name="B200",
-            memory_gib=180,
-            price_hour=4.5432,
-        ),
-        cpu_price_hour=0.012,
-        memory_gib_price_hour=0.0032,
-    ),
-]
-PLATFORMS_MAP = {p.name: p for p in PLATFORMS}
 TIMEOUT = 7
 
 
@@ -138,32 +51,36 @@ class NebiusProvider(AbstractProvider):
     ) -> list[RawCatalogItem]:
         items: list[RawCatalogItem] = []
         sdk = SDK(credentials=self.credentials)
+        calculator = CalculatorServiceClient(sdk)
         try:
-            for region_code, region_name in get_regions_map(sdk).items():
-                for nebius_platform in list_platforms(sdk, region_code).items:
-                    platform = PLATFORMS_MAP.get(nebius_platform.metadata.name)
-                    if platform is None:
-                        logger.warning(f"Unknown platform: {nebius_platform.metadata.name}")
-                        continue
-                    for preset in nebius_platform.spec.presets:
-                        items.append(make_item(platform, preset, region_name, spot=False))
-
-                        if (
-                            platform.cpu_price_hour_spot is not None
-                            and platform.memory_gib_price_hour_spot is not None
-                            and (platform.gpu is None or platform.gpu.price_hour_spot is not None)
+            region_to_project_id = get_sample_projects(sdk)
+            for region, project_id in region_to_project_id.items():
+                platforms = list_platforms(sdk, project_id).items
+                for platform in platforms:
+                    logger.info("Processing %s/%s", region, platform.metadata.name)
+                    gpu = get_gpu_info(platform.metadata.name)
+                    for preset in platform.spec.presets:
+                        for spot in [False] + (
+                            [True] if platform.status.allowed_for_preemptibles else []
                         ):
-                            items.append(make_item(platform, preset, region_name, spot=True))
+                            price = get_price(
+                                calculator, project_id, platform.metadata.name, preset.name, spot
+                            )
+                            item = make_item(
+                                platform.metadata.name, preset, gpu, region, spot, price
+                            )
+                            if item is not None:
+                                items.append(item)
         finally:
             sdk.sync_close(timeout=TIMEOUT)
         items.sort(key=lambda i: i.price)
         return items
 
 
-def get_regions_map(sdk: SDK) -> dict[str, str]:
+def get_sample_projects(sdk: SDK) -> dict[str, str]:
     """
     Returns:
-        `{"e00": "eu-north1", "e01": "eu-west1", ...}`
+        A mapping from region names to project IDs of random projects in those regions.
     """
     tenants = TenantServiceClient(sdk).list(ListTenantsRequest(), per_retry_timeout=TIMEOUT).wait()
     if len(tenants.items) != 1:
@@ -175,42 +92,59 @@ def get_regions_map(sdk: SDK) -> dict[str, str]:
         )
         .wait()
     )
-    result = {}
+    region_to_project_id = {}
     for project in projects.items:
-        match = re.match(r"^project-([a-z]\d\d)", project.metadata.id)
-        if match is None:
-            logger.error(f"Could not parse project id {project.metadata.id!r}")
-            continue
-        result[match.group(1)] = project.status.region
-    return result
+        region_to_project_id[project.status.region] = project.metadata.id
+    return region_to_project_id
 
 
-def list_platforms(sdk: SDK, region_code: str) -> ListPlatformsResponse:
+def get_price(
+    calculator: CalculatorServiceClient, project_id: str, platform: str, preset: str, spot: bool
+) -> float:
+    spec = CreateInstanceRequest(
+        metadata=ResourceMetadata(parent_id=project_id),
+        spec=InstanceSpec(
+            resources=ResourcesSpec(platform=platform, preset=preset),
+            preemptible=PreemptibleSpec() if spot else None,
+        ),
+    )
+    estimate = calculator.estimate(
+        request=EstimateRequest(resource_spec=ResourceSpec(compute_instance_spec=spec))
+    ).wait()
+    return float(estimate.hourly_cost.general.total.cost)
+
+
+def list_platforms(sdk: SDK, project_id: str) -> ListPlatformsResponse:
     req = ListPlatformsRequest(
         page_size=999,
-        parent_id=f"project-{region_code}public-images",
+        parent_id=project_id,
     )
     return PlatformServiceClient(sdk).list(req, per_retry_timeout=TIMEOUT).wait()
 
 
+def get_gpu_info(platform: str) -> Optional[AcceleratorInfo]:
+    m = re.match(r"gpu-([^-]+)-", platform)
+    if m is None:
+        return None
+    gpu_name = m.group(1)
+    accelerator_info = find_accelerators(names=[gpu_name], vendors=[AcceleratorVendor.NVIDIA])
+    if len(accelerator_info) != 1:
+        return None
+    return accelerator_info[0]
+
+
 def make_item(
-    platform: Platform, preset: Preset, region: str, spot: bool = False
-) -> RawCatalogItem:
-    def get_price(regular_price: float, spot_price: Optional[float]) -> float:
-        """Helper function to get the appropriate price based on spot availability"""
-        return spot_price if spot and spot_price is not None else regular_price
-
-    # Determine pricing based on spot availability
-    cpu_price = get_price(platform.cpu_price_hour, platform.cpu_price_hour_spot)
-    memory_price = get_price(platform.memory_gib_price_hour, platform.memory_gib_price_hour_spot)
-
+    platform: str,
+    preset: Preset,
+    gpu: Optional[AcceleratorInfo],
+    region: str,
+    spot: bool,
+    price: float,
+) -> Optional[RawCatalogItem]:
     item = RawCatalogItem(
-        instance_name=f"{platform.name} {preset.name}",
+        instance_name=f"{platform} {preset.name}",
         location=region,
-        price=(
-            preset.resources.vcpu_count * cpu_price
-            + preset.resources.memory_gibibytes * memory_price
-        ),
+        price=price,
         cpu=preset.resources.vcpu_count,
         memory=preset.resources.memory_gibibytes,
         gpu_count=0,
@@ -221,13 +155,17 @@ def make_item(
         disk_size=None,
     )
 
-    if platform.gpu is not None:
+    if preset.resources.gpu_count:
+        if gpu is None:
+            logger.warning(
+                "Platform %s preset %s has GPUs, but they could not be identified. Skipping",
+                platform,
+                preset.name,
+            )
+            return None
         item.gpu_count = preset.resources.gpu_count
-        item.gpu_name = platform.gpu.name
-        item.gpu_memory = platform.gpu.memory_gib
-        item.gpu_vendor = platform.gpu.vendor.value
-        gpu_price = get_price(platform.gpu.price_hour, platform.gpu.price_hour_spot)
-        item.price += item.gpu_count * gpu_price
+        item.gpu_name = gpu.name
+        item.gpu_memory = float(gpu.memory)
+        item.gpu_vendor = gpu.vendor
 
-    item.price = round(item.price, 8)  # fix floating point precision errors
     return item
