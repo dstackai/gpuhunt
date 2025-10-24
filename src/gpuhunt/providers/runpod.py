@@ -176,7 +176,7 @@ def make_catalog_items(query_variables: dict, pod: dict) -> list[RawCatalogItem]
 def fetch_cluster_offers() -> list[RawCatalogItem]:
     cluster_catalog_items = []
     query_variables = {
-        "GpuTypeFilter": {
+        "gpuTypesInput": {
             "cluster": True,
         },
         "lowestPriceInput": {
@@ -190,13 +190,24 @@ def fetch_cluster_offers() -> list[RawCatalogItem]:
             logger.warning(f"{pod_type['id']} missing in runpod GPU_MAP")
             continue
         gpu_vendor, gpu_name = listed_gpu_vendor_and_name
+        # Runpod returns no CPU and memory if the offer is out of stock.
+        # Out of stock appears to be different from no capacity meaning
+        # the offer is not available for a prolonged period.
+        cpu = pod_type["lowestPrice"].get("minVcpu")
+        memory = pod_type["lowestPrice"].get("minMemory")
+        if cpu is None:
+            logger.warning(f"{pod_type['id']} cluster offer missing minVcpu")
+            continue
+        if memory is None:
+            logger.warning(f"{pod_type['id']} cluster offer missing minMemory")
+            continue
         for location in pod_type["nodeGroupDatacenters"]:
             catalog_item = RawCatalogItem(
                 instance_name=pod_type["id"],
                 location=location["id"],
                 price=pod_type["clusterPrice"] * pod_type["maxGpuCount"],
-                cpu=pod_type["lowestPrice"]["minVcpu"],
-                memory=pod_type["lowestPrice"]["minMemory"],
+                cpu=cpu,
+                memory=memory,
                 gpu_vendor=gpu_vendor,
                 gpu_count=pod_type["maxGpuCount"],
                 gpu_name=gpu_name,
