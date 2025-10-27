@@ -11,7 +11,7 @@ def data_rows(catalog_dir: Path) -> list[dict]:
         return list(csv.DictReader(f))
 
 
-@pytest.mark.parametrize("gpu", ["L40S", "H100", "H200", ""])
+@pytest.mark.parametrize("gpu", ["L40S", "H100", "H200", "B200", ""])
 def test_gpu_present(gpu: str, data_rows: list[dict]):
     assert gpu in map(itemgetter("gpu_name"), data_rows)
 
