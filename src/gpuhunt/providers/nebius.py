@@ -1,6 +1,7 @@
 import logging
 import re
-from typing import Optional
+from dataclasses import dataclass
+from typing import Optional, cast
 
 from nebius.aio.channel import Credentials
 from nebius.api.nebius.billing.v1alpha1 import (
@@ -26,11 +27,13 @@ from nebius.api.nebius.iam.v1 import (
     TenantServiceClient,
 )
 from nebius.sdk import SDK
+from typing_extensions import TypedDict
 
 from gpuhunt._internal.constraints import find_accelerators
 from gpuhunt._internal.models import (
     AcceleratorInfo,
     AcceleratorVendor,
+    JSONObject,
     QueryFilter,
     RawCatalogItem,
 )
@@ -38,6 +41,26 @@ from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
 TIMEOUT = 7
+
+
+@dataclass(frozen=True)
+class InfinibandFabric:
+    name: str
+    platform: str
+    region: str
+
+
+# https://docs.nebius.com/compute/clusters/gpu#fabrics
+INFINIBAND_FABRICS = [
+    InfinibandFabric("fabric-2", "gpu-h100-sxm", "eu-north1"),
+    InfinibandFabric("fabric-3", "gpu-h100-sxm", "eu-north1"),
+    InfinibandFabric("fabric-4", "gpu-h100-sxm", "eu-north1"),
+    InfinibandFabric("fabric-5", "gpu-h200-sxm", "eu-west1"),
+    InfinibandFabric("fabric-6", "gpu-h100-sxm", "eu-north1"),
+    InfinibandFabric("fabric-7", "gpu-h200-sxm", "eu-north1"),
+    InfinibandFabric("us-central1-a", "gpu-h200-sxm", "us-central1"),
+    InfinibandFabric("us-central1-b", "gpu-b200-sxm", "us-central1"),
+]
 
 
 class NebiusProvider(AbstractProvider):
@@ -75,6 +98,10 @@ class NebiusProvider(AbstractProvider):
             sdk.sync_close(timeout=TIMEOUT)
         items.sort(key=lambda i: i.price)
         return items
+
+
+class NebiusCatalogItemProviderData(TypedDict):
+    fabrics: list[str]
 
 
 def get_sample_projects(sdk: SDK) -> dict[str, str]:
@@ -141,6 +168,12 @@ def make_item(
     spot: bool,
     price: float,
 ) -> Optional[RawCatalogItem]:
+    fabrics = []
+    if preset.allow_gpu_clustering:
+        fabrics = [
+            f.name for f in INFINIBAND_FABRICS if f.platform == platform and f.region == region
+        ]
+
     item = RawCatalogItem(
         instance_name=f"{platform} {preset.name}",
         location=region,
@@ -153,6 +186,7 @@ def make_item(
         gpu_vendor=None,
         spot=spot,
         disk_size=None,
+        provider_data=cast(JSONObject, NebiusCatalogItemProviderData(fabrics=fabrics)),
     )
 
     if preset.resources.gpu_count:
