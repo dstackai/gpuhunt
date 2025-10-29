@@ -38,8 +38,6 @@ gcp = [
     "google-cloud-billing",
     "google-cloud-compute",
     "google-cloud-tpu",
-    # indirect, workaround for https://github.com/googleapis/python-api-core/issues/848. TODO: drop
-    "google-api-core<2.28.0",
 ]
 # Nebius requires Python 3.10. On 3.9:
 # `pip install gpuhunt[nebius]` is expected to fail
