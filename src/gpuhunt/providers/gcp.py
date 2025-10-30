@@ -463,7 +463,10 @@ class Prices:
 
         # For others, the price consists of several components
         price = 0
-        if region_capacity_type not in self.cpu[vm_family]:
+        if (
+            region_capacity_type not in self.cpu[vm_family]
+            or region_capacity_type not in self.ram[vm_family]
+        ):
             return None
         price += instance.cpu * self.cpu[vm_family][region_capacity_type]
         price += instance.memory * self.ram[vm_family][region_capacity_type]
