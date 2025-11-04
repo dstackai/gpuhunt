@@ -43,10 +43,10 @@ gcp = [
 # `pip install gpuhunt[nebius]` is expected to fail
 # `pip install gpuhunt[all]` is expected to ignore Nebius
 nebius = [
-    "nebius>=0.2.40,<0.3",
+    "nebius>=0.2.40,<0.4",
 ]
 maybe_nebius = [
-    'nebius>=0.2.18,<0.3; python_version>="3.10"',
+    'nebius>=0.2.40,<0.4; python_version>="3.10"',
 ]
 oci = [
     "oci",

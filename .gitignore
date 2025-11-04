@@ -5,3 +5,4 @@
 /venv/
 /.venv/
 /build/
+uv.lock
