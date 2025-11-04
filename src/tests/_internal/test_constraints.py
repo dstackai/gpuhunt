@@ -194,6 +194,23 @@ class TestMatches:
         q = QueryFilter(allowed_flags=query_allowed_flags)
         assert matches(item, q) == should_match
 
+    def test_matches_cpu_instances_with_zero_gpu_count_and_gpu_memory(self):
+        cpu_item = CatalogItem(
+            instance_name="large",
+            location="us-east-1",
+            price=1.2,
+            cpu=16,
+            memory=64.0,
+            gpu_vendor=None,
+            gpu_count=0,
+            gpu_name=None,
+            gpu_memory=None,
+            spot=False,
+            provider="aws",
+            disk_size=None,
+        )
+        assert matches(cpu_item, QueryFilter(min_gpu_count=0, min_gpu_memory=24))
+
 
 @pytest.mark.parametrize(
     ("gpu_name", "memory_mib", "expected_memory_gib"),
