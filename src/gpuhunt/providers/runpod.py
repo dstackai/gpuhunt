@@ -23,6 +23,9 @@ class RunpodCatalogItemProviderData(TypedDict):
 
 class RunpodProvider(AbstractProvider):
     NAME = "runpod"
+    # Minimum CUDA version on the host. Used to filter available offers
+    # and should also be used when provisioning pods.
+    MIN_CUDA_VERSION = "12.8"
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
@@ -94,6 +97,7 @@ def build_query_variables() -> list[dict]:
                         "minDisk": None,
                         "minMemoryInGb": None,
                         "minVcpuCount": None,
+                        "minCudaVersion": RunpodProvider.MIN_CUDA_VERSION,
                     },
                 }
             )
@@ -113,6 +117,7 @@ def build_query_variables() -> list[dict]:
                         "minDisk": None,
                         "minMemoryInGb": None,
                         "minVcpuCount": None,
+                        "minCudaVersion": RunpodProvider.MIN_CUDA_VERSION,
                     },
                 }
             )
