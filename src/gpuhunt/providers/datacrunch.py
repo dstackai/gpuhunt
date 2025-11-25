@@ -91,12 +91,14 @@ def transform_instance(instance: InstanceType, spot: bool, location: str) -> Opt
 
 GPU_MAP = {
     r"\d+x B200 SXM6 180GB": "B200",
+    r"\d+x B300 SXM6 262GB": "B300",
     r"\d+x H200 SXM5 141GB": "H200",
     r"\d+x H100 SXM5 80GB": "H100",
     r"\d+x A100 SXM4 80GB": "A100",
     r"\d+x A100 SXM4 40GB": "A100",
     r"\d+x RTX6000 Ada 48GB": "RTX6000Ada",
     r"\d+x RTX 6000 Ada 48GB": "RTX6000Ada",
+    r"\d+x RTX PRO 6000 96GB": "RTXPRO6000",
     r"\d+x RTX A6000 48GB": "A6000",
     r"\d+x Tesla V100 16GB": "V100",
     r"\d+x L40S 48GB": "L40S",
