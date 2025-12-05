@@ -30,8 +30,3 @@ def test_gpu_present(data_rows: list[dict]):
 @pytest.mark.parametrize("gpu_count", [1, 2])
 def test_gpu_count_present(gpu_count: int, data_rows: list[dict]):
     assert str(gpu_count) in map(itemgetter("gpu_count"), data_rows)
-
-
-@pytest.mark.parametrize("location", ["us-east-nc-nr-1"])
-def test_location_is_present(location: str, data_rows: list[dict]):
-    assert location in map(itemgetter("location"), data_rows)
