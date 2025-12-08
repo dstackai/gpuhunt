@@ -47,7 +47,7 @@ jobs:
         run: |
           IGNORE=
           if [[ "${{ matrix.python-version }}" == "3.9" ]]; then
-            IGNORE="--ignore src/gpuhunt/providers/nebius.py"
+            IGNORE="--ignore src/gpuhunt/providers/nebius.py --ignore src/gpuhunt/providers/verda.py"
           fi
           pytest --doctest-modules src/gpuhunt $IGNORE
       - name: Run pytest
