@@ -48,7 +48,7 @@ def test_all_providers_have_a_names(providers):
 def test_catalog_providers(providers):
     CATALOG_PROVIDERS = OFFLINE_PROVIDERS + ONLINE_PROVIDERS
     if sys.version_info < (3, 10):
-        CATALOG_PROVIDERS = [p for p in CATALOG_PROVIDERS if p != "nebius"]
+        CATALOG_PROVIDERS = [p for p in CATALOG_PROVIDERS if p not in ["nebius", "verda"]]
     names = [p.NAME for p in providers]
     assert set(CATALOG_PROVIDERS) == set(names)
     assert len(CATALOG_PROVIDERS) == len(names)
