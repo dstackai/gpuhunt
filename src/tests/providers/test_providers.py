@@ -14,7 +14,7 @@ def providers():
     """List of all provider classes"""
     members = []
     for module_info in pkgutil.walk_packages(gpuhunt.providers.__path__):
-        if sys.version_info < (3, 10) and module_info.name == "nebius":
+        if sys.version_info < (3, 10) and module_info.name in ["nebius", "verda"]:
             continue
         module = importlib.import_module(
             f".{module_info.name}",

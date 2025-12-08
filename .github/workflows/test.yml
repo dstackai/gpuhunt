@@ -52,4 +52,8 @@ jobs:
           pytest --doctest-modules src/gpuhunt $IGNORE
       - name: Run pytest
         run: |
-          pytest src/tests
+          IGNORE=
+          if [[ "${{ matrix.python-version }}" == "3.9" ]]; then
+            IGNORE="--ignore src/tests/providers/test_verda.py"
+          fi
+          pytest src/tests $IGNORE
