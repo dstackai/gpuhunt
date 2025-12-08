@@ -52,10 +52,10 @@ oci = [
     "oci",
     "pydantic>=1.10.10,<2.0.0",
 ]
-datacrunch = [
-    "datacrunch"
+verda = [
+    "verda"
 ]
-all = ["gpuhunt[aws,azure,datacrunch,gcp,maybe_nebius,oci]"]
+all = ["gpuhunt[aws,azure,verda,gcp,maybe_nebius,oci]"]
 dev = [
     "pre-commit",
     "pytest~=7.0",

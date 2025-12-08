@@ -5,8 +5,8 @@ import re
 from collections.abc import Iterable
 from typing import Optional
 
-from datacrunch import DataCrunchClient
-from datacrunch.instance_types.instance_types import InstanceType
+from verda import VerdaClient
+from verda.instance_types import InstanceType
 
 from gpuhunt import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
@@ -19,11 +19,11 @@ ALL_AMD_GPUS = [
 ]
 
 
-class DataCrunchProvider(AbstractProvider):
-    NAME = "datacrunch"
+class VerdaProvider(AbstractProvider):
+    NAME = "verda"
 
     def __init__(self, client_id: str, client_secret: str) -> None:
-        self.datacrunch_client = DataCrunchClient(client_id, client_secret)
+        self.VERDA_client = VerdaClient(client_id, client_secret)
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
@@ -38,10 +38,10 @@ class DataCrunchProvider(AbstractProvider):
         return sorted(instances, key=lambda x: x.price)
 
     def _get_instance_types(self) -> list[InstanceType]:
-        return self.datacrunch_client.instance_types.get()
+        return self.VERDA_client.instance_types.get()
 
     def _get_locations(self) -> list[dict]:
-        return self.datacrunch_client.locations.get()
+        return self.VERDA_client.locations.get()
 
     @classmethod
     def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
