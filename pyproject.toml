@@ -9,7 +9,7 @@ authors = [
 ]
 description = "A catalog of GPU pricing for different cloud providers"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
@@ -55,7 +55,10 @@ oci = [
 verda = [
     "verda"
 ]
-all = ["gpuhunt[aws,azure,verda,gcp,maybe_nebius,oci]"]
+maybe_verda = [
+    'verda; python_version>="3.10"',
+]
+all = ["gpuhunt[aws,azure,verda,gcp,maybe_nebius,maybe_verda,oci]"]
 dev = [
     "pre-commit",
     "pytest~=7.0",
