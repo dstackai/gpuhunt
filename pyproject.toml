@@ -58,7 +58,7 @@ verda = [
 maybe_verda = [
     'verda; python_version>="3.10"',
 ]
-all = ["gpuhunt[aws,azure,verda,gcp,maybe_nebius,maybe_verda,oci]"]
+all = ["gpuhunt[aws,azure,maybe_verda,gcp,maybe_nebius,oci]"]
 dev = [
     "pre-commit",
     "pytest~=7.0",
