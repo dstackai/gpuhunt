@@ -4,9 +4,9 @@ import pytest
 
 import gpuhunt._internal.catalog as internal_catalog
 from gpuhunt import AcceleratorVendor, Catalog, CatalogItem, RawCatalogItem
-from gpuhunt.providers.datacrunch import (
-    DataCrunchProvider,
+from gpuhunt.providers.verda import (
     InstanceType,
+    VerdaProvider,
     generate_instances,
     get_gpu_name,
     transform_instance,
@@ -15,7 +15,7 @@ from gpuhunt.providers.datacrunch import (
 
 @pytest.fixture
 def raw_instance_types() -> list[dict]:
-    # datacrunch.instance_types.get()
+    # verda.instance_types.get()
     one_gpu = {
         "best_for": [
             "Gargantuan ML models",
@@ -103,7 +103,7 @@ def raw_instance_types() -> list[dict]:
 
 @pytest.fixture
 def availabilities() -> list[dict]:
-    # datacrunch.instances.get_availabilities(is_spot=True)
+    # verda.instances.get_availabilities(is_spot=True)
     data = [
         {
             "location_code": "FIN-01",
@@ -142,7 +142,7 @@ def availabilities() -> list[dict]:
 
 @pytest.fixture
 def locations():
-    # datacrunch.locations.get()
+    # verda.locations.get()
     return [
         {"code": "FIN-01", "name": "Finland 1", "country_code": "FI"},
         {"code": "FIN-02", "name": "Finland 2", "country_code": "FI"},
@@ -185,7 +185,7 @@ def test_gpu_name(caplog):
 def transform(raw_catalog_items: list[RawCatalogItem]) -> list[CatalogItem]:
     items = []
     for raw in raw_catalog_items:
-        item = CatalogItem(provider="datacrunch", **dataclasses.asdict(raw))
+        item = CatalogItem(provider="verda", **dataclasses.asdict(raw))
         items.append(item)
     return items
 
@@ -195,16 +195,16 @@ def test_available_query(mocker, raw_instance_types):
 
     instance_type = instance_types(raw_instance_types[0])
 
-    mocker.patch("datacrunch.DataCrunchClient.__init__", return_value=None)
-    datacrunch = DataCrunchProvider("EXAMPLE", "EXAMPLE")
-    datacrunch._get_instance_types = mocker.Mock(return_value=[instance_type])
-    datacrunch._get_locations = mocker.Mock(return_value=[{"code": "FIN-01"}])
+    mocker.patch("verda.VerdaClient.__init__", return_value=None)
+    verda = VerdaProvider("EXAMPLE", "EXAMPLE")
+    verda._get_instance_types = mocker.Mock(return_value=[instance_type])
+    verda._get_locations = mocker.Mock(return_value=[{"code": "FIN-01"}])
 
-    internal_catalog.ONLINE_PROVIDERS = ["datacrunch"]
+    internal_catalog.ONLINE_PROVIDERS = ["verda"]
     internal_catalog.OFFLINE_PROVIDERS = []
 
-    catalog.add_provider(datacrunch)
-    query_result = catalog.query(provider=["datacrunch"])
+    catalog.add_provider(verda)
+    query_result = catalog.query(provider=["verda"])
 
     assert len(query_result) == 2
 
@@ -219,7 +219,7 @@ def test_available_query(mocker, raw_instance_types):
         gpu_name="H100",
         gpu_memory=80.0,
         spot=True,
-        provider="datacrunch",
+        provider="verda",
         disk_size=None,
     )
     expected_non_spot = CatalogItem(
@@ -233,7 +233,7 @@ def test_available_query(mocker, raw_instance_types):
         gpu_name="H100",
         gpu_memory=80.0,
         spot=False,
-        provider="datacrunch",
+        provider="verda",
         disk_size=None,
     )
     assert [r for r in query_result if r.spot] == [expected_spot]
@@ -246,16 +246,16 @@ def test_available_query_with_instance(mocker, raw_instance_types):
     instance_type = instance_types(raw_instance_types[-1])
     print(instance_type)
 
-    mocker.patch("datacrunch.DataCrunchClient.__init__", return_value=None)
-    datacrunch = DataCrunchProvider("EXAMPLE", "EXAMPLE")
-    datacrunch._get_instance_types = mocker.Mock(return_value=[instance_type])
-    datacrunch._get_locations = mocker.Mock(return_value=[{"code": "FIN-01"}])
+    mocker.patch("verda.VerdaClient.__init__", return_value=None)
+    verda = VerdaProvider("EXAMPLE", "EXAMPLE")
+    verda._get_instance_types = mocker.Mock(return_value=[instance_type])
+    verda._get_locations = mocker.Mock(return_value=[{"code": "FIN-01"}])
 
-    internal_catalog.ONLINE_PROVIDERS = ["datacrunch"]
+    internal_catalog.ONLINE_PROVIDERS = ["verda"]
     internal_catalog.OFFLINE_PROVIDERS = []
 
-    catalog.add_provider(datacrunch)
-    query_result = catalog.query(provider=["datacrunch"])
+    catalog.add_provider(verda)
+    query_result = catalog.query(provider=["verda"])
 
     print(query_result)
 
@@ -272,7 +272,7 @@ def test_available_query_with_instance(mocker, raw_instance_types):
         gpu_name="V100",
         gpu_memory=16.0,
         spot=True,
-        provider="datacrunch",
+        provider="verda",
         disk_size=None,
     )
     expected_non_spot = CatalogItem(
@@ -286,7 +286,7 @@ def test_available_query_with_instance(mocker, raw_instance_types):
         gpu_name="V100",
         gpu_memory=16.0,
         spot=False,
-        provider="datacrunch",
+        provider="verda",
         disk_size=None,
     )
 
@@ -343,16 +343,16 @@ def test_order(mocker, raw_instance_types):
 
     types = map(instance_types, raw_instance_types)
 
-    mocker.patch("datacrunch.DataCrunchClient.__init__", return_value=None)
-    datacrunch = DataCrunchProvider("EXAMPLE", "EXAMPLE")
-    datacrunch._get_instance_types = mocker.Mock(return_value=list(types))
-    datacrunch._get_locations = mocker.Mock(return_value=[{"code": "FIN-01"}])
+    mocker.patch("verda.VerdaClient.__init__", return_value=None)
+    verda = VerdaProvider("EXAMPLE", "EXAMPLE")
+    verda._get_instance_types = mocker.Mock(return_value=list(types))
+    verda._get_locations = mocker.Mock(return_value=[{"code": "FIN-01"}])
 
-    internal_catalog.ONLINE_PROVIDERS = ["datacrunch"]
+    internal_catalog.ONLINE_PROVIDERS = ["verda"]
     internal_catalog.OFFLINE_PROVIDERS = []
 
-    catalog.add_provider(datacrunch)
-    query_result = catalog.query(provider=["datacrunch"])
+    catalog.add_provider(verda)
+    query_result = catalog.query(provider=["verda"])
 
     assert len(query_result) == 8
 

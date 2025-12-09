@@ -27,7 +27,7 @@ def item() -> CatalogItem:
 
 @pytest.fixture
 def cpu_items() -> list[CatalogItem]:
-    datacrunch = CatalogItem(
+    verda = CatalogItem(
         instance_name="CPU.120V.480G",
         location="ICE-01",
         price=3.0,
@@ -38,7 +38,7 @@ def cpu_items() -> list[CatalogItem]:
         gpu_name=None,
         gpu_memory=None,
         spot=False,
-        provider="datacrunch",
+        provider="verda",
         disk_size=None,
     )
     aws = CatalogItem(
@@ -55,7 +55,7 @@ def cpu_items() -> list[CatalogItem]:
         provider="aws",
         disk_size=None,
     )
-    return [datacrunch, aws]
+    return [verda, aws]
 
 
 class TestMatches:
@@ -154,19 +154,19 @@ class TestMatches:
         assert matches(item, QueryFilter(gpu_name=["RTX3060TI"]))
 
     def test_provider(self, cpu_items):
-        assert matches(cpu_items[0], QueryFilter(provider=["datacrunch"]))
-        assert matches(cpu_items[0], QueryFilter(provider=["DataCrunch"]))
+        assert matches(cpu_items[0], QueryFilter(provider=["verda"]))
+        assert matches(cpu_items[0], QueryFilter(provider=["verda"]))
         assert not matches(cpu_items[0], QueryFilter(provider=["aws"]))
 
         assert matches(cpu_items[1], QueryFilter(provider=["aws"]))
         assert matches(cpu_items[1], QueryFilter(provider=["AWS"]))
-        assert not matches(cpu_items[1], QueryFilter(provider=["datacrunch"]))
+        assert not matches(cpu_items[1], QueryFilter(provider=["verda"]))
 
     def test_provider_with_filter_setattr(self, cpu_items):
         q = QueryFilter()
-        q.provider = ["datacrunch"]
+        q.provider = ["verda"]
         assert matches(cpu_items[0], q)
-        q.provider = ["DataCrunch"]
+        q.provider = ["verda"]
         assert matches(cpu_items[0], q)
         q.provider = ["aws"]
         assert not matches(cpu_items[0], q)

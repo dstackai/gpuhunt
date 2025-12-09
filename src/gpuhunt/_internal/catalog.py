@@ -24,7 +24,7 @@ CATALOG_URL = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v2/{version
 OFFLINE_PROVIDERS = [
     "aws",
     "azure",
-    "datacrunch",
+    "verda",
     "gcp",
     "lambdalabs",
     "nebius",

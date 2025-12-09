@@ -60,7 +60,7 @@ print(*items, sep="\n")
 * Azure
 * CloudRift
 * Cudo Compute
-* DataCrunch
+* Verda
 * GCP
 * LambdaLabs
 * Nebius

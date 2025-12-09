@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from gpuhunt.providers.datacrunch import ALL_AMD_GPUS, GPU_MAP
+from gpuhunt.providers.verda import ALL_AMD_GPUS, GPU_MAP
 
 
 @pytest.fixture
 def data_rows(catalog_dir: Path) -> list[dict]:
-    file = catalog_dir / "datacrunch.csv"
+    file = catalog_dir / "verda.csv"
     reader = csv.DictReader(file.open())
     return list(reader)
 
