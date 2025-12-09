@@ -23,7 +23,7 @@ class VerdaProvider(AbstractProvider):
     NAME = "verda"
 
     def __init__(self, client_id: str, client_secret: str) -> None:
-        self.VERDA_client = VerdaClient(client_id, client_secret)
+        self.verda_client = VerdaClient(client_id, client_secret)
 
     def get(
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
@@ -38,10 +38,10 @@ class VerdaProvider(AbstractProvider):
         return sorted(instances, key=lambda x: x.price)
 
     def _get_instance_types(self) -> list[InstanceType]:
-        return self.VERDA_client.instance_types.get()
+        return self.verda_client.instance_types.get()
 
     def _get_locations(self) -> list[dict]:
-        return self.VERDA_client.locations.get()
+        return self.verda_client.locations.get()
 
     @classmethod
     def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
