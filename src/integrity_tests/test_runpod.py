@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from gpuhunt.providers.runpod import GPU_MAP
+from gpuhunt.providers.runpod import get_gpu_map
 
 
 @pytest.fixture
@@ -53,6 +53,6 @@ def test_spot(data_rows):
 
 
 def test_gpu_present(data_rows):
-    refs = set(name for _, name in GPU_MAP.values())
+    refs = set(name for _, name in get_gpu_map().values())
     gpus = set(select_row(data_rows, "gpu_name"))
     assert len(refs & gpus) > 7
