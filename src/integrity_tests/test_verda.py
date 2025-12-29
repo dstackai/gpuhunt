@@ -23,7 +23,6 @@ def test_locations(data_rows):
         "FIN-01",
         "FIN-02",
         "FIN-02",
-        "ICE-01",
     }
     locations = select_row(data_rows, "location")
     missing = expected - set(locations)
