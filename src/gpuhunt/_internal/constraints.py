@@ -189,8 +189,7 @@ KNOWN_NVIDIA_GPUS: list[NvidiaGPUInfo] = [
     NvidiaGPUInfo(name="RTX3080Ti", memory=12, compute_capability=(8, 6)),
     NvidiaGPUInfo(name="RTX3090", memory=24, compute_capability=(8, 6)),
     NvidiaGPUInfo(name="RTX4090", memory=24, compute_capability=(8, 9)),
-    # Set to 5090, in k8s we have 'nvidia.com/gpu.product=NVIDIA-GeForce-RTX-5090'
-    NvidiaGPUInfo(name="5090", memory=32, compute_capability=(12, 0)),
+    NvidiaGPUInfo(name="RTX5090", memory=32, compute_capability=(12, 0)),
     NvidiaGPUInfo(name="RTX6000", memory=24, compute_capability=(7, 5)),
     NvidiaGPUInfo(name="RTX2000Ada", memory=16, compute_capability=(8, 9)),
     NvidiaGPUInfo(name="RTX4000Ada", memory=20, compute_capability=(8, 9)),
