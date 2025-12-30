@@ -268,6 +268,8 @@ def _get_nvidia_gpu_name(name: str) -> Optional[str]:
         return "V100"
     if name == "H100 NVL":
         return "H100NVL"
+    if "H200 NVL" in name:
+        return "H200NVL"
     if name.startswith(("A", "L", "H")):
         gpu_name, _, _ = name.partition(" ")
         return gpu_name
