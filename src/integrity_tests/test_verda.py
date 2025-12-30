@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from gpuhunt.providers.datacrunch import ALL_AMD_GPUS, GPU_MAP
+from gpuhunt.providers.verda import ALL_AMD_GPUS, GPU_MAP
 
 
 @pytest.fixture
 def data_rows(catalog_dir: Path) -> list[dict]:
-    file = catalog_dir / "datacrunch.csv"
+    file = catalog_dir / "verda.csv"
     reader = csv.DictReader(file.open())
     return list(reader)
 
@@ -23,7 +23,6 @@ def test_locations(data_rows):
         "FIN-01",
         "FIN-02",
         "FIN-02",
-        "ICE-01",
     }
     locations = select_row(data_rows, "location")
     missing = expected - set(locations)

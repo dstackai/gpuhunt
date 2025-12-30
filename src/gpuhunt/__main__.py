@@ -15,7 +15,7 @@ def main():
             "azure",
             "cloudrift",
             "cudo",
-            "datacrunch",
+            "verda",
             "digitalocean",
             "gcp",
             "hotaisle",
@@ -49,12 +49,10 @@ def main():
         from gpuhunt.providers.cloudrift import CloudRiftProvider
 
         provider = CloudRiftProvider()
-    elif args.provider == "datacrunch":
-        from gpuhunt.providers.datacrunch import DataCrunchProvider
+    elif args.provider == "verda":
+        from gpuhunt.providers.verda import VerdaProvider
 
-        provider = DataCrunchProvider(
-            os.getenv("DATACRUNCH_CLIENT_ID"), os.getenv("DATACRUNCH_CLIENT_SECRET")
-        )
+        provider = VerdaProvider(os.getenv("VERDA_CLIENT_ID"), os.getenv("VERDA_CLIENT_SECRET"))
     elif args.provider == "digitalocean":
         from gpuhunt.providers.digitalocean import DigitalOceanProvider
 

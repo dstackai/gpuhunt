@@ -70,8 +70,8 @@ jobs:
           path: azure.csv
           retention-days: 1
 
-  catalog-datacrunch:
-    name: Collect DataCrunch catalog
+  catalog-verda:
+    name: Collect Verda catalog
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -81,17 +81,22 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pip -U
-          pip install -e '.[datacrunch]'
+          pip install -e '.[verda]'
       - name: Collect catalog
         working-directory: src
         env:
-          DATACRUNCH_CLIENT_ID: ${{ secrets.DATACRUNCH_CLIENT_ID }}
-          DATACRUNCH_CLIENT_SECRET: ${{ secrets.DATACRUNCH_CLIENT_SECRET }}
-        run: python -m gpuhunt datacrunch --output ../datacrunch.csv
+          VERDA_CLIENT_ID: ${{ secrets.VERDA_CLIENT_ID }}
+          VERDA_CLIENT_SECRET: ${{ secrets.VERDA_CLIENT_SECRET }}
+        run: |
+          python -m gpuhunt verda --output ../verda.csv
+          # Copy for backward compatibility
+          cp ../verda.csv ../datacrunch.csv
       - uses: actions/upload-artifact@v4
         with:
-          name: catalogs-datacrunch
-          path: datacrunch.csv
+          name: catalogs-verda
+          path: |
+            verda.csv
+            datacrunch.csv
           retention-days: 1
 
   catalog-gcp:
@@ -252,7 +257,7 @@ jobs:
     needs:
       - catalog-aws
       - catalog-azure
-      - catalog-datacrunch
+      - catalog-verda
       - catalog-gcp
       - catalog-lambdalabs
       - catalog-nebius
