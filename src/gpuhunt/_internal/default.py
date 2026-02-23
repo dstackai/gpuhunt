@@ -22,6 +22,7 @@ def default_catalog() -> Catalog:
         ("gpuhunt.providers.tensordock", "TensorDockProvider"),
         ("gpuhunt.providers.vastai", "VastAIProvider"),
         ("gpuhunt.providers.cudo", "CudoProvider"),
+        ("gpuhunt.providers.crusoe", "CrusoeProvider"),
         ("gpuhunt.providers.vultr", "VultrProvider"),
         ("gpuhunt.providers.hotaisle", "HotAisleProvider"),
         ("gpuhunt.providers.digitalocean", "DigitalOceanProvider"),
