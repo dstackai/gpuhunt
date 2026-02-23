@@ -191,6 +191,9 @@ def _make_gpu_items(
         gpu_memory=gpu_memory,
         spot=None,
         disk_size=float(spec["disk_gb"]) if spec.get("disk_gb") else None,
+        # disk_gb: ephemeral NVMe size in GB (0 = no ephemeral disk).
+        # Used by dstack to decide whether to create a persistent data disk.
+        provider_data={"disk_gb": spec.get("disk_gb", 0)},
     )
 
     items = []
@@ -231,6 +234,7 @@ def _make_cpu_items(product_name: str, spec: dict, locations: list[str]) -> list
         gpu_memory=None,
         spot=False,
         disk_size=float(spec["disk_gb"]) if spec.get("disk_gb") else None,
+        provider_data={"disk_gb": spec.get("disk_gb", 0)},
     )
 
     items = []
