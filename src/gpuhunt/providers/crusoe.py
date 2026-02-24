@@ -204,12 +204,9 @@ def _make_gpu_items(
         on_demand.price = round(num_gpu * on_demand_per_gpu, 2)
         items.append(on_demand)
 
-        if spot_per_gpu is not None:
-            spot = copy.deepcopy(template)
-            spot.location = location
-            spot.spot = True
-            spot.price = round(num_gpu * spot_per_gpu, 2)
-            items.append(spot)
+        # TODO: Enable spot offers once we confirm how to request spot billing
+        # via the VM create API (POST /v1alpha5/projects/{pid}/compute/vms/instances).
+        # The API schema doesn't have an obvious spot/billing_type field.
 
     return items
 
