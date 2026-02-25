@@ -4,6 +4,7 @@ import heapq
 import io
 import logging
 import os
+import threading
 import time
 import urllib.request
 import zipfile
@@ -48,6 +49,7 @@ class Catalog:
         self.providers: list[AbstractProvider] = []
         self.balance_resources = balance_resources
         self.auto_reload = auto_reload
+        self._load_lock = threading.Lock()
 
     def query(
         self,
@@ -108,7 +110,11 @@ class Catalog:
         if self.auto_reload and (
             self.loaded_at is None or time.monotonic() - self.loaded_at > RELOAD_INTERVAL
         ):
-            self.load()
+            with self._load_lock:
+                if self.auto_reload and (
+                    self.loaded_at is None or time.monotonic() - self.loaded_at > RELOAD_INTERVAL
+                ):
+                    self.load()
 
         query_filter = QueryFilter(
             provider=[provider] if isinstance(provider, str) else provider,
@@ -207,8 +213,8 @@ class Catalog:
                     logger.exception(
                         f"Got exception when parsing {provider} catalog. Skipping provider."
                     )
-        self.loaded_at = time.monotonic()
         self.catalog = catalog
+        self.loaded_at = time.monotonic()
 
     @staticmethod
     def get_latest_version() -> str:
