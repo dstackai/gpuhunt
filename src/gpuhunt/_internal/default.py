@@ -19,7 +19,6 @@ def default_catalog() -> Catalog:
     catalog = Catalog()
     catalog.load()
     for module, provider in [
-        ("gpuhunt.providers.tensordock", "TensorDockProvider"),
         ("gpuhunt.providers.vastai", "VastAIProvider"),
         ("gpuhunt.providers.cudo", "CudoProvider"),
         ("gpuhunt.providers.vultr", "VultrProvider"),

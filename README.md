@@ -66,7 +66,6 @@ print(*items, sep="\n")
 * Nebius
 * OCI
 * RunPod
-* TensorDock
 * Vast AI
 * Vultr
 
