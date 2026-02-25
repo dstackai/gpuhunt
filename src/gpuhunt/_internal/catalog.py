@@ -200,8 +200,12 @@ class Catalog:
                             item = CatalogItem.from_dict(row, provider=provider)
                             catalog.setdefault(provider, []).append(item)
                 except KeyError:
-                    logger.exception(
+                    logger.error(
                         f"Failed to find catalog for provider {provider} in the zip. Skipping provider."
+                    )
+                except Exception:
+                    logger.exception(
+                        f"Got exception when parsing {provider} catalog. Skipping provider."
                     )
         self.loaded_at = time.monotonic()
         self.catalog = catalog
