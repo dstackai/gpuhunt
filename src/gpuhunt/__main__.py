@@ -24,7 +24,6 @@ def main():
             "nebius",
             "oci",
             "runpod",
-            "tensordock",
             "vastai",
             "vultr",
         ],
@@ -110,10 +109,6 @@ def main():
         from gpuhunt.providers.runpod import RunpodProvider
 
         provider = RunpodProvider()
-    elif args.provider == "tensordock":
-        from gpuhunt.providers.tensordock import TensorDockProvider
-
-        provider = TensorDockProvider()
     elif args.provider == "vastai":
         from gpuhunt.providers.vastai import VastAIProvider
 

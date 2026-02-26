@@ -4,6 +4,7 @@ import heapq
 import io
 import logging
 import os
+import threading
 import time
 import urllib.request
 import zipfile
@@ -32,7 +33,7 @@ OFFLINE_PROVIDERS = [
     "runpod",
     "cloudrift",
 ]
-ONLINE_PROVIDERS = ["cudo", "crusoe", "digitalocean", "hotaisle", "tensordock", "vastai", "vultr"]
+ONLINE_PROVIDERS = ["crusoe", "cudo", "digitalocean", "hotaisle", "vastai", "vultr"]
 RELOAD_INTERVAL = 15 * 60  # 15 minutes
 
 
@@ -48,6 +49,7 @@ class Catalog:
         self.providers: list[AbstractProvider] = []
         self.balance_resources = balance_resources
         self.auto_reload = auto_reload
+        self._load_lock = threading.Lock()
 
     def query(
         self,
@@ -108,7 +110,11 @@ class Catalog:
         if self.auto_reload and (
             self.loaded_at is None or time.monotonic() - self.loaded_at > RELOAD_INTERVAL
         ):
-            self.load()
+            with self._load_lock:
+                if self.auto_reload and (
+                    self.loaded_at is None or time.monotonic() - self.loaded_at > RELOAD_INTERVAL
+                ):
+                    self.load()
 
         query_filter = QueryFilter(
             provider=[provider] if isinstance(provider, str) else provider,
@@ -189,8 +195,26 @@ class Catalog:
             catalog_url = CATALOG_URL.format(version=version)
         logger.debug("Downloading catalog %s...", version)
         with urllib.request.urlopen(catalog_url) as f:
-            self.loaded_at = time.monotonic()
-            self.catalog = io.BytesIO(f.read())
+            file = f.read()
+        catalog: dict[str, list[CatalogItem]] = {}
+        with zipfile.ZipFile(io.BytesIO(file)) as zip_file:
+            for provider in OFFLINE_PROVIDERS:
+                try:
+                    with zip_file.open(f"{provider}.csv", "r") as csv_file:
+                        reader = csv.DictReader(io.TextIOWrapper(csv_file, "utf-8"))
+                        for row in reader:
+                            item = CatalogItem.from_dict(row, provider=provider)
+                            catalog.setdefault(provider, []).append(item)
+                except KeyError:
+                    logger.error(
+                        f"Failed to find catalog for provider {provider} in the zip. Skipping provider."
+                    )
+                except Exception:
+                    logger.exception(
+                        f"Got exception when parsing {provider} catalog. Skipping provider."
+                    )
+        self.catalog = catalog
+        self.loaded_at = time.monotonic()
 
     @staticmethod
     def get_latest_version() -> str:
@@ -223,17 +247,18 @@ class Catalog:
                     item = CatalogItem.from_dict(row, provider=provider_name)
                     if constraints.matches(item, query_filter):
                         items.append(item)
-        else:
-            if self.catalog is None:
-                logger.warning("Catalog not loaded")
-                return items
-            with zipfile.ZipFile(self.catalog) as zip_file:
-                with zip_file.open(f"{provider_name}.csv", "r") as csv_file:
-                    reader = csv.DictReader(io.TextIOWrapper(csv_file, "utf-8"))
-                    for row in reader:
-                        item = CatalogItem.from_dict(row, provider=provider_name)
-                        if constraints.matches(item, query_filter):
-                            items.append(item)
+            return items
+
+        if self.catalog is None:
+            logger.error("Catalog not loaded. Returning zero items.")
+            return []
+        provider_catalog = self.catalog.get(provider_name)
+        if provider_catalog is None:
+            logger.error(f"No catalog for offline provider {provider_name}. Returning zero items.")
+            return []
+        for item in provider_catalog:
+            if constraints.matches(item, query_filter):
+                items.append(item)
         return items
 
     def _get_online_provider_items(
