@@ -177,6 +177,7 @@ KNOWN_NVIDIA_GPUS: list[NvidiaGPUInfo] = [
     NvidiaGPUInfo(name="H200", memory=141, compute_capability=(9, 0)),
     NvidiaGPUInfo(name="H200NVL", memory=141, compute_capability=(9, 0)),
     NvidiaGPUInfo(name="B200", memory=180, compute_capability=(10, 0)),
+    NvidiaGPUInfo(name="GB200", memory=186, compute_capability=(10, 0)),
     NvidiaGPUInfo(name="L4", memory=24, compute_capability=(8, 9)),
     NvidiaGPUInfo(name="L40", memory=48, compute_capability=(8, 9)),
     NvidiaGPUInfo(name="L40S", memory=48, compute_capability=(8, 9)),
@@ -252,6 +253,12 @@ KNOWN_AMD_GPUS: list[AMDGPUInfo] = [
         memory=288,
         architecture=AMDArchitecture.CDNA3,
         device_ids=(0x74A5,),
+    ),
+    AMDGPUInfo(
+        name="MI355X",
+        memory=288,
+        architecture=AMDArchitecture.CDNA4,
+        device_ids=(0x75A3,),
     ),
 ]
 
