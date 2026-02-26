@@ -14,6 +14,7 @@ def main():
             "aws",
             "azure",
             "cloudrift",
+            "crusoe",
             "cudo",
             "verda",
             "digitalocean",
@@ -40,6 +41,14 @@ def main():
         from gpuhunt.providers.azure import AzureProvider
 
         provider = AzureProvider(os.getenv("AZURE_SUBSCRIPTION_ID"))
+    elif args.provider == "crusoe":
+        from gpuhunt.providers.crusoe import CrusoeProvider
+
+        provider = CrusoeProvider(
+            access_key=os.getenv("CRUSOE_ACCESS_KEY"),
+            secret_key=os.getenv("CRUSOE_SECRET_KEY"),
+            project_id=os.getenv("CRUSOE_PROJECT_ID"),
+        )
     elif args.provider == "cudo":
         from gpuhunt.providers.cudo import CudoProvider
 
