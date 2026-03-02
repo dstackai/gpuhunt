@@ -65,7 +65,7 @@ print(*items, sep="\n")
 * LambdaLabs
 * Nebius
 * OCI
-* RunPod
+* Runpod
 * Vast AI
 * Vultr
 
