@@ -10,7 +10,12 @@ from typing import Optional
 
 import requests
 
-from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
+from gpuhunt._internal.models import (
+    AcceleratorVendor,
+    CPUArchitecture,
+    QueryFilter,
+    RawCatalogItem,
+)
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -26,15 +31,13 @@ GPU_TYPE_MAP: dict[str, tuple[str, AcceleratorVendor, float]] = {
     "A100-PCIe-80GB": ("A100", AcceleratorVendor.NVIDIA, 80),
     "A100-SXM-80GB": ("A100", AcceleratorVendor.NVIDIA, 80),
     "H100-SXM-80GB": ("H100", AcceleratorVendor.NVIDIA, 80),
+    "H200-SXM-141GB": ("H200", AcceleratorVendor.NVIDIA, 141),
+    "B200-SXM-180GB": ("B200", AcceleratorVendor.NVIDIA, 180),
+    "GB200-NVL-186GB": ("GB200", AcceleratorVendor.NVIDIA, 186),
     "L40S-48GB": ("L40S", AcceleratorVendor.NVIDIA, 48),
     "A40-PCIe-48GB": ("A40", AcceleratorVendor.NVIDIA, 48),
     "MI300X-192GB": ("MI300X", AcceleratorVendor.AMD, 192),
-    # TODO: The following GPUs are listed on https://crusoe.ai/cloud/pricing but not yet
-    # returned by the instance types API. Add them once Crusoe exposes them:
-    #   - H200 141GB ($4.29/GPU-hr on-demand, spot: contact sales)
-    #   - GB200 186GB (contact sales)
-    #   - B200 180GB (contact sales)
-    #   - MI355X 288GB ($3.45 listed but not confirmed; also missing from KNOWN_AMD_GPUS)
+    "MI355X_288GB": ("MI355X", AcceleratorVendor.AMD, 288),
 }
 
 # Per-GPU-hour pricing from https://crusoe.ai/cloud/pricing
@@ -44,6 +47,10 @@ GPU_PRICING: dict[str, tuple[float, Optional[float]]] = {
     "A100-PCIe-80GB": (1.65, 1.20),
     "A100-SXM-80GB": (1.95, 1.30),
     "H100-SXM-80GB": (3.90, 1.60),
+    "H200-SXM-141GB": (4.29, None),
+    # TODO: B200 estimated from B200/H100 ratio on other providers; update once Crusoe publishes rates.
+    # GB200 and MI355X pricing not known yet; update once Crusoe publishes rates.
+    "B200-SXM-180GB": (7.25, None),
     "L40S-48GB": (1.00, 0.50),
     "A40-PCIe-48GB": (0.90, 0.40),
     "MI300X-192GB": (3.45, 0.95),
@@ -137,6 +144,13 @@ class CrusoeProvider(AbstractProvider):
         return requests.request(method, url, headers=headers, params=params, timeout=TIMEOUT)
 
 
+def _get_cpu_arch(spec: dict) -> str:
+    cpu_type = spec.get("cpu_type", "")
+    if cpu_type == "arm64":
+        return CPUArchitecture.ARM.value
+    return CPUArchitecture.X86.value
+
+
 def _get_available_type_locations(capacities: list[dict]) -> dict[str, list[str]]:
     best_qty: dict[tuple[str, str], int] = defaultdict(int)
     for cap in capacities:
@@ -191,6 +205,7 @@ def _make_gpu_items(
         gpu_memory=gpu_memory,
         spot=None,
         disk_size=float(spec["disk_gb"]) if spec.get("disk_gb") else None,
+        cpu_arch=_get_cpu_arch(spec),
         # disk_gb: ephemeral NVMe size in GB (0 = no ephemeral disk).
         # Used by dstack to decide whether to create a persistent data disk.
         provider_data={"disk_gb": spec.get("disk_gb", 0)},
@@ -231,6 +246,7 @@ def _make_cpu_items(product_name: str, spec: dict, locations: list[str]) -> list
         gpu_memory=None,
         spot=False,
         disk_size=float(spec["disk_gb"]) if spec.get("disk_gb") else None,
+        cpu_arch=_get_cpu_arch(spec),
         provider_data={"disk_gb": spec.get("disk_gb", 0)},
     )
 

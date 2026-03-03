@@ -32,6 +32,7 @@ class AMDArchitecture(enum.Enum):
     CDNA = "CDNA"
     CDNA2 = "CDNA2"
     CDNA3 = "CDNA3"
+    CDNA4 = "CDNA4"
 
     @classmethod
     def cast(cls, value: Union["AMDArchitecture", str]) -> "AMDArchitecture":
