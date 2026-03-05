@@ -24,7 +24,7 @@ class VastAIProvider(AbstractProvider):
     def __init__(
         self,
         extra_filters: Optional[dict[str, dict[Operators, FilterValue]]] = None,
-        community_cloud: bool = False,
+        community_cloud: bool = True,
     ):
         self.extra_filters = extra_filters
         self.community_cloud = community_cloud
@@ -87,7 +87,7 @@ class VastAIProvider(AbstractProvider):
 
     @staticmethod
     def make_filters(
-        q: QueryFilter, community_cloud: bool = False
+        q: QueryFilter, community_cloud: bool = True
     ) -> dict[str, dict[Operators, FilterValue]]:
         filters = defaultdict(dict)
         if q.min_cpu is not None:
