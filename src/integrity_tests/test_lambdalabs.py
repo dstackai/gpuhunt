@@ -35,7 +35,6 @@ def test_locations(data_rows: list[dict]):
         "us-east-1",
         "us-east-3",
         "us-midwest-1",
-        "us-south-1",
         "us-south-2",
         "us-south-3",
         "us-west-1",
