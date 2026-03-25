@@ -53,10 +53,10 @@ oci = [
     "pydantic>=1.10.10,<2.0.0",
 ]
 verda = [
-    'verda',
+    'verda>=1.22.0',
 ]
 maybe_verda = [
-    'verda; python_version>="3.10"',
+    'verda>=1.22.0; python_version>="3.10"',
 ]
 all = ["gpuhunt[aws,azure,maybe_verda,gcp,maybe_nebius,oci]"]
 dev = [
