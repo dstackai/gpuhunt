@@ -36,7 +36,7 @@ gpu_vm_series = [
     VMSeries(r"NC(\d+)ads_A10_v4", "A10", 24.0),  # NC A10 v4-series [A10]
     VMSeries(r"NC(\d+)as_T4_v3", "T4", 16.0),  # NCasT4_v3-series [T4]
     VMSeries(r"NC(\d+)r?s_v3", "V100", 16.0),  # NCv3-series [V100 16GB]
-    VMSeries(r"NC(\d+)adi?s_H100_v5", "H100", 94.0),  # NC H100 v5-series [H100 NVL 94GB]
+    VMSeries(r"NC(\d+)adi?s_H100_v5", "H100NVL", 94.0),  # NC H100 v5-series [H100 NVL 94GB]
     VMSeries(r"ND(\d+)amsr_A100_v4", "A100", 80.0),  # NDm A100 v4-series [8xA100 80GB]
     VMSeries(r"ND(\d+)asr_v4", "A100", 40.0),  # ND A100 v4-series [8xA100 40GB]
     VMSeries(r"ND(\d+)rs_v2", "V100", 32.0),  # NDv2-series [8xV100 32GB]
@@ -231,7 +231,7 @@ class AzureProvider(AbstractProvider):
             VMSeries(r"NC(\d+)s_v3", "V100", 16 * 1024),  # NCv3-series [V100 16GB]
             VMSeries(r"NC(\d+)as_T4_v3", "T4", 16 * 1024),  # NCasT4_v3-series [T4]
             VMSeries(
-                r"NC(\d+)adi?s_H100_v5", "H100", 94 * 1024
+                r"NC(\d+)adi?s_H100_v5", "H100NVL", 94 * 1024
             ),  # NC H100 v5-series [H100 NVL 94GB]
             VMSeries(r"ND(\d+)rs_v2", "V100", 32 * 1024),  # NDv2-series [8xV100 32GB]
             VMSeries(
