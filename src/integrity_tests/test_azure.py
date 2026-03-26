@@ -94,6 +94,8 @@ class TestAzureCatalog:
         expected_gpus = {
             "A100",
             "A10",
+            "H100NVL",
+            "H200",
             "T4",
             "V100",
         }
