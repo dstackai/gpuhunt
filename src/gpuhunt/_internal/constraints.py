@@ -255,6 +255,12 @@ KNOWN_AMD_GPUS: list[AMDGPUInfo] = [
         device_ids=(0x74A5,),
     ),
     AMDGPUInfo(
+        name="MI350X",
+        memory=288,
+        architecture=AMDArchitecture.CDNA4,
+        device_ids=(0x75A0,),
+    ),
+    AMDGPUInfo(
         name="MI355X",
         memory=288,
         architecture=AMDArchitecture.CDNA4,
