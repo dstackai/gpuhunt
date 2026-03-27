@@ -37,8 +37,10 @@ def test_locations(data_rows):
         "US",
     }
     locations = set(select_row(data_rows, "location"))
-    # Assert most are present. Some may be missing due to low availability
-    assert len(expected - locations) <= 3
+    # Assert most are present. Some may be missing due to low availability.
+    # TODO: CA-MTL-2 looks absent in recent live Runpod snapshots.
+    # Re-evaluate this expectation later and tighten back to <= 3.
+    assert len(expected - locations) <= 4
 
 
 def test_spot(data_rows):

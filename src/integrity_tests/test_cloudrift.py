@@ -18,7 +18,7 @@ def select_row(rows, name: str) -> list[str]:
 
 
 def test_gpu_present(data_rows: list[dict]):
-    expected_gpus = [gpu for _, gpu in GPU_MAP]
+    expected_gpus = [gpu for _, gpu, _vendor in GPU_MAP]
     gpus = select_row(data_rows, "gpu_name")
     gpus = list(dict.fromkeys(gpus))
     assert set(gpus).issubset(
