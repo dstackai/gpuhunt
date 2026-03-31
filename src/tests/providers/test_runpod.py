@@ -42,6 +42,7 @@ def test_make_cpu_catalog_items():
     assert [item.location for item in items] == ["AP-JP-1"] * 5
     assert [item.spot for item in items] == [False] * 5
     assert [item.gpu_count for item in items] == [0] * 5
+    assert [item.flags for item in items] == [["runpod-cpu"]] * 5
     assert [item.disk_size for item in items] == [20.0, 40.0, 80.0, 160.0, 320.0]
     assert items[0].price == pytest.approx(0.08)
     assert items[-1].price == pytest.approx(1.28)
@@ -145,6 +146,7 @@ def test_fetch_cpu_offers_handles_partial_datacenter_failures(monkeypatch):
 
     assert len(items) == 5
     assert {item.location for item in items} == {"DC-OK"}
+    assert {tuple(item.flags) for item in items} == {("runpod-cpu",)}
     assert {item.disk_size for item in items} == {20.0, 40.0, 80.0, 160.0, 320.0}
     assert {item.instance_name for item in items} == {
         "cpu3c-2-4",

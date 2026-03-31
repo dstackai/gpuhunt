@@ -297,6 +297,7 @@ class RunpodProvider(AbstractProvider):
                         gpu_memory=None,
                         spot=False,
                         disk_size=disk_size,
+                        flags=["runpod-cpu"],
                         provider_data={},
                     )
                 )
