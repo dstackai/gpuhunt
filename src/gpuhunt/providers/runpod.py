@@ -68,6 +68,8 @@ class RunpodProvider(AbstractProvider):
 
         cluster_catalog_items = self._fetch_cluster_offers()
         catalog_items.extend(cluster_catalog_items)
+        cpu_catalog_items = self._fetch_cpu_offers()
+        catalog_items.extend(cpu_catalog_items)
         return catalog_items
 
     def _build_query_variables(self) -> list[dict]:
@@ -221,6 +223,85 @@ class RunpodProvider(AbstractProvider):
                 cluster_catalog_items.append(catalog_item)
         return cluster_catalog_items
 
+    def _fetch_cpu_offers(self) -> list[RawCatalogItem]:
+        response = _make_request({"query": cpu_data_centers_query, "variables": {}})
+        data_centers = [dc["id"] for dc in response["data"]["dataCenters"] if dc["listed"]]
+        if len(data_centers) == 0:
+            return []
+
+        cpu_flavors_by_data_center: dict[str, list[dict]] = {}
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_data_center = {
+                executor.submit(self._get_cpu_flavors, dc_id): dc_id for dc_id in data_centers
+            }
+            for future, dc_id in future_to_data_center.items():
+                try:
+                    cpu_flavors_by_data_center[dc_id] = future.result()
+                except RequestException as e:
+                    logger.exception("Failed to get cpuFlavors data for %s: %s", dc_id, e)
+
+        catalog_items = []
+        for dc_id in data_centers:
+            cpu_flavors = cpu_flavors_by_data_center.get(dc_id)
+            if cpu_flavors is None:
+                continue
+            catalog_items.extend(self._make_cpu_catalog_items(dc_id, cpu_flavors))
+        return catalog_items
+
+    def _get_cpu_flavors(self, data_center_id: str) -> list[dict]:
+        response = _make_request(
+            {"query": query_cpu_flavors, "variables": {"dataCenterId": data_center_id}}
+        )
+        return response["data"]["cpuFlavors"]
+
+    def _make_cpu_catalog_items(
+        self, data_center_id: str, cpu_flavors: list[dict]
+    ) -> list[RawCatalogItem]:
+        items: list[RawCatalogItem] = []
+        for flavor in cpu_flavors:
+            specifics = flavor.get("specifics") or {}
+            if specifics.get("stockStatus") is None:
+                continue
+            base_secure_price = specifics.get("securePrice")
+            if base_secure_price is None:
+                continue
+
+            min_vcpu = flavor.get("minVcpu")
+            max_vcpu = flavor.get("maxVcpu")
+            ram_multiplier = flavor.get("ramMultiplier")
+            disk_limit_per_vcpu = flavor.get("diskLimitPerVcpu")
+            if min_vcpu is None or max_vcpu is None or ram_multiplier is None:
+                continue
+            if min_vcpu <= 0 or max_vcpu <= 0 or min_vcpu > max_vcpu:
+                continue
+
+            for vcpu in _cpu_size_ladder(int(min_vcpu), int(max_vcpu)):
+                # `ramMultiplier` maps vCPU to RAM in GB.
+                memory = int(vcpu * int(ram_multiplier))
+                disk_size = (
+                    float(vcpu * int(disk_limit_per_vcpu))
+                    if disk_limit_per_vcpu is not None and int(disk_limit_per_vcpu) > 0
+                    else None
+                )
+                scale = vcpu / min_vcpu
+                price = base_secure_price * scale
+                items.append(
+                    RawCatalogItem(
+                        instance_name=f"{flavor['id']}-{vcpu}-{memory}",
+                        location=data_center_id,
+                        price=price,
+                        cpu=vcpu,
+                        memory=memory,
+                        gpu_count=0,
+                        gpu_name=None,
+                        gpu_memory=None,
+                        spot=False,
+                        disk_size=disk_size,
+                        provider_data={},
+                    )
+                )
+        return items
+
     def _get_gpu_vendor_and_name(
         self,
         gpu_id: str,
@@ -284,6 +365,45 @@ def _get_amd_gpu_name(name: str) -> Optional[str]:
     if accelerators := find_accelerators(names=[name], vendors=[AcceleratorVendor.AMD]):
         return accelerators[0].name
     return None
+
+
+def _cpu_size_ladder(min_vcpu: int, max_vcpu: int) -> list[int]:
+    sizes = []
+    current = min_vcpu
+    while current <= max_vcpu:
+        sizes.append(current)
+        current *= 2
+    if sizes and sizes[-1] != max_vcpu:
+        sizes.append(max_vcpu)
+    return sorted(set(sizes))
+
+
+cpu_data_centers_query = """
+query CpuDataCenters {
+  dataCenters {
+    id
+    listed
+  }
+}
+"""
+
+query_cpu_flavors = """
+query CpuFlavors($dataCenterId: String!) {
+  cpuFlavors {
+    id
+    displayName
+    groupId
+    minVcpu
+    maxVcpu
+    ramMultiplier
+    diskLimitPerVcpu
+    specifics(input: { dataCenterId: $dataCenterId }) {
+      stockStatus
+      securePrice
+    }
+  }
+}
+"""
 
 
 gpu_types_query = """
