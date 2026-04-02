@@ -12,7 +12,7 @@ from typing import Optional
 
 import boto3
 import requests
-from botocore.exceptions import ClientError, EndpointConnectionError
+from botocore.exceptions import ClientError, ConnectTimeoutError, EndpointConnectionError
 
 from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
@@ -53,6 +53,9 @@ pricing_filters = {
     "MarketOption": ["OnDemand"],
 }
 describe_instances_limit = 100
+ALLOWED_TO_SKIP_ON_FAILURE_REGIONS = {
+    "me-south-1",
+}
 
 
 class AWSProvider(AbstractProvider):
@@ -135,21 +138,29 @@ class AWSProvider(AbstractProvider):
             region = max(regions, key=lambda r: len(regions[r]))
             instance_types = regions.pop(region)
 
-            client = boto3.client("ec2", region_name=region)
-            paginator = client.get_paginator("describe_instance_types")
-            for offset in range(0, len(instance_types), describe_instances_limit):
-                logger.info("Fetching GPU details for %s (offset=%s)", region, offset)
-                pages = paginator.paginate(
-                    InstanceTypes=instance_types[offset : offset + describe_instances_limit]
-                )
-                for page in pages:
-                    for i in page["InstanceTypes"]:
-                        if "GpuInfo" in i:
-                            gpu = i["GpuInfo"]["Gpus"][0]
-                            gpus[i["InstanceType"]] = (
-                                gpu["Name"],
-                                _get_gpu_memory_gib(gpu["Name"], gpu["MemoryInfo"]["SizeInMiB"]),
-                            )
+            try:
+                client = boto3.client("ec2", region_name=region)
+                paginator = client.get_paginator("describe_instance_types")
+                for offset in range(0, len(instance_types), describe_instances_limit):
+                    logger.info("Fetching GPU details for %s (offset=%s)", region, offset)
+                    pages = paginator.paginate(
+                        InstanceTypes=instance_types[offset : offset + describe_instances_limit]
+                    )
+                    for page in pages:
+                        for i in page["InstanceTypes"]:
+                            if "GpuInfo" in i:
+                                gpu = i["GpuInfo"]["Gpus"][0]
+                                gpus[i["InstanceType"]] = (
+                                    gpu["Name"],
+                                    _get_gpu_memory_gib(
+                                        gpu["Name"], gpu["MemoryInfo"]["SizeInMiB"]
+                                    ),
+                                )
+            except (ClientError, ConnectTimeoutError, EndpointConnectionError) as e:
+                if region in ALLOWED_TO_SKIP_ON_FAILURE_REGIONS:
+                    logger.warning("Skipping failed AWS region %s for GPU details: %s", region, e)
+                    continue
+                raise
 
             regions = {
                 region: left
@@ -195,8 +206,11 @@ class AWSProvider(AbstractProvider):
                 zone_prices,
             ) in instance_prices.items():  # reduce zone prices to a single value
                 spot_prices[(instance_type, region)] = min(zone_prices)
-        except (ClientError, EndpointConnectionError):
-            return {}
+        except (ClientError, ConnectTimeoutError, EndpointConnectionError) as e:
+            if region in ALLOWED_TO_SKIP_ON_FAILURE_REGIONS:
+                logger.warning("Skipping failed AWS region %s for spot prices: %s", region, e)
+                return {}
+            raise
         return spot_prices
 
     def add_spots(self, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
