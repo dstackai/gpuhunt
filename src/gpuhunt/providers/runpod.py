@@ -270,19 +270,22 @@ class RunpodProvider(AbstractProvider):
             max_vcpu = flavor.get("maxVcpu")
             ram_multiplier = flavor.get("ramMultiplier")
             disk_limit_per_vcpu = flavor.get("diskLimitPerVcpu")
-            if min_vcpu is None or max_vcpu is None or ram_multiplier is None:
+            if (
+                min_vcpu is None
+                or max_vcpu is None
+                or ram_multiplier is None
+                or disk_limit_per_vcpu is None
+            ):
                 continue
             if min_vcpu <= 0 or max_vcpu <= 0 or min_vcpu > max_vcpu:
+                continue
+            if int(disk_limit_per_vcpu) <= 0:
                 continue
 
             for vcpu in _cpu_size_ladder(int(min_vcpu), int(max_vcpu)):
                 # `ramMultiplier` maps vCPU to RAM in GB.
                 memory = int(vcpu * int(ram_multiplier))
-                disk_size = (
-                    float(vcpu * int(disk_limit_per_vcpu))
-                    if disk_limit_per_vcpu is not None and int(disk_limit_per_vcpu) > 0
-                    else None
-                )
+                disk_size = float(vcpu * int(disk_limit_per_vcpu))
                 scale = vcpu / min_vcpu
                 price = base_secure_price * scale
                 items.append(

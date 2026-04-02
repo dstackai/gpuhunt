@@ -101,6 +101,30 @@ def test_make_cpu_catalog_items_skips_invalid_flavors():
                 "slsPrice": 0,
             },
         },
+        {
+            "id": "cpu5g",
+            "minVcpu": 2,
+            "maxVcpu": 32,
+            "ramMultiplier": 4,
+            "diskLimitPerVcpu": None,
+            "specifics": {
+                "stockStatus": "High",
+                "securePrice": 0.08,
+                "slsPrice": 0.1,
+            },
+        },
+        {
+            "id": "cpu5x",
+            "minVcpu": 2,
+            "maxVcpu": 32,
+            "ramMultiplier": 4,
+            "diskLimitPerVcpu": 0,
+            "specifics": {
+                "stockStatus": "High",
+                "securePrice": 0.08,
+                "slsPrice": 0.1,
+            },
+        },
     ]
 
     assert provider._make_cpu_catalog_items("AP-JP-1", cpu_flavors) == []
@@ -114,15 +138,15 @@ def test_fetch_cpu_offers_handles_partial_datacenter_failures(monkeypatch):
         return {
             "data": {
                 "dataCenters": [
-                    {"id": "DC-ERR", "listed": True},
-                    {"id": "DC-OK", "listed": True},
+                    {"id": "US-IL-1", "listed": True},
+                    {"id": "AP-JP-1", "listed": True},
                     {"id": "DC-SKIP", "listed": False},
                 ]
             }
         }
 
     def fake_get_cpu_flavors(dc_id: str):
-        if dc_id == "DC-ERR":
+        if dc_id == "US-IL-1":
             raise RequestException("boom")
         return [
             {
@@ -145,7 +169,9 @@ def test_fetch_cpu_offers_handles_partial_datacenter_failures(monkeypatch):
     items = provider._fetch_cpu_offers()
 
     assert len(items) == 5
-    assert {item.location for item in items} == {"DC-OK"}
+    assert {item.location for item in items} == {"AP-JP-1"}
+    assert all("-" in item.location for item in items)
+    assert all(item.spot is False for item in items)
     assert {tuple(item.flags) for item in items} == {("runpod-cpu",)}
     assert {item.disk_size for item in items} == {20.0, 40.0, 80.0, 160.0, 320.0}
     assert {item.instance_name for item in items} == {
@@ -169,7 +195,8 @@ def test_fetch_offers_appends_cpu_items(monkeypatch):
         gpu_name=None,
         gpu_memory=None,
         spot=False,
-        disk_size=None,
+        disk_size=20.0,
+        flags=["runpod-cpu"],
         provider_data={},
     )
 
