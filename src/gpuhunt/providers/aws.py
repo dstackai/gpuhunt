@@ -55,6 +55,7 @@ pricing_filters = {
 describe_instances_limit = 100
 ALLOWED_TO_SKIP_ON_FAILURE_REGIONS = {
     "me-south-1",
+    "ap-southeast-5",
 }
 
 
@@ -160,7 +161,7 @@ class AWSProvider(AbstractProvider):
                 if region in ALLOWED_TO_SKIP_ON_FAILURE_REGIONS:
                     logger.warning("Skipping failed AWS region %s for GPU details: %s", region, e)
                     continue
-                raise
+                raise RuntimeError(f"Failed AWS GPU details fetch in region {region}: {e}") from e
 
             regions = {
                 region: left
@@ -210,7 +211,7 @@ class AWSProvider(AbstractProvider):
             if region in ALLOWED_TO_SKIP_ON_FAILURE_REGIONS:
                 logger.warning("Skipping failed AWS region %s for spot prices: %s", region, e)
                 return {}
-            raise
+            raise RuntimeError(f"Failed AWS spot price fetch in region {region}: {e}") from e
         return spot_prices
 
     def add_spots(self, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
