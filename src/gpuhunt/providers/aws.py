@@ -53,9 +53,36 @@ pricing_filters = {
     "MarketOption": ["OnDemand"],
 }
 describe_instances_limit = 100
-ALLOWED_TO_SKIP_ON_FAILURE_REGIONS = {
+pricing_download_retries = 3
+pricing_download_chunk_size = 1024 * 1024
+# AWS disruption workaround: if a request to one of these regions times out,
+# skip that region and continue collecting the catalog.
+TEMPORARILY_UNAVAILABLE_REGIONS = {
     "me-south-1",
+}
+# If this AWS account is not enabled in one of these regions,
+# skip that region and continue collecting the catalog.
+ACCOUNT_NOT_ENABLED_REGIONS = {
     "ap-southeast-5",
+    "us-gov-west-1",
+    "eu-south-1",
+    "eu-south-2",
+    "ap-southeast-3",
+    "us-west-2-phx-1",
+    "me-central-1",
+    "il-central-1",
+    "ap-southeast-4",
+    "mx-central-1",
+    "af-south-1",
+    "ap-east-2",
+    "us-gov-east-1",
+    "ap-east-1",
+    "ap-south-2",
+    "ap-southeast-6",
+    "eu-central-2",
+    "ap-southeast-7",
+    "ca-west-1",
+    "me-south-1",
 }
 
 
@@ -75,6 +102,7 @@ class AWSProvider(AbstractProvider):
         else:
             self.temp_dir = tempfile.TemporaryDirectory()
             self.cache_path = self.temp_dir.name + "/index.csv"
+        self.ec2_api_regions = _get_ec2_api_regions()
         # todo aws creds
         self.preview_gpus = {
             "p4de.24xlarge": ("A100", 80.0),
@@ -84,12 +112,7 @@ class AWSProvider(AbstractProvider):
         self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         if not os.path.exists(self.cache_path):
-            logger.info("Downloading EC2 prices to %s", self.cache_path)
-            with requests.get(ec2_pricing_url, stream=True, timeout=20) as r:
-                r.raise_for_status()
-                with open(self.cache_path, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
+            self._download_pricing_file()
 
         offers = []
         with open(self.cache_path, newline="") as f:
@@ -130,9 +153,18 @@ class AWSProvider(AbstractProvider):
 
     def fill_gpu_details(self, offers: list[RawCatalogItem]):
         regions = defaultdict(list)
+        non_ec2_api_regions = set()
         for offer in offers:
             if offer.gpu_count > 0 and offer.instance_name not in self.preview_gpus:
+                if offer.location not in self.ec2_api_regions:
+                    non_ec2_api_regions.add(offer.location)
+                    continue
                 regions[offer.location].append(offer.instance_name)
+        if non_ec2_api_regions:
+            logger.info(
+                "Skipping non-EC2 location codes for GPU details: %s",
+                ", ".join(sorted(non_ec2_api_regions)),
+            )
 
         gpus = copy.deepcopy(self.preview_gpus)
         while regions:
@@ -157,9 +189,35 @@ class AWSProvider(AbstractProvider):
                                         gpu["Name"], gpu["MemoryInfo"]["SizeInMiB"]
                                     ),
                                 )
-            except (ClientError, ConnectTimeoutError, EndpointConnectionError) as e:
-                if region in ALLOWED_TO_SKIP_ON_FAILURE_REGIONS:
-                    logger.warning("Skipping failed AWS region %s for GPU details: %s", region, e)
+            except ConnectTimeoutError as e:
+                if region in TEMPORARILY_UNAVAILABLE_REGIONS:
+                    logger.warning(
+                        "Skipping AWS region %s for GPU details due to temporary AWS regional disruption "
+                        "(connect timeout): %s",
+                        region,
+                        e,
+                    )
+                    continue
+                raise RuntimeError(f"Failed AWS GPU details fetch in region {region}: {e}") from e
+            except ClientError as e:
+                code = e.response.get("Error", {}).get("Code")
+                if code == "AuthFailure" and region in ACCOUNT_NOT_ENABLED_REGIONS:
+                    logger.warning(
+                        "Skipping AWS region %s for GPU details because account is not enabled "
+                        "in this region (AuthFailure): %s",
+                        region,
+                        e,
+                    )
+                    continue
+                raise RuntimeError(f"Failed AWS GPU details fetch in region {region}: {e}") from e
+            except EndpointConnectionError as e:
+                if region in ACCOUNT_NOT_ENABLED_REGIONS:
+                    logger.warning(
+                        "Skipping AWS region %s for GPU details because account is not enabled "
+                        "in this region (EndpointConnectionError): %s",
+                        region,
+                        e,
+                    )
                     continue
                 raise RuntimeError(f"Failed AWS GPU details fetch in region {region}: {e}") from e
 
@@ -207,17 +265,80 @@ class AWSProvider(AbstractProvider):
                 zone_prices,
             ) in instance_prices.items():  # reduce zone prices to a single value
                 spot_prices[(instance_type, region)] = min(zone_prices)
-        except (ClientError, ConnectTimeoutError, EndpointConnectionError) as e:
-            if region in ALLOWED_TO_SKIP_ON_FAILURE_REGIONS:
-                logger.warning("Skipping failed AWS region %s for spot prices: %s", region, e)
+        except ConnectTimeoutError as e:
+            if region in TEMPORARILY_UNAVAILABLE_REGIONS:
+                logger.warning(
+                    "Skipping AWS region %s for spot prices due to temporary AWS regional disruption "
+                    "(connect timeout): %s",
+                    region,
+                    e,
+                )
+                return {}
+            raise RuntimeError(f"Failed AWS spot price fetch in region {region}: {e}") from e
+        except ClientError as e:
+            code = e.response.get("Error", {}).get("Code")
+            if code == "AuthFailure" and region in ACCOUNT_NOT_ENABLED_REGIONS:
+                logger.warning(
+                    "Skipping AWS region %s for spot prices because account is not enabled "
+                    "in this region (AuthFailure): %s",
+                    region,
+                    e,
+                )
+                return {}
+            raise RuntimeError(f"Failed AWS spot price fetch in region {region}: {e}") from e
+        except EndpointConnectionError as e:
+            if region in ACCOUNT_NOT_ENABLED_REGIONS:
+                logger.warning(
+                    "Skipping AWS region %s for spot prices because account is not enabled "
+                    "in this region (EndpointConnectionError): %s",
+                    region,
+                    e,
+                )
                 return {}
             raise RuntimeError(f"Failed AWS spot price fetch in region {region}: {e}") from e
         return spot_prices
 
+    def _download_pricing_file(self) -> None:
+        logger.info("Downloading EC2 prices to %s", self.cache_path)
+        temp_cache_path = f"{self.cache_path}.part"
+        for attempt in range(1, pricing_download_retries + 1):
+            try:
+                with requests.get(ec2_pricing_url, stream=True, timeout=20) as r:
+                    r.raise_for_status()
+                    with open(temp_cache_path, "wb") as f:
+                        for chunk in r.iter_content(chunk_size=pricing_download_chunk_size):
+                            if chunk:
+                                f.write(chunk)
+                os.replace(temp_cache_path, self.cache_path)
+                return
+            except (requests.RequestException, OSError) as e:
+                if os.path.exists(temp_cache_path):
+                    os.remove(temp_cache_path)
+                if attempt == pricing_download_retries:
+                    raise RuntimeError(
+                        f"Failed to download AWS pricing file after {pricing_download_retries} "
+                        f"attempts: {e}"
+                    ) from e
+                logger.warning(
+                    "Failed to download AWS pricing file (attempt %s/%s), retrying: %s",
+                    attempt,
+                    pricing_download_retries,
+                    e,
+                )
+
     def add_spots(self, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
         region_instances = defaultdict(set)
+        non_ec2_api_regions = set()
         for offer in offers:
+            if offer.location not in self.ec2_api_regions:
+                non_ec2_api_regions.add(offer.location)
+                continue
             region_instances[offer.location].add(offer.instance_name)
+        if non_ec2_api_regions:
+            logger.info(
+                "Skipping non-EC2 location codes for spot prices: %s",
+                ", ".join(sorted(non_ec2_api_regions)),
+            )
 
         spot_prices = dict()
         with ThreadPoolExecutor(max_workers=8) as executor:
@@ -297,3 +418,12 @@ def _parse_gpu_count(s: str) -> Optional[int]:
         # AWS fractional GPUs not supported
         return None
     return int(count)
+
+
+def _get_ec2_api_regions() -> set[str]:
+    session = boto3.session.Session()
+    return {
+        region
+        for partition in session.get_available_partitions()
+        for region in session.get_available_regions("ec2", partition_name=partition)
+    }
