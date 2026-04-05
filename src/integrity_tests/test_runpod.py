@@ -58,3 +58,11 @@ def test_gpu_present(data_rows):
     refs = set(name for _, name in get_gpu_map().values())
     gpus = set(select_row(data_rows, "gpu_name"))
     assert len(refs & gpus) > 7
+
+
+def test_cpu_offers_integrity(data_rows):
+    cpu_rows = [row for row in data_rows if row["gpu_count"] == "0"]
+    assert len(cpu_rows) > 0
+    assert all("runpod-cpu" in row["flags"].split(",") for row in cpu_rows)
+    assert all(row["spot"] == "False" for row in cpu_rows)
+    assert all("-" in row["location"] for row in cpu_rows)
