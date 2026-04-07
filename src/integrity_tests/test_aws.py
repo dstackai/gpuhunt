@@ -60,6 +60,7 @@ class TestAWSCatalog:
             "T4",
             "V100",
             "L40S",
+            "RTXPRO6000",
             "L4",
         ]
         assert all(f",{i}," in data for i in gpus)
