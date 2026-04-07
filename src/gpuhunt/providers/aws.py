@@ -84,6 +84,9 @@ ACCOUNT_NOT_ENABLED_REGIONS = {
     "ca-west-1",
     "me-south-1",
 }
+GPU_NAME_MAPPING = {
+    "RTX PRO Server 6000": "RTXPRO6000",
+}
 
 
 class AWSProvider(AbstractProvider):
@@ -184,7 +187,7 @@ class AWSProvider(AbstractProvider):
                             if "GpuInfo" in i:
                                 gpu = i["GpuInfo"]["Gpus"][0]
                                 gpus[i["InstanceType"]] = (
-                                    gpu["Name"],
+                                    GPU_NAME_MAPPING.get(gpu["Name"], gpu["Name"]),
                                     _get_gpu_memory_gib(
                                         gpu["Name"], gpu["MemoryInfo"]["SizeInMiB"]
                                     ),
@@ -379,6 +382,7 @@ class AWSProvider(AbstractProvider):
                     "p4d.",
                     "p4de.",
                     "p3.",
+                    "g7e.",
                     "g6.",
                     "g6e.",
                     "gr6.",
