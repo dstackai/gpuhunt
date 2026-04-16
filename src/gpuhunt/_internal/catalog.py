@@ -114,7 +114,7 @@ class Catalog:
                 if self.auto_reload and (
                     self.loaded_at is None or time.monotonic() - self.loaded_at > RELOAD_INTERVAL
                 ):
-                    self.load()
+                    self._load()
 
         query_filter = QueryFilter(
             provider=[provider] if isinstance(provider, str) else provider,
@@ -183,11 +183,15 @@ class Catalog:
 
     def load(self, version: Optional[str] = None):
         """
-        Fetch the catalog from the S3 bucket
+        Fetch the catalog from the S3 bucket. Thread-safe.
 
         Args:
             version: specific version of the catalog to download. If not specified, the latest version will be used
         """
+        with self._load_lock:
+            self._load(version)
+
+    def _load(self, version: Optional[str] = None):
         catalog_url = os.getenv("GPUHUNT_CATALOG_URL")
         if catalog_url is None:
             if version is None:
