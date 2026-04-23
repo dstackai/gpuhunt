@@ -1,7 +1,6 @@
 import importlib
 import inspect
 import pkgutil
-import sys
 
 import pytest
 
@@ -14,8 +13,6 @@ def providers():
     """List of all provider classes"""
     members = []
     for module_info in pkgutil.walk_packages(gpuhunt.providers.__path__):
-        if sys.version_info < (3, 10) and module_info.name in ["nebius", "verda"]:
-            continue
         module = importlib.import_module(
             f".{module_info.name}",
             package="gpuhunt.providers",
@@ -47,8 +44,6 @@ def test_all_providers_have_a_names(providers):
 
 def test_catalog_providers(providers):
     CATALOG_PROVIDERS = OFFLINE_PROVIDERS + ONLINE_PROVIDERS
-    if sys.version_info < (3, 10):
-        CATALOG_PROVIDERS = [p for p in CATALOG_PROVIDERS if p not in ["nebius", "verda"]]
     names = [p.NAME for p in providers]
     assert set(CATALOG_PROVIDERS) == set(names)
     assert len(CATALOG_PROVIDERS) == len(names)
