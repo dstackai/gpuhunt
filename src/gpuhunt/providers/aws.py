@@ -8,7 +8,6 @@ import tempfile
 from collections import defaultdict
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Optional
 
 import boto3
 import requests
@@ -99,7 +98,7 @@ class AWSProvider(AbstractProvider):
 
     NAME = "aws"
 
-    def __init__(self, cache_path: Optional[str] = None):
+    def __init__(self, cache_path: str | None = None):
         if cache_path:
             self.cache_path = cache_path
         else:
@@ -112,7 +111,7 @@ class AWSProvider(AbstractProvider):
         }
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         if not os.path.exists(self.cache_path):
             self._download_pricing_file()
@@ -414,7 +413,7 @@ def _parse_memory(s: str) -> float:
     return float(r.group(1))
 
 
-def _parse_gpu_count(s: str) -> Optional[int]:
+def _parse_gpu_count(s: str) -> int | None:
     if not s:
         return 0
     count = float(s)

@@ -1,6 +1,6 @@
 import re
 from collections.abc import Container, Iterable
-from typing import Optional, TypeVar, Union
+from typing import TypeVar
 
 from gpuhunt._internal.models import (
     AcceleratorInfo,
@@ -19,22 +19,22 @@ from gpuhunt._internal.models import (
 _TPU_VERSIONS = ["v2", "v3", "v4", "v5p", "v5litepod", "v6e"]
 
 
-Comparable = TypeVar("Comparable", bound=Union[int, float, tuple[int, int]])
+Comparable = TypeVar("Comparable", bound=int | float | tuple[int, int])
 
 
-def is_between(value: Comparable, left: Optional[Comparable], right: Optional[Comparable]) -> bool:
+def is_between(value: Comparable, left: Comparable | None, right: Comparable | None) -> bool:
     if is_below(value, left) or is_above(value, right):
         return False
     return True
 
 
-def is_below(value: Comparable, limit: Optional[Comparable]) -> bool:
+def is_below(value: Comparable, limit: Comparable | None) -> bool:
     if limit is not None and value < limit:
         return True
     return False
 
 
-def is_above(value: Comparable, limit: Optional[Comparable]) -> bool:
+def is_above(value: Comparable, limit: Comparable | None) -> bool:
     if limit is not None and value > limit:
         return True
     return False
@@ -102,7 +102,7 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
 
 
 def find_accelerators(
-    names: Optional[Iterable[str]] = None, vendors: Optional[Container[AcceleratorVendor]] = None
+    names: Iterable[str] | None = None, vendors: Container[AcceleratorVendor] | None = None
 ) -> list[AcceleratorInfo]:
     if names is not None:
         names = {n.lower() for n in names}
@@ -115,14 +115,14 @@ def find_accelerators(
     return result
 
 
-def get_compute_capability(gpu_name: str) -> Optional[tuple[int, int]]:
+def get_compute_capability(gpu_name: str) -> tuple[int, int] | None:
     if accelerators := find_accelerators(names=[gpu_name], vendors=AcceleratorVendor.NVIDIA):
         assert isinstance(accelerators[0], NvidiaGPUInfo)
         return accelerators[0].compute_capability
     return None
 
 
-def get_gpu_vendor(gpu_name: Optional[str]) -> Optional[AcceleratorVendor]:
+def get_gpu_vendor(gpu_name: str | None) -> AcceleratorVendor | None:
     if gpu_name is None:
         return None
     if accelerators := find_accelerators(names=[gpu_name]):
@@ -309,7 +309,7 @@ KNOWN_TENSTORRENT_ACCELERATORS: list[TenstorrentAcceleratorInfo] = [
 ]
 
 KNOWN_ACCELERATORS: list[
-    Union[NvidiaGPUInfo, AMDGPUInfo, TPUInfo, IntelAcceleratorInfo, TenstorrentAcceleratorInfo]
+    NvidiaGPUInfo | AMDGPUInfo | TPUInfo | IntelAcceleratorInfo | TenstorrentAcceleratorInfo
 ] = (
     KNOWN_NVIDIA_GPUS
     + KNOWN_AMD_GPUS

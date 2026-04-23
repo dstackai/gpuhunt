@@ -1,9 +1,10 @@
 import functools
 import importlib
 import logging
-from typing import Callable, TypeVar
+from collections.abc import Callable
+from typing import Concatenate, TypeVar
 
-from typing_extensions import Concatenate, ParamSpec
+from typing_extensions import ParamSpec
 
 from gpuhunt._internal.catalog import Catalog
 

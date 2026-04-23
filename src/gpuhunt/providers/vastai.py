@@ -2,7 +2,7 @@ import copy
 import logging
 import re
 from collections import defaultdict
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal
 
 import requests
 
@@ -15,7 +15,7 @@ bundles_url = "https://console.vast.ai/api/v0/bundles/"
 kilo = 1000
 # Maximum number of offers to fetch when GPU name mapping fails.
 Operators = Literal["lt", "lte", "eq", "gte", "gt"]
-FilterValue = Union[int, float, str, bool]
+FilterValue = int | float | str | bool
 
 
 class VastAIProvider(AbstractProvider):
@@ -23,14 +23,14 @@ class VastAIProvider(AbstractProvider):
 
     def __init__(
         self,
-        extra_filters: Optional[dict[str, dict[Operators, FilterValue]]] = None,
+        extra_filters: dict[str, dict[Operators, FilterValue]] | None = None,
         community_cloud: bool = True,
     ):
         self.extra_filters = extra_filters
         self.community_cloud = community_cloud
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         filters: dict[str, Any] = self.make_filters(
             query_filter or QueryFilter(), community_cloud=self.community_cloud
@@ -212,7 +212,7 @@ def get_dstack_gpu_name(gpu_name: str) -> str:
     return gpu_name.replace(" ", "")
 
 
-def get_location(location: Optional[str]) -> str:
+def get_location(location: str | None) -> str:
     if location is None:
         return ""
     try:

@@ -3,7 +3,6 @@ import itertools
 import logging
 import re
 from collections.abc import Iterable
-from typing import Optional
 
 from verda import VerdaClient
 from verda.instance_types import InstanceType
@@ -26,7 +25,7 @@ class VerdaProvider(AbstractProvider):
         self.verda_client = VerdaClient(client_id, client_secret)
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         instance_types = self._get_instance_types()
         locations = self._get_locations()
@@ -60,7 +59,7 @@ def generate_instances(
     return instances
 
 
-def transform_instance(instance: InstanceType, spot: bool, location: str) -> Optional[dict]:
+def transform_instance(instance: InstanceType, spot: bool, location: str) -> dict | None:
     gpu_memory = None
     gpu_count = instance.gpu["number_of_gpus"]
     gpu_name = None
@@ -106,7 +105,7 @@ GPU_MAP = {
 }
 
 
-def get_gpu_name(name: str) -> Optional[str]:
+def get_gpu_name(name: str) -> str | None:
     for regex, gpu_name in GPU_MAP.items():
         if re.fullmatch(regex, name):
             return gpu_name

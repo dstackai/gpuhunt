@@ -6,7 +6,6 @@ import hmac
 import logging
 import os
 from collections import defaultdict
-from typing import Optional
 
 import requests
 
@@ -41,7 +40,7 @@ GPU_TYPE_MAP: dict[str, tuple[str, AcceleratorVendor, float]] = {
 }
 
 # Per-GPU-hour pricing from https://crusoe.ai/cloud/pricing
-GPU_PRICING: dict[str, tuple[float, Optional[float]]] = {
+GPU_PRICING: dict[str, tuple[float, float | None]] = {
     # gpu_type -> (on_demand_per_gpu_hr, spot_per_gpu_hr or None)
     "A100-PCIe-40GB": (1.45, 1.00),
     "A100-PCIe-80GB": (1.65, 1.20),
@@ -69,9 +68,9 @@ class CrusoeProvider(AbstractProvider):
 
     def __init__(
         self,
-        access_key: Optional[str] = None,
-        secret_key: Optional[str] = None,
-        project_id: Optional[str] = None,
+        access_key: str | None = None,
+        secret_key: str | None = None,
+        project_id: str | None = None,
     ):
         self.access_key = access_key or os.getenv("CRUSOE_ACCESS_KEY")
         self.secret_key = secret_key or os.getenv("CRUSOE_SECRET_KEY")
@@ -85,7 +84,7 @@ class CrusoeProvider(AbstractProvider):
             raise ValueError("Set the CRUSOE_PROJECT_ID environment variable.")
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         instance_types = self._get_instance_types()
         type_specs = {t["product_name"]: t for t in instance_types}
@@ -119,7 +118,7 @@ class CrusoeProvider(AbstractProvider):
         resp.raise_for_status()
         return resp.json()["items"]
 
-    def _request(self, method: str, path: str, params: Optional[dict] = None) -> requests.Response:
+    def _request(self, method: str, path: str, params: dict | None = None) -> requests.Response:
         dt = str(datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0))
         dt = dt.replace(" ", "T")
 

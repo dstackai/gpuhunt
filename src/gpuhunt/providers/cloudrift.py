@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Optional, Union
 
 import requests
 
@@ -18,7 +17,7 @@ class CloudRiftProvider(AbstractProvider):
     NAME = "cloudrift"
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         instance_types = self._get_instance_types()
         instance_types = [
@@ -71,7 +70,7 @@ GPU_MAP = [
 ]
 
 
-def _make_request(endpoint: str, request_data: dict) -> Union[dict, str, None]:
+def _make_request(endpoint: str, request_data: dict) -> dict | str | None:
     server = os.environ.get("CLOUDRIFT_SERVER_ADDRESS", CLOUDRIFT_SERVER_ADDRESS)
     response = requests.request(
         "POST",

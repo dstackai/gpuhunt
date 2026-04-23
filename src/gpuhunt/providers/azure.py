@@ -8,7 +8,6 @@ from collections import namedtuple
 from collections.abc import Iterable
 from queue import Queue
 from threading import Thread
-from typing import Optional
 
 import requests
 import requests.adapters
@@ -72,8 +71,8 @@ class AzureProvider(AbstractProvider):
     def __init__(
         self,
         subscription_id: str,
-        credential: Optional[TokenCredential] = None,
-        cache_dir: Optional[str] = None,
+        credential: TokenCredential | None = None,
+        cache_dir: str | None = None,
     ):
         self.cache_dir = cache_dir
         self.client = ComputeManagementClient(
@@ -140,7 +139,7 @@ class AzureProvider(AbstractProvider):
             q.put(None)
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         offers = []
         for page in self.get_pages():
@@ -260,7 +259,7 @@ class AzureProvider(AbstractProvider):
         return [i for i in offers if vm_series_pattern.match(i.instance_name)]
 
 
-def get_gpu_name_memory(vm_name: str) -> tuple[Optional[str], Optional[float]]:
+def get_gpu_name_memory(vm_name: str) -> tuple[str | None, float | None]:
     for pattern, gpu_name, gpu_memory in gpu_vm_series:
         m = re.match(f"^Standard_{pattern}$", vm_name)
         if m is None:

@@ -3,7 +3,7 @@ import logging
 import re
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from typing import Annotated, Optional
+from typing import Annotated
 
 import oci
 from oci.identity.models import Region
@@ -22,11 +22,11 @@ COST_ESTIMATOR_REQUEST_TIMEOUT = 10
 
 
 class OCICredentials(TypedDict):
-    user: Optional[str]
-    key_content: Optional[str]
-    fingerprint: Optional[str]
-    tenancy: Optional[str]
-    region: Optional[str]
+    user: str | None
+    key_content: str | None
+    fingerprint: str | None
+    tenancy: str | None
+    region: str | None
 
 
 class OCIProvider(AbstractProvider):
@@ -39,7 +39,7 @@ class OCIProvider(AbstractProvider):
         self.cost_estimator = CostEstimator()
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         shapes = self.cost_estimator.get_shapes()
         products = self.cost_estimator.get_products()
@@ -115,7 +115,7 @@ class CostEstimatorTypeField(BaseModel):
 class CostEstimatorShapeProduct(BaseModel):
     type: CostEstimatorTypeField
     part_number: str
-    qty: Optional[int]
+    qty: int | None
 
     class Config:
         alias_generator = to_camel_case
@@ -126,9 +126,9 @@ class CostEstimatorShape(BaseModel):
     hidden: bool
     status: str
     allow_preemptible: bool
-    bundle_memory_qty: Optional[int]
-    gpu_qty: Optional[int]
-    gpu_memory_qty: Optional[int]
+    bundle_memory_qty: int | None
+    gpu_qty: int | None
+    gpu_memory_qty: int | None
     processor_type: CostEstimatorTypeField
     shape_type: CostEstimatorTypeField
     sub_type: CostEstimatorTypeField
@@ -144,7 +144,7 @@ class CostEstimatorShape(BaseModel):
         # the data says A10 and A100 GPU instances are ARM, but they are not
         return self.processor_type.value == "arm" and not is_ampere_gpu
 
-    def get_gpu_unit_memory_gb(self) -> Optional[float]:
+    def get_gpu_unit_memory_gb(self) -> float | None:
         if self.gpu_memory_qty and self.gpu_qty:
             return self.gpu_memory_qty / self.gpu_qty
         return None
@@ -176,7 +176,7 @@ class CostEstimatorProduct(BaseModel):
     class Config:
         alias_generator = to_camel_case
 
-    def find_price_l10n(self, currency_code: str) -> Optional[CostEstimatorPriceLocalization]:
+    def find_price_l10n(self, currency_code: str) -> CostEstimatorPriceLocalization | None:
         return next(
             filter(
                 lambda price: price.currency_code == currency_code,
@@ -189,7 +189,7 @@ class CostEstimatorProduct(BaseModel):
 class CostEstimatorProductList(BaseModel):
     items: list[CostEstimatorProduct]
 
-    def find(self, part_number: str) -> Optional[CostEstimatorProduct]:
+    def find(self, part_number: str) -> CostEstimatorProduct | None:
         return next(filter(lambda product: product.part_number == part_number, self.items), None)
 
 
@@ -229,8 +229,8 @@ class MemoryConfiguration:
 @dataclass
 class GPUConfiguration:
     units_count: int
-    unit_memory_gb: Optional[float]
-    name: Optional[str]
+    unit_memory_gb: float | None
+    name: str | None
     price: float
 
     def __post_init__(self):
@@ -254,7 +254,7 @@ def shape_to_resources(
 ) -> ResourcesConfiguration:
     cpu = None
     gpu = GPUConfiguration(units_count=0, unit_memory_gb=None, name=None, price=0.0)
-    memory: Optional[MemoryConfiguration] = None
+    memory: MemoryConfiguration | None = None
     if shape.bundle_memory_qty is not None:
         memory = MemoryConfiguration(gbs=shape.bundle_memory_qty, price=0.0)
 
@@ -317,7 +317,7 @@ def get_product_price_usd_per_hour(product: CostEstimatorProduct) -> float:
     return price.value
 
 
-def get_gpu_name(shape_name: str) -> Optional[str]:
+def get_gpu_name(shape_name: str) -> str | None:
     parts = re.split(r"[\.-]", shape_name.upper())
 
     if "GPU4" in parts:

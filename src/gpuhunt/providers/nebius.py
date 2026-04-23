@@ -1,7 +1,7 @@
 import logging
 import re
 from dataclasses import dataclass
-from typing import Optional, cast
+from typing import cast
 
 from nebius.aio.channel import Credentials
 from nebius.api.nebius.billing.v1alpha1 import (
@@ -70,7 +70,7 @@ class NebiusProvider(AbstractProvider):
         self.credentials = credentials
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         items: list[RawCatalogItem] = []
         sdk = SDK(credentials=self.credentials)
@@ -149,7 +149,7 @@ def list_platforms(sdk: SDK, project_id: str) -> ListPlatformsResponse:
     return PlatformServiceClient(sdk).list(req, per_retry_timeout=TIMEOUT).wait()
 
 
-def get_gpu_info(platform: str) -> Optional[AcceleratorInfo]:
+def get_gpu_info(platform: str) -> AcceleratorInfo | None:
     m = re.match(r"gpu-([^-]+)-", platform)
     if m is None:
         return None
@@ -163,11 +163,11 @@ def get_gpu_info(platform: str) -> Optional[AcceleratorInfo]:
 def make_item(
     platform: str,
     preset: Preset,
-    gpu: Optional[AcceleratorInfo],
+    gpu: AcceleratorInfo | None,
     region: str,
     spot: bool,
     price: float,
-) -> Optional[RawCatalogItem]:
+) -> RawCatalogItem | None:
     fabrics = []
     if preset.allow_gpu_clustering:
         fabrics = [
