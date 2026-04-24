@@ -9,7 +9,7 @@ authors = [
 ]
 description = "A catalog of GPU pricing for different cloud providers"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
@@ -39,14 +39,8 @@ gcp = [
     "google-cloud-compute",
     "google-cloud-tpu",
 ]
-# Nebius requires Python 3.10. On 3.9:
-# `pip install gpuhunt[nebius]` is expected to fail
-# `pip install gpuhunt[all]` is expected to ignore Nebius
 nebius = [
     "nebius>=0.2.40,<0.4",
-]
-maybe_nebius = [
-    'nebius>=0.2.40,<0.4; python_version>="3.10"',
 ]
 oci = [
     "oci",
@@ -55,10 +49,7 @@ oci = [
 verda = [
     'verda>=1.22.0',
 ]
-maybe_verda = [
-    'verda>=1.22.0; python_version>="3.10"',
-]
-all = ["gpuhunt[aws,azure,maybe_verda,gcp,maybe_nebius,oci]"]
+all = ["gpuhunt[aws,azure,verda,gcp,nebius,oci]"]
 dev = [
     "pre-commit",
     "pytest~=7.0",

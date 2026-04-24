@@ -1,7 +1,7 @@
 import copy
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, cast
+from typing import cast
 
 import requests
 from requests import RequestException
@@ -31,7 +31,7 @@ class RunpodProvider(AbstractProvider):
         self._gpu_map = get_gpu_map()
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         offers = self._fetch_offers()
         return sorted(offers, key=lambda i: i.price or 0)
@@ -309,7 +309,7 @@ class RunpodProvider(AbstractProvider):
     def _get_gpu_vendor_and_name(
         self,
         gpu_id: str,
-    ) -> Optional[tuple[AcceleratorVendor, str]]:
+    ) -> tuple[AcceleratorVendor, str] | None:
         if not gpu_id:
             return None
         return self._gpu_map.get(gpu_id)
@@ -338,7 +338,7 @@ def _make_request(payload: dict):
     return resp.json()
 
 
-def _get_gpu_name(vendor: AcceleratorVendor, name: str) -> Optional[str]:
+def _get_gpu_name(vendor: AcceleratorVendor, name: str) -> str | None:
     if vendor == AcceleratorVendor.NVIDIA:
         return _get_nvidia_gpu_name(name)
     if vendor == AcceleratorVendor.AMD:
@@ -346,7 +346,7 @@ def _get_gpu_name(vendor: AcceleratorVendor, name: str) -> Optional[str]:
     return None
 
 
-def _get_nvidia_gpu_name(name: str) -> Optional[str]:
+def _get_nvidia_gpu_name(name: str) -> str | None:
     if "B200" in name:
         return "B200"
     if "V100" in name:
@@ -365,7 +365,7 @@ def _get_nvidia_gpu_name(name: str) -> Optional[str]:
     return None
 
 
-def _get_amd_gpu_name(name: str) -> Optional[str]:
+def _get_amd_gpu_name(name: str) -> str | None:
     if accelerators := find_accelerators(names=[name], vendors=[AcceleratorVendor.AMD]):
         return accelerators[0].name
     return None

@@ -3,13 +3,12 @@ import logging
 from collections.abc import Sequence
 from pathlib import Path
 from textwrap import dedent
-from typing import Optional
 
 from gpuhunt._internal import storage
 from gpuhunt._internal.utils import configure_logging
 
 
-def main(args: Optional[Sequence[str]] = None):
+def main(args: Sequence[str] | None = None):
     configure_logging()
     parser = argparse.ArgumentParser(
         description=dedent(

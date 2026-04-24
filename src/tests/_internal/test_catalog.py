@@ -1,4 +1,3 @@
-from typing import Union
 from unittest.mock import Mock
 
 import gpuhunt._internal.catalog as internal_catalog
@@ -75,7 +74,7 @@ class TestQuery:
         assert len(catalog.query(gpu_name=["a10", "A100"])) == 3
 
 
-def catalog_item(**kwargs) -> Union[CatalogItem, RawCatalogItem]:
+def catalog_item(**kwargs) -> CatalogItem | RawCatalogItem:
     values = dict(
         instance_name="instance",
         cpu=1,

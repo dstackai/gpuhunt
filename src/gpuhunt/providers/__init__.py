@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 
@@ -16,7 +15,7 @@ class AbstractProvider(ABC):
 
     @abstractmethod
     def get(
-        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         """
         Return a list of available instance offers. Offers should be ordered by priority. In most

@@ -4,7 +4,6 @@ from collections.abc import Container
 from dataclasses import asdict, dataclass, field, fields
 from typing import (
     ClassVar,
-    Optional,
     Union,
 )
 
@@ -22,7 +21,7 @@ JSONType = Union[
 JSONObject = dict[str, JSONType]
 
 
-def bool_loader(x: Union[bool, str]) -> bool:
+def bool_loader(x: bool | str) -> bool:
     if isinstance(x, bool):
         return x
     return x.lower() == "true"
@@ -73,19 +72,19 @@ class RawCatalogItem:
     See `CatalogItem` for field descriptions.
     """
 
-    instance_name: Optional[str]
-    location: Optional[str]
-    price: Optional[float]
-    cpu: Optional[int]
-    memory: Optional[float]
-    gpu_count: Optional[int]
-    gpu_name: Optional[str]
-    gpu_memory: Optional[float]
-    spot: Optional[bool]
-    disk_size: Optional[float]
-    gpu_vendor: Optional[str] = None
+    instance_name: str | None
+    location: str | None
+    price: float | None
+    cpu: int | None
+    memory: float | None
+    gpu_count: int | None
+    gpu_name: str | None
+    gpu_memory: float | None
+    spot: bool | None
+    disk_size: float | None
+    gpu_vendor: str | None = None
     flags: list[str] = field(default_factory=list)
-    cpu_arch: Optional[str] = None
+    cpu_arch: str | None = None
     provider_data: JSONObject = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -138,7 +137,7 @@ class RawCatalogItem:
             provider_data=json.loads(v.get("provider_data", "{}")),
         )
 
-    def dict(self) -> dict[str, Union[str, int, float, bool, None]]:
+    def dict(self) -> dict[str, str | int | float | bool | None]:
         return {
             **asdict(self),
             "flags": " ".join(self.flags),
@@ -179,14 +178,14 @@ class CatalogItem:
     cpu: int
     memory: float
     gpu_count: int
-    gpu_name: Optional[str]
-    gpu_memory: Optional[float]
+    gpu_name: str | None
+    gpu_memory: float | None
     spot: bool
-    disk_size: Optional[float]
+    disk_size: float | None
     provider: str
-    gpu_vendor: Optional[AcceleratorVendor] = None
+    gpu_vendor: AcceleratorVendor | None = None
     flags: list[str] = field(default_factory=list)
-    cpu_arch: Optional[CPUArchitecture] = None
+    cpu_arch: CPUArchitecture | None = None
     provider_data: JSONObject = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -216,7 +215,7 @@ class CatalogItem:
             self.cpu_arch = CPUArchitecture.cast(cpu_arch)
 
     @staticmethod
-    def from_dict(v: dict, *, provider: Optional[str] = None) -> "CatalogItem":
+    def from_dict(v: dict, *, provider: str | None = None) -> "CatalogItem":
         return CatalogItem(provider=provider, **asdict(RawCatalogItem.from_dict(v)))
 
 
@@ -248,28 +247,28 @@ class QueryFilter:
         allowed_flags: only offers with all flags allowed will be returned. `None` allows all flags
     """
 
-    provider: Optional[list[str]] = None  # strings can have mixed case
-    cpu_arch: Optional[CPUArchitecture] = None
-    min_cpu: Optional[int] = None
-    max_cpu: Optional[int] = None
-    min_memory: Optional[float] = None
-    max_memory: Optional[float] = None
-    min_gpu_count: Optional[int] = None
-    max_gpu_count: Optional[int] = None
-    gpu_vendor: Optional[AcceleratorVendor] = None
-    gpu_name: Optional[list[str]] = None  # strings can have mixed case
-    min_gpu_memory: Optional[float] = None
-    max_gpu_memory: Optional[float] = None
-    min_total_gpu_memory: Optional[float] = None
-    max_total_gpu_memory: Optional[float] = None
-    min_disk_size: Optional[int] = None
-    max_disk_size: Optional[int] = None
-    min_price: Optional[float] = None
-    max_price: Optional[float] = None
-    min_compute_capability: Optional[tuple[int, int]] = None
-    max_compute_capability: Optional[tuple[int, int]] = None
-    spot: Optional[bool] = None
-    allowed_flags: Optional[Container[str]] = None
+    provider: list[str] | None = None  # strings can have mixed case
+    cpu_arch: CPUArchitecture | None = None
+    min_cpu: int | None = None
+    max_cpu: int | None = None
+    min_memory: float | None = None
+    max_memory: float | None = None
+    min_gpu_count: int | None = None
+    max_gpu_count: int | None = None
+    gpu_vendor: AcceleratorVendor | None = None
+    gpu_name: list[str] | None = None  # strings can have mixed case
+    min_gpu_memory: float | None = None
+    max_gpu_memory: float | None = None
+    min_total_gpu_memory: float | None = None
+    max_total_gpu_memory: float | None = None
+    min_disk_size: int | None = None
+    max_disk_size: int | None = None
+    min_price: float | None = None
+    max_price: float | None = None
+    min_compute_capability: tuple[int, int] | None = None
+    max_compute_capability: tuple[int, int] | None = None
+    spot: bool | None = None
+    allowed_flags: Container[str] | None = None
 
     def __repr__(self) -> str:
         """

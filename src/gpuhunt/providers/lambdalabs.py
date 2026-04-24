@@ -1,7 +1,6 @@
 import copy
 import logging
 import re
-from typing import Optional
 
 from requests import Session
 
@@ -29,7 +28,7 @@ class LambdaLabsProvider(AbstractProvider):
         self.session.headers.update({"Authorization": f"Bearer {token}"})
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         offers = []
         resp = self.session.get(INSTANCE_TYPES_URL, timeout=TIMEOUT)
@@ -87,7 +86,7 @@ class LambdaLabsProvider(AbstractProvider):
         return sorted(regions)
 
 
-def parse_description(v: str) -> Optional[tuple[int, str, float]]:
+def parse_description(v: str) -> tuple[int, str, float] | None:
     """Returns gpus count, gpu name, and GPU memory"""
     r = re.match(r"^(\d)x (?:Tesla )?(.+) \((\d+) GB", v)
     if r is None:

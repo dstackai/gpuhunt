@@ -8,7 +8,7 @@ from collections import defaultdict, namedtuple
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Optional, cast
+from typing import cast
 
 import google.cloud.billing_v1 as billing_v1
 import google.cloud.compute_v1 as compute_v1
@@ -273,7 +273,7 @@ class GCPProvider(AbstractProvider):
                 logger.warning("Unknown accelerator vendor: %s", accelerator_type)
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         instances = self.list_preconfigured_instances()
         self.add_gpus(instances)
@@ -450,7 +450,7 @@ class Prices:
 
     def get_instance_price(
         self, instance: RawCatalogItem, capacity_type: CapacityType
-    ) -> Optional[float]:
+    ) -> float | None:
         vm_family = self.get_vm_family(instance.instance_name)
         if vm_family in ["g1", "f1", "m2"]:  # shared-core and reservation-only
             return None
@@ -668,7 +668,7 @@ def get_tpu_prices() -> list[dict]:
 
 def find_base_price(
     tpu_version: str, location: str, tpu_prices: list[dict], spot: bool, is_pod: bool
-) -> Optional[float]:
+) -> float | None:
     for price_info in tpu_prices:
         if (
             price_info["instance_name"] == tpu_version
@@ -689,7 +689,7 @@ def find_no_of_chips(instance_name: str, configs: list[dict]):
 
 def find_tpu_price_static_src(
     tpu_version: str, num_cores: int, tpu_region: str, no_of_chips: int, spot: bool
-) -> Optional[float]:
+) -> float | None:
     # The pricing page names v5litepod as v5e
     tpu_version = "v5e" if tpu_version == "v5litepod" else tpu_version
     # The pricing page lists different (device and pod) prices per chip for v2 and v3.
@@ -712,7 +712,7 @@ def find_tpu_price_static_src(
 
 def find_base_price_v5(
     tpu_version: str, location: str, tpu_prices: list[dict], spot: bool
-) -> Optional[float]:
+) -> float | None:
     for price_info in tpu_prices:
         if (
             price_info["instance_name"] == tpu_version
@@ -776,7 +776,7 @@ def get_locations(project_id: str) -> list[str]:
     return locations
 
 
-def extract_tpu_version(input_string: str) -> Optional[str]:
+def extract_tpu_version(input_string: str) -> str | None:
     # The regular expression pattern to find a substring starting with 'Tpu'
     pattern = r"\bTpu[-\w]*\b"
     # Search for the first match of the pattern
@@ -793,5 +793,5 @@ def extract_tpu_version(input_string: str) -> Optional[str]:
     return None
 
 
-def get_tpu_hardware_spec(instance_name: str) -> Optional[TPUHardwareSpec]:
+def get_tpu_hardware_spec(instance_name: str) -> TPUHardwareSpec | None:
     return TPU_NAME_TO_HARDWARE_SPEC.get(instance_name)

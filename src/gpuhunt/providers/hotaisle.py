@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Optional, TypedDict, cast
+from typing import TypedDict, cast
 
 import requests
 from requests import Response
@@ -17,7 +17,7 @@ API_URL = "https://admin.hotaisle.app/api"
 class HotAisleProvider(AbstractProvider):
     NAME = "hotaisle"
 
-    def __init__(self, api_key: Optional[str] = None, team_handle: Optional[str] = None):
+    def __init__(self, api_key: str | None = None, team_handle: str | None = None):
         """Hotaisle requries an API key and team handle to access the API."""
         self.api_key = api_key or os.getenv("HOTAISLE_API_KEY")
         self.team_handle = team_handle or os.getenv("HOTAISLE_TEAM_HANDLE")
@@ -28,7 +28,7 @@ class HotAisleProvider(AbstractProvider):
             raise ValueError("Set the HOTAISLE_TEAM_HANDLE environment variable.")
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         offers = self.fetch_offers()
         return sorted(offers, key=lambda i: i.price)
@@ -57,7 +57,7 @@ class HotAisleCatalogItemProviderData(TypedDict):
     vm_specs: JSONObject
 
 
-def get_gpu_memory(gpu_name: str) -> Optional[float]:
+def get_gpu_memory(gpu_name: str) -> float | None:
     if accelerators := find_accelerators(names=[gpu_name], vendors=[AcceleratorVendor.AMD]):
         return float(accelerators[0].memory)
     logger.warning(f"Unknown AMD GPU {gpu_name}")

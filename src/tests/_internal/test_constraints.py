@@ -1,5 +1,3 @@
-from typing import Optional
-
 import pytest
 
 from gpuhunt import CatalogItem, QueryFilter
@@ -187,7 +185,7 @@ class TestMatches:
         self,
         item: CatalogItem,
         item_flags: list[str],
-        query_allowed_flags: Optional[list[str]],
+        query_allowed_flags: list[str] | None,
         should_match: bool,
     ) -> None:
         item.flags = item_flags

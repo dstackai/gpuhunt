@@ -1,6 +1,6 @@
 import logging
 import sys
-from typing import Callable, Optional, Union
+from collections.abc import Callable
 
 
 def configure_logging() -> None:
@@ -11,7 +11,7 @@ def configure_logging() -> None:
     )
 
 
-def empty_as_none(value: Optional[str], loader: Optional[Callable] = None):
+def empty_as_none(value: str | None, loader: Callable | None = None):
     if value is None or value == "":
         return None
     if loader is not None:
@@ -20,8 +20,8 @@ def empty_as_none(value: Optional[str], loader: Optional[Callable] = None):
 
 
 def parse_compute_capability(
-    value: Optional[Union[str, tuple[int, int]]],
-) -> Optional[tuple[int, int]]:
+    value: str | tuple[int, int] | None,
+) -> tuple[int, int] | None:
     if isinstance(value, str):
         major, minor = value.split(".")
         return int(major), int(minor)

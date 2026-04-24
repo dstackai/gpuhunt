@@ -11,7 +11,6 @@ import zipfile
 from collections.abc import Container
 from concurrent.futures import ThreadPoolExecutor, wait
 from pathlib import Path
-from typing import Optional, Union
 
 import gpuhunt._internal.constraints as constraints
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, CPUArchitecture, QueryFilter
@@ -54,28 +53,28 @@ class Catalog:
     def query(
         self,
         *,
-        provider: Optional[Union[str, list[str]]] = None,
-        cpu_arch: Optional[Union[CPUArchitecture, str]] = None,
-        min_cpu: Optional[int] = None,
-        max_cpu: Optional[int] = None,
-        min_memory: Optional[float] = None,
-        max_memory: Optional[float] = None,
-        min_gpu_count: Optional[int] = None,
-        max_gpu_count: Optional[int] = None,
-        gpu_vendor: Optional[Union[AcceleratorVendor, str]] = None,
-        gpu_name: Optional[Union[str, list[str]]] = None,
-        min_gpu_memory: Optional[float] = None,
-        max_gpu_memory: Optional[float] = None,
-        min_total_gpu_memory: Optional[float] = None,
-        max_total_gpu_memory: Optional[float] = None,
-        min_disk_size: Optional[int] = None,
-        max_disk_size: Optional[int] = None,
-        min_price: Optional[float] = None,
-        max_price: Optional[float] = None,
-        min_compute_capability: Optional[Union[str, tuple[int, int]]] = None,
-        max_compute_capability: Optional[Union[str, tuple[int, int]]] = None,
-        spot: Optional[bool] = None,
-        allowed_flags: Optional[Container[str]] = None,
+        provider: str | list[str] | None = None,
+        cpu_arch: CPUArchitecture | str | None = None,
+        min_cpu: int | None = None,
+        max_cpu: int | None = None,
+        min_memory: float | None = None,
+        max_memory: float | None = None,
+        min_gpu_count: int | None = None,
+        max_gpu_count: int | None = None,
+        gpu_vendor: AcceleratorVendor | str | None = None,
+        gpu_name: str | list[str] | None = None,
+        min_gpu_memory: float | None = None,
+        max_gpu_memory: float | None = None,
+        min_total_gpu_memory: float | None = None,
+        max_total_gpu_memory: float | None = None,
+        min_disk_size: int | None = None,
+        max_disk_size: int | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_compute_capability: str | tuple[int, int] | None = None,
+        max_compute_capability: str | tuple[int, int] | None = None,
+        spot: bool | None = None,
+        allowed_flags: Container[str] | None = None,
     ) -> list[CatalogItem]:
         """
         Query the catalog for matching offers
@@ -181,7 +180,7 @@ class Catalog:
             items = list(heapq.merge(*[f.result() for f in completed], key=lambda i: i.price))
         return items
 
-    def load(self, version: Optional[str] = None):
+    def load(self, version: str | None = None):
         """
         Fetch the catalog from the S3 bucket. Thread-safe.
 
@@ -191,7 +190,7 @@ class Catalog:
         with self._load_lock:
             self._load(version)
 
-    def _load(self, version: Optional[str] = None):
+    def _load(self, version: str | None = None):
         catalog_url = os.getenv("GPUHUNT_CATALOG_URL")
         if catalog_url is None:
             if version is None:

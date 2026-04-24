@@ -3,7 +3,7 @@ import math
 from collections import namedtuple
 from itertools import chain
 from math import ceil
-from typing import Optional, TypeVar, Union
+from typing import TypeVar
 
 import requests
 
@@ -33,14 +33,14 @@ class CudoProvider(AbstractProvider):
     NAME = "cudo"
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         offers = self.fetch_offers(query_filter, balance_resources)
         offers = get_min_price_for_location_and_instance(offers)
         return sorted(offers, key=lambda i: i.price)
 
     def fetch_offers(
-        self, query_filter: Optional[QueryFilter], balance_resources
+        self, query_filter: QueryFilter | None, balance_resources
     ) -> list[RawCatalogItem]:
         machine_types = self.list_vm_machine_types()
         if query_filter is not None:
@@ -382,14 +382,14 @@ def get_balanced_disk_size(available_disk, memory, total_gpu_memory, max_disk_si
     )
 
 
-def gpu_name(name: str) -> Optional[str]:
+def gpu_name(name: str) -> str | None:
     if not name:
         return None
     result = GPU_MAP.get(name)
     return result
 
 
-def get_memory(gpu_name: str) -> Optional[int]:
+def get_memory(gpu_name: str) -> int | None:
     if not gpu_name:
         return None
     if accelerators := find_accelerators(names=[gpu_name], vendors=[AcceleratorVendor.NVIDIA]):
@@ -397,26 +397,26 @@ def get_memory(gpu_name: str) -> Optional[int]:
     return None
 
 
-def round_up(value: Optional[Union[int, float]], step: int) -> Optional[int]:
+def round_up(value: int | float | None, step: int) -> int | None:
     if value is None:
         return None
     return round_down(value + step - 1, step)
 
 
-def round_down(value: Optional[Union[int, float]], step: int) -> Optional[int]:
+def round_down(value: int | float | None, step: int) -> int | None:
     if value is None:
         return None
     return int(value // step * step)
 
 
-T = TypeVar("T", bound=Union[int, float])
+T = TypeVar("T", bound=int | float)
 
 
-def min_none(*args: Optional[T]) -> T:
+def min_none(*args: T | None) -> T:
     return min(v for v in args if v is not None)
 
 
-def max_none(*args: Optional[T]) -> T:
+def max_none(*args: T | None) -> T:
     return max(v for v in args if v is not None)
 
 

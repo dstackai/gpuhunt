@@ -1,5 +1,3 @@
-from typing import Union
-
 import pytest
 
 from gpuhunt._internal.constraints import KNOWN_AMD_GPUS
@@ -8,7 +6,6 @@ from gpuhunt._internal.models import (
     AMDArchitecture,
     CatalogItem,
     CPUArchitecture,
-    Optional,
     RawCatalogItem,
 )
 
@@ -29,11 +26,11 @@ AMD = AcceleratorVendor.AMD
     ],
 )
 def test_raw_catalog_item_gpu_vendor_heuristic(
-    gpu_count: Optional[int],
-    gpu_vendor: Union[AcceleratorVendor, str, None],
-    gpu_name: Optional[str],
-    expected_gpu_vendor: Optional[str],
-    expected_gpu_name: Optional[str],
+    gpu_count: int | None,
+    gpu_vendor: AcceleratorVendor | str | None,
+    gpu_name: str | None,
+    expected_gpu_vendor: str | None,
+    expected_gpu_name: str | None,
 ):
     dct = {}
     if gpu_vendor is not None:
@@ -60,10 +57,10 @@ def test_raw_catalog_item_gpu_vendor_heuristic(
     ],
 )
 def test_catalog_item_gpu_vendor_heuristic(
-    gpu_count: Optional[int],
-    gpu_vendor: Union[AcceleratorVendor, str, None],
-    gpu_name: Optional[str],
-    expected_gpu_vendor: Optional[AcceleratorVendor],
+    gpu_count: int | None,
+    gpu_vendor: AcceleratorVendor | str | None,
+    gpu_name: str | None,
+    expected_gpu_vendor: AcceleratorVendor | None,
 ):
     item = CatalogItem(
         instance_name="test-instance",
@@ -92,7 +89,7 @@ def test_catalog_item_gpu_vendor_heuristic(
     ],
 )
 def test_catalog_item_cpu_arch_heuristic(
-    cpu_arch: Union[CPUArchitecture, str, None],
+    cpu_arch: CPUArchitecture | str | None,
     expected_cpu_arch: CPUArchitecture,
 ):
     item = CatalogItem(

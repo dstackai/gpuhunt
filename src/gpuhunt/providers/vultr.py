@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import requests
 from requests import Response
@@ -22,7 +22,7 @@ class VultrProvider(AbstractProvider):
     NAME = "vultr"
 
     def get(
-        self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True
+        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         offers = fetch_offers()
         return sorted(offers, key=lambda i: i.price)
@@ -65,7 +65,7 @@ def convert_response_to_raw_catalog_items(
     return catalog_items
 
 
-def get_bare_metal_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
+def get_bare_metal_plans(plan: dict, location: str) -> RawCatalogItem | None:
     cpu_arch = CPUArchitecture.X86
     gpu_count, gpu_name, gpu_memory, gpu_vendor = 0, None, None, None
     if "gpu" in plan["id"]:
@@ -95,7 +95,7 @@ def get_bare_metal_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
     )
 
 
-def get_instance_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
+def get_instance_plans(plan: dict, location: str) -> RawCatalogItem | None:
     cpu_arch = CPUArchitecture.X86
     plan_type = plan["type"]
     if plan_type in ["vc2", "vhf", "vhp", "voc"]:
@@ -114,7 +114,7 @@ def get_instance_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
             disk_size=plan["disk"],
         )
     elif plan_type == "vcg":
-        gpu_type = cast(Optional[str], plan.get("gpu_type"))
+        gpu_type = cast(str | None, plan.get("gpu_type"))
         if not gpu_type:
             logger.warning("Missing gpu_type for plan %s, skipping", plan["id"])
             return None
@@ -158,7 +158,7 @@ def get_instance_plans(plan: dict, location: str) -> Optional[RawCatalogItem]:
     return None
 
 
-def get_gpu_memory(gpu_name: str) -> Optional[int]:
+def get_gpu_memory(gpu_name: str) -> int | None:
     if gpu_name.upper() == "A100":
         return 80  # VULTR A100 instances have 80GB
     if accelerators := find_accelerators(
