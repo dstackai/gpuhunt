@@ -20,6 +20,7 @@ def main():
             "digitalocean",
             "gcp",
             "hotaisle",
+            "jarvislabs",
             "lambdalabs",
             "nebius",
             "oci",
@@ -76,6 +77,12 @@ def main():
 
         provider = HotAisleProvider(
             api_key=os.getenv("HOTAISLE_API_KEY"), team_handle=os.getenv("HOTAISLE_TEAM_HANDLE")
+        )
+    elif args.provider == "jarvislabs":
+        from gpuhunt.providers.jarvislabs import JarvisLabsProvider
+
+        provider = JarvisLabsProvider(
+            api_key=os.getenv("JL_API_KEY"), api_url=os.getenv("JARVISLABS_API_URL")
         )
     elif args.provider == "lambdalabs":
         from gpuhunt.providers.lambdalabs import LambdaLabsProvider

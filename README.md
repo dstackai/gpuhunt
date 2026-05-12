@@ -62,6 +62,7 @@ print(*items, sep="\n")
 * Cudo Compute
 * Verda
 * GCP
+* JarvisLabs
 * LambdaLabs
 * Nebius
 * OCI
