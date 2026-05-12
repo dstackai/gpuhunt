@@ -25,6 +25,7 @@ def default_catalog() -> Catalog:
         ("gpuhunt.providers.crusoe", "CrusoeProvider"),
         ("gpuhunt.providers.vultr", "VultrProvider"),
         ("gpuhunt.providers.hotaisle", "HotAisleProvider"),
+        ("gpuhunt.providers.jarvislabs", "JarvisLabsProvider"),
         ("gpuhunt.providers.digitalocean", "DigitalOceanProvider"),
     ]:
         try:

@@ -32,7 +32,15 @@ OFFLINE_PROVIDERS = [
     "runpod",
     "cloudrift",
 ]
-ONLINE_PROVIDERS = ["crusoe", "cudo", "digitalocean", "hotaisle", "vastai", "vultr"]
+ONLINE_PROVIDERS = [
+    "crusoe",
+    "cudo",
+    "digitalocean",
+    "hotaisle",
+    "jarvislabs",
+    "vastai",
+    "vultr",
+]
 RELOAD_INTERVAL = 15 * 60  # 15 minutes
 
 
