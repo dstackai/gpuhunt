@@ -115,7 +115,7 @@ def test_convert_response_to_raw_catalog_items():
     assert a100.gpu_name == "A100"
     assert a100.gpu_memory == 80
     assert a100.location == "india-noida-01"
-    assert a100.disk_size == 100
+    assert a100.disk_size is None
     assert a100.provider_data == {}
 
     a100_spot = next(o for o in offers if o.instance_name == "A100-1x" and o.spot)
@@ -125,7 +125,7 @@ def test_convert_response_to_raw_catalog_items():
     assert h100.gpu_count == 1
     assert h100.location == "europe-01"
     assert h100.provider_data == {}
-    assert h100.disk_size == 100
+    assert h100.disk_size is None
 
     cpu = next(o for o in offers if o.gpu_count == 0)
     assert cpu.instance_name == "cpu-4x16"
@@ -133,12 +133,9 @@ def test_convert_response_to_raw_catalog_items():
     assert cpu.cpu == 4
     assert cpu.memory == 16
     assert cpu.provider_data == {}
-    assert cpu.disk_size == 100
+    assert cpu.disk_size is None
 
     assert not any(o.location == "unknown-region" for o in offers)
-
-    offers = convert_response_to_raw_catalog_items(SERVER_META_RESPONSE, disk_size=250)
-    assert all(o.disk_size == 250 for o in offers)
 
 
 def test_convert_response_warns_and_skips_unsupported_regions(caplog):
@@ -146,6 +143,26 @@ def test_convert_response_warns_and_skips_unsupported_regions(caplog):
 
     assert "Skipping JarvisLabs GPU VM offer in unsupported region unknown-region" in caplog.text
     assert "Skipping JarvisLabs CPU VM offer in unsupported region unknown-region" in caplog.text
+
+
+def test_convert_response_skips_ambiguous_gpu_types_with_spaces(caplog):
+    response = {
+        "server_meta": [
+            {
+                "gpu_type": "H100 NVL",
+                "region": "india-noida-01",
+                "num_free_devices": 1,
+                "price_per_hour": 2.99,
+                "vram": "94",
+                "cpus_per_gpu": 16,
+                "ram_per_gpu": 200,
+                "workload_type": "vm",
+            },
+        ],
+    }
+
+    assert convert_response_to_raw_catalog_items(response) == []
+    assert "Skipping JarvisLabs GPU offer with ambiguous gpu_type: H100 NVL" in caplog.text
 
 
 def test_convert_response_skips_malformed_specs(caplog):
@@ -201,12 +218,15 @@ def test_fetch_offers(requests_mock):
 
     assert requests_mock.last_request.headers["Authorization"] == "Bearer test-token"
     assert len(offers) == 9
+    assert all(o.disk_size is None for o in offers)
 
     offers = provider.fetch_offers(query_filter=QueryFilter(min_disk_size=250))
-    assert all(o.disk_size == 250 for o in offers)
+    assert len(offers) == 9
+    assert all(o.disk_size is None for o in offers)
 
     offers = provider.fetch_offers(query_filter=QueryFilter(min_disk_size=50))
-    assert all(o.disk_size == 100 for o in offers)
+    assert len(offers) == 9
+    assert all(o.disk_size is None for o in offers)
 
 
 def test_catalog_query(requests_mock, monkeypatch):
@@ -223,6 +243,6 @@ def test_catalog_query(requests_mock, monkeypatch):
     assert len(catalog.query(provider=["jarvislabs"], gpu_name="A100", min_gpu_memory=80)) == 2
     assert len(catalog.query(provider=["jarvislabs"], max_gpu_count=0)) == 1
     assert len(catalog.query(provider=["jarvislabs"], min_disk_size=250)) == 9
-    assert len(catalog.query(provider=["jarvislabs"], max_disk_size=50)) == 0
+    assert len(catalog.query(provider=["jarvislabs"], max_disk_size=50)) == 9
     assert len(catalog.query(provider=["jarvislabs"], gpu_name="L4", spot=False)) == 3
     assert len(catalog.query(provider=["jarvislabs"], gpu_name="L4", spot=True)) == 2

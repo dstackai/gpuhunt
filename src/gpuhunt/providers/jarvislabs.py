@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 API_URL = "https://backendprod.jarvislabs.net"
 SERVER_META_PATH = "/misc/server_meta"
 TIMEOUT = 30
-VM_MIN_STORAGE_GB = 100
 # JarvisLabs exposes offer regions in server_meta, but VM provisioning calls must be sent
 # to region-specific API hosts and server_meta does not include those hosts. Keep this
 # allowlist in sync with the known provisioning hosts and do not advertise offers for
@@ -21,6 +20,12 @@ JARVISLABS_REGION_URLS = {
     "india-01": "https://backendprod.jarvislabs.net",
     "india-noida-01": "https://backendn.jarvislabs.net",
     "europe-01": "https://backendeu.jarvislabs.net",
+}
+# dstack provisions JarvisLabs GPU VMs by passing a GPU type back to the API.
+# Keep ambiguous API names with spaces out of the catalog; otherwise the
+# normalized gpuhunt name cannot be converted back safely without provider_data.
+JARVISLABS_GPU_NAME_OVERRIDES = {
+    "A100-80GB": ("A100", 80.0),
 }
 
 
@@ -42,9 +47,7 @@ class JarvisLabsProvider(AbstractProvider):
 
     def fetch_offers(self, query_filter: QueryFilter | None = None) -> list[RawCatalogItem]:
         response = self._make_request("GET", SERVER_META_PATH)
-        return convert_response_to_raw_catalog_items(
-            response.json(), disk_size=_disk_size(query_filter)
-        )
+        return convert_response_to_raw_catalog_items(response.json())
 
     def _make_request(self, method: str, path: str) -> Response:
         response = requests.request(
@@ -57,17 +60,15 @@ class JarvisLabsProvider(AbstractProvider):
         return response
 
 
-def convert_response_to_raw_catalog_items(
-    data: dict, disk_size: float = VM_MIN_STORAGE_GB
-) -> list[RawCatalogItem]:
+def convert_response_to_raw_catalog_items(data: dict) -> list[RawCatalogItem]:
     offers = []
     for gpu in data.get("server_meta") or []:
-        offers.extend(_make_gpu_catalog_items(gpu, disk_size=disk_size))
-    offers.extend(_make_cpu_catalog_items(data.get("cpu_meta") or {}, disk_size=disk_size))
+        offers.extend(_make_gpu_catalog_items(gpu))
+    offers.extend(_make_cpu_catalog_items(data.get("cpu_meta") or {}))
     return offers
 
 
-def _make_gpu_catalog_items(gpu: dict, disk_size: float) -> list[RawCatalogItem]:
+def _make_gpu_catalog_items(gpu: dict) -> list[RawCatalogItem]:
     region = gpu.get("region")
     if not region:
         return []
@@ -94,7 +95,11 @@ def _make_gpu_catalog_items(gpu: dict, disk_size: float) -> list[RawCatalogItem]
         logger.warning("Skipping JarvisLabs GPU offer without price: %s", gpu_type)
         return []
 
-    gpu_name, gpu_memory = _gpu_name_and_memory(gpu_type, gpu.get("vram"))
+    gpu_spec = _gpu_name_and_memory(gpu_type, gpu.get("vram"))
+    if gpu_spec is None:
+        logger.warning("Skipping JarvisLabs GPU offer with ambiguous gpu_type: %s", gpu_type)
+        return []
+    gpu_name, gpu_memory = gpu_spec
     if gpu_memory is None:
         logger.warning("Skipping JarvisLabs GPU offer with unknown VRAM: %s", gpu_type)
         return []
@@ -115,7 +120,6 @@ def _make_gpu_catalog_items(gpu: dict, disk_size: float) -> list[RawCatalogItem]
         available_devices=_available_devices(gpu),
         max_gpus_per_instance=_max_gpus_per_instance(gpu),
         spot=False,
-        disk_size=disk_size,
     )
 
     spot_price = _as_float(gpu.get("spot_price"))
@@ -131,7 +135,6 @@ def _make_gpu_catalog_items(gpu: dict, disk_size: float) -> list[RawCatalogItem]
                 available_devices=_spot_available_devices(gpu),
                 max_gpus_per_instance=_max_gpus_per_instance(gpu),
                 spot=True,
-                disk_size=disk_size,
             )
         )
     return items
@@ -148,7 +151,6 @@ def _make_gpu_catalog_items_for_price(
     available_devices: int,
     max_gpus_per_instance: int,
     spot: bool,
-    disk_size: float,
 ) -> list[RawCatalogItem]:
     items = []
     for gpu_count in _supported_gpu_counts(
@@ -167,13 +169,13 @@ def _make_gpu_catalog_items_for_price(
                 gpu_name=gpu_name,
                 gpu_memory=gpu_memory,
                 spot=spot,
-                disk_size=disk_size,
+                disk_size=None,
             )
         )
     return items
 
 
-def _make_cpu_catalog_items(cpu_meta: dict, disk_size: float) -> list[RawCatalogItem]:
+def _make_cpu_catalog_items(cpu_meta: dict) -> list[RawCatalogItem]:
     offers = []
     # The JarvisLabs SDK resolves CPU VMs from cpu_meta.combinations and creates them via
     # templates/vm/cpu/create; cpu_meta.workload_type is not the GPU workload selector.
@@ -208,7 +210,7 @@ def _make_cpu_catalog_items(cpu_meta: dict, disk_size: float) -> list[RawCatalog
                     gpu_name=None,
                     gpu_memory=None,
                     spot=False,
-                    disk_size=disk_size,
+                    disk_size=None,
                 )
             )
     return offers
@@ -234,17 +236,11 @@ def _max_gpus_per_instance(gpu: dict) -> int:
     return _as_int(gpu.get("num_gpus")) or 1
 
 
-def _disk_size(query_filter: QueryFilter | None) -> float:
-    if query_filter is None or query_filter.min_disk_size is None:
-        return float(VM_MIN_STORAGE_GB)
-    return float(max(VM_MIN_STORAGE_GB, query_filter.min_disk_size))
-
-
-def _gpu_name_and_memory(gpu_type: str, vram: object) -> tuple[str, float | None]:
-    gpu_memory = _as_float(vram)
-    if gpu_type == "A100-80GB":
-        return "A100", gpu_memory or 80.0
-    return gpu_type.replace(" ", ""), gpu_memory
+def _gpu_name_and_memory(gpu_type: str, vram: object) -> tuple[str, float | None] | None:
+    if any(c.isspace() for c in gpu_type):
+        return None
+    gpu_name, default_memory = JARVISLABS_GPU_NAME_OVERRIDES.get(gpu_type, (gpu_type, None))
+    return gpu_name, _as_float(vram) or default_memory
 
 
 def _gpu_instance_name(gpu_name: str, gpu_count: int) -> str:
