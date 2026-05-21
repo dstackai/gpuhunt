@@ -1,6 +1,7 @@
 *.egg-info
 *.pyc
 .DS_Store
+.envrc
 /.idea/
 /venv/
 /.venv/
