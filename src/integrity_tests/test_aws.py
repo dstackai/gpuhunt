@@ -58,7 +58,6 @@ class TestAWSCatalog:
             "A100",
             "A10G",
             "T4",
-            "V100",
             "L40S",
             "RTXPRO6000",
             "L4",
