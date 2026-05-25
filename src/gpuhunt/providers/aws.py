@@ -21,7 +21,8 @@ ec2_pricing_url = (
     "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/index.csv"
 )
 disclaimer_rows_skip = 5
-# https://aws.amazon.com/ec2/previous-generation/
+# Retired (https://aws.amazon.com/ec2/previous-generation/)
+# or unlisted instance types (https://docs.aws.amazon.com/ec2/latest/instancetypes/ec2-instance-regions.html)
 previous_generation_families = [
     "a1.",
     "c1.",
@@ -30,6 +31,7 @@ previous_generation_families = [
     "g2.",
     "g3.",
     "g3s.",
+    "p3.",
     "i2.",
     "m1.",
     "m2.",
@@ -380,7 +382,6 @@ class AWSProvider(AbstractProvider):
                     "p5e.",
                     "p4d.",
                     "p4de.",
-                    "p3.",
                     "g7e.",
                     "g6.",
                     "g6e.",
