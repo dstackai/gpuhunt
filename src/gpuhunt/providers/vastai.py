@@ -30,7 +30,7 @@ class VastAIProvider(AbstractProvider):
     ):
         self.extra_filters = extra_filters
         self.community_cloud = community_cloud
-        self.order = order
+        self.order = list(order)
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
@@ -134,7 +134,7 @@ class VastAIProvider(AbstractProvider):
             filters["datacenter"]["eq"] = True
         filters["rentable"]["eq"] = True
         filters["rented"]["eq"] = False
-        filters["order"] = list(self.order)
+        filters["order"] = self.order
         return filters
 
     @staticmethod
