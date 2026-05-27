@@ -306,6 +306,12 @@ KNOWN_INTEL_ACCELERATORS: list[IntelAcceleratorInfo] = [
 KNOWN_TENSTORRENT_ACCELERATORS: list[TenstorrentAcceleratorInfo] = [
     TenstorrentAcceleratorInfo(name="n150", memory=12),
     TenstorrentAcceleratorInfo(name="n300", memory=24),
+    TenstorrentAcceleratorInfo(name="tt-galaxy-wh", memory=12),
+    TenstorrentAcceleratorInfo(name="p100a", memory=28),
+    TenstorrentAcceleratorInfo(name="p150", memory=32),
+    TenstorrentAcceleratorInfo(name="p300", memory=32),
+    TenstorrentAcceleratorInfo(name="p300", memory=64),
+    TenstorrentAcceleratorInfo(name="tt-galaxy-bh", memory=32),
 ]
 
 KNOWN_ACCELERATORS: list[
