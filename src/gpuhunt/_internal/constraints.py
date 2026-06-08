@@ -222,6 +222,7 @@ KNOWN_NVIDIA_GPUS: list[NvidiaGPUInfo] = [
     NvidiaGPUInfo(name="RTX2000Ada", memory=16, compute_capability=(8, 9)),
     NvidiaGPUInfo(name="RTX4000Ada", memory=20, compute_capability=(8, 9)),
     NvidiaGPUInfo(name="RTX6000Ada", memory=48, compute_capability=(8, 9)),
+    NvidiaGPUInfo(name="RTXPRO6000", memory=96, compute_capability=(12, 0)),
     NvidiaGPUInfo(name="T4", memory=16, compute_capability=(7, 5)),
     NvidiaGPUInfo(name="V100", memory=16, compute_capability=(7, 0)),
     NvidiaGPUInfo(name="V100", memory=32, compute_capability=(7, 0)),
