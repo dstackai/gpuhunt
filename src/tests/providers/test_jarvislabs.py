@@ -180,24 +180,24 @@ def test_convert_response_warns_and_skips_unsupported_regions(caplog):
     assert "Skipping JarvisLabs CPU VM offer in unsupported region unknown-region" in caplog.text
 
 
-def test_convert_response_skips_ambiguous_gpu_types_with_spaces(caplog):
+def test_convert_response_skips_unmapped_gpu_types_with_spaces(caplog):
     response = {
         "server_meta": [
             {
-                "gpu_type": "H100 NVL",
+                "gpu_type": "RTX A6000",
                 "region": "india-noida-01",
                 "num_free_devices": 1,
-                "price_per_hour": 2.99,
-                "vram": "94",
+                "price_per_hour": 0.79,
+                "vram": "48",
                 "cpus_per_gpu": 16,
-                "ram_per_gpu": 200,
+                "ram_per_gpu": 100,
                 "workload_type": "vm",
             },
         ],
     }
 
     assert convert_response_to_raw_catalog_items(response) == []
-    assert "Skipping JarvisLabs GPU offer with ambiguous gpu_type: H100 NVL" in caplog.text
+    assert "Skipping JarvisLabs GPU offer with unmapped gpu_type: RTX A6000" in caplog.text
 
 
 def test_convert_response_skips_malformed_specs(caplog):

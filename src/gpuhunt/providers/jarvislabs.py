@@ -24,9 +24,9 @@ JARVISLABS_REGION_URLS = {
     "india-noida-01": "https://backendn.jarvislabs.net",
     "europe-01": "https://backendeu.jarvislabs.net",
 }
-# dstack provisions JarvisLabs GPU VMs by passing a GPU type back to the API.
-# Keep ambiguous API names with spaces out of the catalog; otherwise the
-# normalized gpuhunt name cannot be converted back safely.
+# Explicit mappings for human-reviewed JarvisLabs GPU tokens that differ from
+# gpuhunt canonical GPU names. Keep unmapped spaced names out of the catalog so
+# new provider tokens do not get normalized incorrectly and silently.
 JARVISLABS_GPU_NAME_OVERRIDES = {
     "A100-80GB": ("A100", 80.0),
     "RTX-PRO6000": ("RTXPRO6000", 96.0),
@@ -109,7 +109,7 @@ def _make_gpu_catalog_items(gpu: dict) -> list[RawCatalogItem]:
 
     gpu_spec = _gpu_name_and_memory(gpu_type, gpu.get("vram"))
     if gpu_spec is None:
-        logger.warning("Skipping JarvisLabs GPU offer with ambiguous gpu_type: %s", gpu_type)
+        logger.warning("Skipping JarvisLabs GPU offer with unmapped gpu_type: %s", gpu_type)
         return []
     gpu_name, gpu_memory = gpu_spec
     if gpu_memory is None:
