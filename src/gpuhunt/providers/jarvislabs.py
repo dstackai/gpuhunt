@@ -1,15 +1,17 @@
 import logging
 import os
+from typing import cast
 
 import requests
 from requests import Response
+from typing_extensions import NotRequired, TypedDict
 
-from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
+from gpuhunt._internal.models import AcceleratorVendor, JSONObject, QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
 
-API_URL = "https://backendprod.jarvislabs.net"
+API_URL = "https://backendn.jarvislabs.net"
 SERVER_META_PATH = "/misc/server_meta"
 TIMEOUT = 30
 # JarvisLabs exposes offer regions in server_meta, but VM provisioning calls must be sent
@@ -18,15 +20,25 @@ TIMEOUT = 30
 # unknown regions, otherwise dstack may select capacity it cannot create.
 JARVISLABS_REGION_URLS = {
     "india-01": "https://backendprod.jarvislabs.net",
+    "india-chennai-01": "https://backendc.jarvislabs.net",
     "india-noida-01": "https://backendn.jarvislabs.net",
     "europe-01": "https://backendeu.jarvislabs.net",
 }
-# dstack provisions JarvisLabs GPU VMs by passing a GPU type back to the API.
-# Keep ambiguous API names with spaces out of the catalog; otherwise the
-# normalized gpuhunt name cannot be converted back safely without provider_data.
+# Explicit mappings for human-reviewed JarvisLabs GPU tokens that differ from
+# gpuhunt canonical GPU names. Keep unmapped spaced names out of the catalog so
+# new provider tokens do not get normalized incorrectly and silently.
 JARVISLABS_GPU_NAME_OVERRIDES = {
     "A100-80GB": ("A100", 80.0),
+    "RTX-PRO6000": ("RTXPRO6000", 96.0),
+    "RTX PRO 6000": ("RTXPRO6000", 96.0),
 }
+
+
+class JarvisLabsCatalogItemProviderData(TypedDict):
+    # Original JarvisLabs API GPU type, set only when gpuhunt normalization loses
+    # the create-time token, e.g. A100-80GB -> A100 or RTX-PRO6000 -> RTXPRO6000.
+    # dstack uses this value for VM creation.
+    gpu_type: NotRequired[str]
 
 
 class JarvisLabsProvider(AbstractProvider):
@@ -97,7 +109,7 @@ def _make_gpu_catalog_items(gpu: dict) -> list[RawCatalogItem]:
 
     gpu_spec = _gpu_name_and_memory(gpu_type, gpu.get("vram"))
     if gpu_spec is None:
-        logger.warning("Skipping JarvisLabs GPU offer with ambiguous gpu_type: %s", gpu_type)
+        logger.warning("Skipping JarvisLabs GPU offer with unmapped gpu_type: %s", gpu_type)
         return []
     gpu_name, gpu_memory = gpu_spec
     if gpu_memory is None:
@@ -119,24 +131,12 @@ def _make_gpu_catalog_items(gpu: dict) -> list[RawCatalogItem]:
         ram_per_gpu=ram_per_gpu,
         available_devices=_available_devices(gpu),
         max_gpus_per_instance=_max_gpus_per_instance(gpu),
+        provider_data=_gpu_provider_data(gpu_type, gpu_name),
         spot=False,
     )
 
-    spot_price = _as_float(gpu.get("spot_price"))
-    if spot_price is not None:
-        items.extend(
-            _make_gpu_catalog_items_for_price(
-                region=region,
-                gpu_name=gpu_name,
-                gpu_memory=gpu_memory,
-                price=spot_price,
-                cpu_per_gpu=cpu_per_gpu,
-                ram_per_gpu=ram_per_gpu,
-                available_devices=_spot_available_devices(gpu),
-                max_gpus_per_instance=_max_gpus_per_instance(gpu),
-                spot=True,
-            )
-        )
+    # JarvisLabs supports spot for containers/templates, not VMs. This provider
+    # only publishes VM-capable offers because dstack provisions JarvisLabs VMs.
     return items
 
 
@@ -150,6 +150,7 @@ def _make_gpu_catalog_items_for_price(
     ram_per_gpu: float,
     available_devices: int,
     max_gpus_per_instance: int,
+    provider_data: JSONObject,
     spot: bool,
 ) -> list[RawCatalogItem]:
     items = []
@@ -170,6 +171,7 @@ def _make_gpu_catalog_items_for_price(
                 gpu_memory=gpu_memory,
                 spot=spot,
                 disk_size=None,
+                provider_data=provider_data,
             )
         )
     return items
@@ -216,6 +218,12 @@ def _make_cpu_catalog_items(cpu_meta: dict) -> list[RawCatalogItem]:
     return offers
 
 
+def _gpu_provider_data(gpu_type: str, gpu_name: str) -> JSONObject:
+    if gpu_type == gpu_name:
+        return {}
+    return cast(JSONObject, JarvisLabsCatalogItemProviderData(gpu_type=gpu_type))
+
+
 def _supported_gpu_counts(*, available_devices: int, max_gpus_per_instance: int) -> list[int]:
     if available_devices <= 0 or max_gpus_per_instance <= 0:
         return []
@@ -228,18 +236,14 @@ def _available_devices(gpu: dict) -> int:
     )
 
 
-def _spot_available_devices(gpu: dict) -> int:
-    return _as_int(gpu.get("spot_num_free_devices")) or 0
-
-
 def _max_gpus_per_instance(gpu: dict) -> int:
     return _as_int(gpu.get("num_gpus")) or 1
 
 
 def _gpu_name_and_memory(gpu_type: str, vram: object) -> tuple[str, float | None] | None:
-    if any(c.isspace() for c in gpu_type):
-        return None
     gpu_name, default_memory = JARVISLABS_GPU_NAME_OVERRIDES.get(gpu_type, (gpu_type, None))
+    if gpu_name == gpu_type and any(c.isspace() for c in gpu_type):
+        return None
     return gpu_name, _as_float(vram) or default_memory
 
 

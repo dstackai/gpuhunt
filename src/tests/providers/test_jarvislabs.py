@@ -51,6 +51,34 @@ SERVER_META_RESPONSE = {
             "num_gpus": "4",
         },
         {
+            "gpu_type": "RTX-PRO6000",
+            "region": "india-chennai-01",
+            "num_free_devices": 2,
+            "effective_num_free_devices": 2,
+            "spot_num_free_devices": 1,
+            "price_per_hour": 1.89,
+            "spot_price": 1.19,
+            "vram": "96",
+            "cpus_per_gpu": 28,
+            "ram_per_gpu": 160,
+            "workload_type": "vm",
+            "num_gpus": "8",
+        },
+        {
+            "gpu_type": "RTX PRO 6000",
+            "region": "india-noida-01",
+            "num_free_devices": 1,
+            "effective_num_free_devices": 1,
+            "spot_num_free_devices": 0,
+            "price_per_hour": 1.89,
+            "spot_price": None,
+            "vram": "96",
+            "cpus_per_gpu": 28,
+            "ram_per_gpu": 160,
+            "workload_type": "vm",
+            "num_gpus": "8",
+        },
+        {
             "gpu_type": "H100",
             "region": "europe-01",
             "num_free_devices": 25,
@@ -98,28 +126,35 @@ SERVER_META_RESPONSE = {
 
 def test_convert_response_to_raw_catalog_items():
     offers = convert_response_to_raw_catalog_items(SERVER_META_RESPONSE)
-
-    assert all(o.provider_data == {} for o in offers)
+    assert not any(o.spot for o in offers)
 
     l4_vm = [o for o in offers if o.gpu_name == "L4" and not o.spot]
     assert [o.gpu_count for o in l4_vm] == [1, 2, 3]
     assert [o.price for o in l4_vm] == [0.44, 0.88, 1.32]
     assert [o.instance_name for o in l4_vm] == ["L4-1x", "L4-2x", "L4-3x"]
-
-    l4_spot = [o for o in offers if o.gpu_name == "L4" and o.spot]
-    assert [o.gpu_count for o in l4_spot] == [1, 2]
-    assert [o.price for o in l4_spot] == [0.29, 0.58]
-    assert [o.instance_name for o in l4_spot] == ["L4-1x", "L4-2x"]
+    assert all(o.provider_data == {} for o in l4_vm)
 
     a100 = next(o for o in offers if o.instance_name == "A100-1x" and not o.spot)
     assert a100.gpu_name == "A100"
     assert a100.gpu_memory == 80
     assert a100.location == "india-noida-01"
     assert a100.disk_size is None
-    assert a100.provider_data == {}
+    assert a100.provider_data == {"gpu_type": "A100-80GB"}
 
-    a100_spot = next(o for o in offers if o.instance_name == "A100-1x" and o.spot)
-    assert a100_spot.price == 0.89
+    rtx_pro_6000 = [o for o in offers if o.gpu_name == "RTXPRO6000" and not o.spot]
+    assert [o.gpu_count for o in rtx_pro_6000] == [1, 2, 1]
+    assert [o.instance_name for o in rtx_pro_6000] == [
+        "RTXPRO6000-1x",
+        "RTXPRO6000-2x",
+        "RTXPRO6000-1x",
+    ]
+    assert [o.provider_data for o in rtx_pro_6000] == [
+        {"gpu_type": "RTX-PRO6000"},
+        {"gpu_type": "RTX-PRO6000"},
+        {"gpu_type": "RTX PRO 6000"},
+    ]
+    assert rtx_pro_6000[0].location == "india-chennai-01"
+    assert all(o.gpu_memory == 96 for o in rtx_pro_6000)
 
     h100 = next(o for o in offers if o.gpu_name == "H100")
     assert h100.gpu_count == 1
@@ -145,24 +180,24 @@ def test_convert_response_warns_and_skips_unsupported_regions(caplog):
     assert "Skipping JarvisLabs CPU VM offer in unsupported region unknown-region" in caplog.text
 
 
-def test_convert_response_skips_ambiguous_gpu_types_with_spaces(caplog):
+def test_convert_response_skips_unmapped_gpu_types_with_spaces(caplog):
     response = {
         "server_meta": [
             {
-                "gpu_type": "H100 NVL",
+                "gpu_type": "RTX A6000",
                 "region": "india-noida-01",
                 "num_free_devices": 1,
-                "price_per_hour": 2.99,
-                "vram": "94",
+                "price_per_hour": 0.79,
+                "vram": "48",
                 "cpus_per_gpu": 16,
-                "ram_per_gpu": 200,
+                "ram_per_gpu": 100,
                 "workload_type": "vm",
             },
         ],
     }
 
     assert convert_response_to_raw_catalog_items(response) == []
-    assert "Skipping JarvisLabs GPU offer with ambiguous gpu_type: H100 NVL" in caplog.text
+    assert "Skipping JarvisLabs GPU offer with unmapped gpu_type: RTX A6000" in caplog.text
 
 
 def test_convert_response_skips_malformed_specs(caplog):
@@ -239,10 +274,11 @@ def test_catalog_query(requests_mock, monkeypatch):
         JarvisLabsProvider(api_key="test-token", api_url="https://api.jarvislabs.test")
     )
 
-    assert len(catalog.query(provider=["jarvislabs"], min_gpu_count=2, gpu_name="L4")) == 3
-    assert len(catalog.query(provider=["jarvislabs"], gpu_name="A100", min_gpu_memory=80)) == 2
+    assert len(catalog.query(provider=["jarvislabs"], min_gpu_count=2, gpu_name="L4")) == 2
+    assert len(catalog.query(provider=["jarvislabs"], gpu_name="A100", min_gpu_memory=80)) == 1
+    assert len(catalog.query(provider=["jarvislabs"], gpu_name="RTXPRO6000")) == 3
     assert len(catalog.query(provider=["jarvislabs"], max_gpu_count=0)) == 1
     assert len(catalog.query(provider=["jarvislabs"], min_disk_size=250)) == 9
     assert len(catalog.query(provider=["jarvislabs"], max_disk_size=50)) == 9
     assert len(catalog.query(provider=["jarvislabs"], gpu_name="L4", spot=False)) == 3
-    assert len(catalog.query(provider=["jarvislabs"], gpu_name="L4", spot=True)) == 2
+    assert len(catalog.query(provider=["jarvislabs"], gpu_name="L4", spot=True)) == 0

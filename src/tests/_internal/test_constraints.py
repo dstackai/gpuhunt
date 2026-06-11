@@ -4,6 +4,7 @@ from gpuhunt import CatalogItem, QueryFilter
 from gpuhunt._internal.constraints import (
     correct_gpu_memory_gib,
     find_accelerators,
+    get_compute_capability,
     get_gpu_vendor,
     matches,
 )
@@ -250,3 +251,14 @@ def test_tenstorrent_accelerators(gpu_name: str, expected_memories_gib: set[int]
     assert {accelerator.name for accelerator in accelerators} == {gpu_name}
     assert {accelerator.memory for accelerator in accelerators} == expected_memories_gib
     assert get_gpu_vendor(gpu_name.upper()) == AcceleratorVendor.TENSTORRENT
+
+
+def test_rtx_pro_6000_accelerator() -> None:
+    accelerators = find_accelerators(
+        names=["RTXPRO6000"],
+        vendors=[AcceleratorVendor.NVIDIA],
+    )
+
+    assert [accelerator.memory for accelerator in accelerators] == [96]
+    assert get_compute_capability("RTXPRO6000") == (12, 0)
+    assert get_gpu_vendor("RTXPRO6000") == AcceleratorVendor.NVIDIA
