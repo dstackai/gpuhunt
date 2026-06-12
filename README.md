@@ -59,7 +59,6 @@ print(*items, sep="\n")
 * AWS
 * Azure
 * CloudRift
-* Cudo Compute
 * Verda
 * GCP
 * JarvisLabs
