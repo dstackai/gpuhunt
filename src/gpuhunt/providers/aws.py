@@ -378,6 +378,8 @@ class AWSProvider(AbstractProvider):
                     "t2.small",
                     "c5.",
                     "m5.",
+                    "p6-b300.",
+                    "p6-b200.",
                     "p5.",
                     "p5e.",
                     "p4d.",
