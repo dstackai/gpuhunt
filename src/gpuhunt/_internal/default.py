@@ -21,7 +21,6 @@ def default_catalog() -> Catalog:
     catalog.load()
     for module, provider in [
         ("gpuhunt.providers.vastai", "VastAIProvider"),
-        ("gpuhunt.providers.cudo", "CudoProvider"),
         ("gpuhunt.providers.crusoe", "CrusoeProvider"),
         ("gpuhunt.providers.vultr", "VultrProvider"),
         ("gpuhunt.providers.hotaisle", "HotAisleProvider"),

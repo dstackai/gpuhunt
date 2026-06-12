@@ -15,7 +15,6 @@ def main():
             "azure",
             "cloudrift",
             "crusoe",
-            "cudo",
             "verda",
             "digitalocean",
             "gcp",
@@ -50,10 +49,6 @@ def main():
             secret_key=os.getenv("CRUSOE_SECRET_KEY"),
             project_id=os.getenv("CRUSOE_PROJECT_ID"),
         )
-    elif args.provider == "cudo":
-        from gpuhunt.providers.cudo import CudoProvider
-
-        provider = CudoProvider()
     elif args.provider == "cloudrift":
         from gpuhunt.providers.cloudrift import CloudRiftProvider
 
