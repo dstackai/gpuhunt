@@ -40,7 +40,7 @@ gcp = [
     "google-cloud-tpu",
 ]
 nebius = [
-    "nebius>=0.2.40,<0.4",
+    "nebius>=0.3.20,<0.4",
 ]
 oci = [
     "oci",

@@ -89,11 +89,16 @@ def main():
         from gpuhunt.providers.nebius import NebiusProvider
 
         provider = NebiusProvider(
-            credentials=PKReader(
-                filename=os.getenv("NEBIUS_PRIVATE_KEY_FILE"),
-                public_key_id=os.getenv("NEBIUS_PUBLIC_KEY_ID"),
-                service_account_id=os.getenv("NEBIUS_SERVICE_ACCOUNT_ID"),
-            ),
+            credentials=(
+                # temporary user token from `nebius iam get-access-token`
+                os.getenv("NEBIUS_ACCESS_TOKEN")
+                # or service account credentials
+                or PKReader(
+                    filename=os.getenv("NEBIUS_PRIVATE_KEY_FILE"),
+                    public_key_id=os.getenv("NEBIUS_PUBLIC_KEY_ID"),
+                    service_account_id=os.getenv("NEBIUS_SERVICE_ACCOUNT_ID"),
+                )
+            )
         )
     elif args.provider == "oci":
         from gpuhunt.providers.oci import OCICredentials, OCIProvider

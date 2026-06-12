@@ -15,6 +15,7 @@ from nebius.api.nebius.compute.v1 import (
     InstanceSpec,
     ListPlatformsRequest,
     ListPlatformsResponse,
+    Platform,
     PlatformServiceClient,
     PreemptibleSpec,
     Preset,
@@ -41,6 +42,11 @@ from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
 TIMEOUT = 7
+# When GPU name from the platform ID does not match the standard dstack GPU name.
+# https://docs.nebius.com/compute/virtual-machines/types
+GPU_NAME_OVERRIDES = {
+    "rtx6000": "rtxpro6000",
+}
 
 
 @dataclass(frozen=True)
@@ -58,6 +64,9 @@ INFINIBAND_FABRICS = [
     InfinibandFabric("fabric-5", "gpu-h200-sxm", "eu-west1"),
     InfinibandFabric("fabric-6", "gpu-h100-sxm", "eu-north1"),
     InfinibandFabric("fabric-7", "gpu-h200-sxm", "eu-north1"),
+    InfinibandFabric("eu-north2-a", "gpu-h200-sxm", "eu-north2"),
+    InfinibandFabric("me-west1-a", "gpu-b200-sxm-a", "me-west1"),
+    InfinibandFabric("uk-south1-a", "gpu-b300-sxm", "uk-south1"),
     InfinibandFabric("us-central1-a", "gpu-h200-sxm", "us-central1"),
     InfinibandFabric("us-central1-b", "gpu-b200-sxm", "us-central1"),
 ]
@@ -81,7 +90,7 @@ class NebiusProvider(AbstractProvider):
                 platforms = list_platforms(sdk, project_id).items
                 for platform in platforms:
                     logger.info("Processing %s/%s", region, platform.metadata.name)
-                    gpu = get_gpu_info(platform.metadata.name)
+                    gpu = get_gpu_info(platform)
                     for preset in platform.spec.presets:
                         for spot in [False] + (
                             [True] if platform.status.allowed_for_preemptibles else []
@@ -149,13 +158,17 @@ def list_platforms(sdk: SDK, project_id: str) -> ListPlatformsResponse:
     return PlatformServiceClient(sdk).list(req, per_retry_timeout=TIMEOUT).wait()
 
 
-def get_gpu_info(platform: str) -> AcceleratorInfo | None:
-    m = re.match(r"gpu-([^-]+)-", platform)
+def get_gpu_info(platform: Platform) -> AcceleratorInfo | None:
+    m = re.match(r"gpu-([^-]+)", platform.metadata.name)
     if m is None:
         return None
     gpu_name = m.group(1)
+    gpu_name = GPU_NAME_OVERRIDES.get(gpu_name, gpu_name)
     accelerator_info = find_accelerators(names=[gpu_name], vendors=[AcceleratorVendor.NVIDIA])
-    if len(accelerator_info) != 1:
+    if (
+        len(accelerator_info) != 1
+        or accelerator_info[0].memory != platform.spec.gpu_memory_gigabytes
+    ):
         return None
     return accelerator_info[0]
 
