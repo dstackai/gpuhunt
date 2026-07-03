@@ -73,3 +73,4 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["gpuhunt"]
+combine-as-imports = true
