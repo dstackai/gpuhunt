@@ -3,9 +3,10 @@ import logging
 import re
 from collections import defaultdict
 from collections.abc import Iterable
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import requests
+from typing_extensions import NotRequired, TypedDict
 
 from gpuhunt._internal.constraints import correct_gpu_memory_gib
 from gpuhunt._internal.models import QueryFilter, RawCatalogItem
@@ -60,14 +61,12 @@ class VastAIProvider(AbstractProvider):
                 continue
             gpu_name = get_dstack_gpu_name(offer["gpu_name"])
             gpu_memory = correct_gpu_memory_gib(gpu_name, offer["gpu_ram"])
+            disk_cost = disk_size * offer["storage_cost"] / 30 / 24
             ondemand_offer = RawCatalogItem(
                 instance_name=str(offer["id"]),
                 location=get_location(offer["geolocation"]),
                 # storage_cost is $/gb/month
-                price=round(
-                    offer["dph_base"] + disk_size * offer["storage_cost"] / 30 / 24,
-                    5,
-                ),
+                price=round(offer["dph_base"] + disk_cost, 5),
                 cpu=int(offer["cpu_cores_effective"]),
                 memory=memory,
                 gpu_vendor=None,
@@ -77,13 +76,19 @@ class VastAIProvider(AbstractProvider):
                 spot=False,
                 disk_size=disk_size,
             )
-            instance_offers.append(ondemand_offer)
+            offer_variants = [ondemand_offer]
 
             if offer.get("min_bid"):
                 spot_offer = copy.deepcopy(ondemand_offer)
-                spot_offer.price = round(offer["min_bid"], 5)
+                spot_offer.price = round(offer["min_bid"] + disk_cost, 5)
                 spot_offer.spot = True
-                instance_offers.append(spot_offer)
+                cast(VastAICatalogItemProviderData, spot_offer.provider_data)["min_bid"] = offer[
+                    "min_bid"
+                ]
+                offer_variants.append(spot_offer)
+
+            offer_variants.sort(key=lambda i: i.price)
+            instance_offers.extend(offer_variants)
         return instance_offers
 
     def make_filters(self, q: QueryFilter) -> dict[str, dict[Operators, FilterValue]]:
@@ -158,6 +163,10 @@ class VastAIProvider(AbstractProvider):
                 if op == "gt" and offer[key] <= value:
                     return False
         return True
+
+
+class VastAICatalogItemProviderData(TypedDict):
+    min_bid: NotRequired[float]
 
 
 GPU_MAPPING = {
