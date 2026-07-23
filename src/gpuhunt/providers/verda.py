@@ -90,7 +90,7 @@ def transform_instance(instance: InstanceType, spot: bool, location: str) -> dic
 
 GPU_MAP = {
     r"\d+x B200 SXM6 180GB": "B200",
-    r"\d+x B300 SXM6 262GB": "B300",
+    r"\d+x B300 SXM6 268GB": "B300",
     r"\d+x H200 SXM5 141GB": "H200",
     r"\d+x H100 SXM5 80GB": "H100",
     r"\d+x A100 SXM4 80GB": "A100",
