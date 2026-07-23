@@ -86,6 +86,7 @@ ACCOUNT_NOT_ENABLED_REGIONS = {
     "me-south-1",
 }
 GPU_NAME_MAPPING = {
+    "RTX PRO 4500": "RTXPRO4500",
     "RTX PRO Server 6000": "RTXPRO6000",
 }
 
@@ -384,6 +385,7 @@ class AWSProvider(AbstractProvider):
                     "p5e.",
                     "p4d.",
                     "p4de.",
+                    "g7.",
                     "g7e.",
                     "g6.",
                     "g6e.",
