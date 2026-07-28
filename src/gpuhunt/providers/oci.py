@@ -3,11 +3,11 @@ import logging
 import re
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from typing import Annotated
+from typing import Annotated, TypeVar
 
 import oci
 from oci.identity.models import Region
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 from requests import Session
 from typing_extensions import TypedDict
 
@@ -19,6 +19,14 @@ from gpuhunt.providers import AbstractProvider
 logger = logging.getLogger(__name__)
 COST_ESTIMATOR_URL_TEMPLATE = "https://www.oracle.com/a/ocom/docs/cloudestimator2/data/{resource}"
 COST_ESTIMATOR_REQUEST_TIMEOUT = 10
+
+ResponseModelT = TypeVar("ResponseModelT", bound=BaseModel)
+
+# The Cost Estimator reports some integral quantities as fractional floats, e.g. the disk
+# `qty` of BM.DenseIO.E5.128 is 81.6. Pydantic v1 truncated such values silently, while v2
+# rejects them, failing the whole document. Truncate to keep the v1 behaviour: an unparsable
+# shape we do not even use would otherwise break catalog collection entirely.
+LaxInt = Annotated[int, BeforeValidator(lambda v: int(v) if isinstance(v, float) else v)]
 
 
 class OCICredentials(TypedDict):
@@ -113,29 +121,27 @@ class CostEstimatorTypeField(BaseModel):
 
 
 class CostEstimatorShapeProduct(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel_case)
+
     type: CostEstimatorTypeField
     part_number: str
-    qty: int | None
-
-    class Config:
-        alias_generator = to_camel_case
+    qty: LaxInt | None = None
 
 
 class CostEstimatorShape(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel_case)
+
     name: str
     hidden: bool
     status: str
     allow_preemptible: bool
-    bundle_memory_qty: int | None
-    gpu_qty: int | None
-    gpu_memory_qty: int | None
+    bundle_memory_qty: LaxInt | None = None
+    gpu_qty: LaxInt | None = None
+    gpu_memory_qty: LaxInt | None = None
     processor_type: CostEstimatorTypeField
     shape_type: CostEstimatorTypeField
     sub_type: CostEstimatorTypeField
     products: list[CostEstimatorShapeProduct]
-
-    class Config:
-        alias_generator = to_camel_case
 
     def is_arm_cpu(self):
         is_ampere_gpu = self.sub_type.value == "gpu" and (
@@ -160,21 +166,20 @@ class CostEstimatorPrice(BaseModel):
 
 
 class CostEstimatorPriceLocalization(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel_case)
+
     currency_code: str
     prices: list[CostEstimatorPrice]
 
-    class Config:
-        alias_generator = to_camel_case
-
 
 class CostEstimatorProduct(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel_case)
+
     part_number: str
     billing_model: str
+    # The explicit alias takes priority over the generated `priceType`
     price_type: Annotated[str, Field(alias="pricetype")]
     currency_code_localizations: list[CostEstimatorPriceLocalization]
-
-    class Config:
-        alias_generator = to_camel_case
 
     def find_price_l10n(self, currency_code: str) -> CostEstimatorPriceLocalization | None:
         return next(
@@ -203,11 +208,11 @@ class CostEstimator:
     def get_products(self) -> CostEstimatorProductList:
         return self._get("products.json", CostEstimatorProductList)
 
-    def _get(self, resource: str, ResponseModel: type[BaseModel]):
+    def _get(self, resource: str, ResponseModel: type[ResponseModelT]) -> ResponseModelT:
         url = COST_ESTIMATOR_URL_TEMPLATE.format(resource=resource)
         resp = self.session.get(url, timeout=COST_ESTIMATOR_REQUEST_TIMEOUT)
         resp.raise_for_status()
-        return ResponseModel.parse_raw(resp.content)
+        return ResponseModel.model_validate_json(resp.content)
 
 
 class CostEstimatorDataError(Exception):
