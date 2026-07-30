@@ -21,7 +21,7 @@ class FakeResponse:
 @pytest.fixture
 def plans_payload() -> dict:
     # Mirrors the live /plans shape: ram is in MB, gpu is a count string, gpu_label has a memory
-    # suffix, available_regions carries the region code under "location".
+    # suffix, available_regions carries compatible region codes under "location".
     regions = [{"location": "it-fr2"}, {"location": "it-mi2"}]
     return {
         "status": "ok",
@@ -99,11 +99,7 @@ def test_get_builds_gpu_offers_per_region(monkeypatch, plans_payload):
     assert sample.disk_size == 500.0
     assert sample.gpu_vendor == "nvidia"
     assert sample.spot is False
-    assert sample.provider_data == {
-        "plan_id": 7,
-        "gpu_label": "L40s 48GB",
-        "host_type": "ECS",
-    }
+    assert sample.provider_data == {}
 
     a100 = next(o for o in offers if o.instance_name == "ECS2GPU3")
     assert a100.gpu_count == 2

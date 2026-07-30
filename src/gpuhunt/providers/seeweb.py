@@ -1,17 +1,11 @@
 import logging
 import os
 import re
-from typing import NotRequired, TypedDict, cast
 
 import requests
 
 from gpuhunt._internal.constraints import find_accelerators
-from gpuhunt._internal.models import (
-    AcceleratorVendor,
-    JSONObject,
-    QueryFilter,
-    RawCatalogItem,
-)
+from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -39,12 +33,6 @@ SEEWEB_GPU_MAP: dict[str, tuple[str, float]] = {
 _NON_NVIDIA_MARKERS = ("MI300", "TENSTORRENT", "GRAYSKULL", "WORMHOLE")
 
 
-class SeewebCatalogItemProviderData(TypedDict):
-    plan_id: NotRequired[int]
-    gpu_label: str
-    host_type: NotRequired[str]
-
-
 class SeewebProvider(AbstractProvider):
     """Online provider for Seeweb Cloud Server GPU.
 
@@ -57,9 +45,10 @@ class SeewebProvider(AbstractProvider):
     NAME = "seeweb"
 
     def __init__(self, token: str | None = None):
-        self.token = token or os.getenv("SEEWEB_API_TOKEN")
-        if not self.token:
+        token = token or os.getenv("SEEWEB_API_TOKEN")
+        if not token:
             raise ValueError("Set the SEEWEB_API_TOKEN environment variable.")
+        self.token = token
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
@@ -86,6 +75,8 @@ class SeewebProvider(AbstractProvider):
 def _convert_plan(plan: dict) -> list[RawCatalogItem]:
     plan_name = plan.get("name")
     gpu_label = plan.get("gpu_label")
+    # In the /plans response, "available" means that the plan is active. It does not indicate
+    # current capacity in any particular region.
     if plan.get("available") is False:
         return []
     if not plan_name or not gpu_label:
@@ -122,14 +113,10 @@ def _convert_plan(plan: dict) -> list[RawCatalogItem]:
         )
         return []
 
-    provider_data: SeewebCatalogItemProviderData = {"gpu_label": str(gpu_label)}
-    if isinstance(plan.get("id"), int):
-        provider_data["plan_id"] = plan["id"]
-    if isinstance(plan.get("host_type"), str):
-        provider_data["host_type"] = plan["host_type"]
-
     offers = []
     seen_regions = set()
+    # These are regions where the plan is active/compatible, not a real-time capacity signal.
+    # Consumers that need current capacity should query /plans/availables separately.
     regions = plan.get("available_regions")
     if not isinstance(regions, list):
         logger.warning("Skipping Seeweb plan %s: invalid available_regions", plan_name)
@@ -156,7 +143,6 @@ def _convert_plan(plan: dict) -> list[RawCatalogItem]:
                 gpu_vendor=AcceleratorVendor.NVIDIA.value,
                 spot=False,
                 disk_size=disk_size,
-                provider_data=cast(JSONObject, provider_data),
             )
         )
     return offers
