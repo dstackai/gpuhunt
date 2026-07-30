@@ -24,6 +24,7 @@ def main():
             "nebius",
             "oci",
             "runpod",
+            "seeweb",
             "vastai",
             "vultr",
         ],
@@ -116,6 +117,10 @@ def main():
         from gpuhunt.providers.runpod import RunpodProvider
 
         provider = RunpodProvider()
+    elif args.provider == "seeweb":
+        from gpuhunt.providers.seeweb import SeewebProvider
+
+        provider = SeewebProvider(os.getenv("SEEWEB_API_TOKEN"))
     elif args.provider == "vastai":
         from gpuhunt.providers.vastai import VastAIProvider
 
