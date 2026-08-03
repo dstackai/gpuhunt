@@ -44,7 +44,7 @@ nebius = [
 ]
 oci = [
     "oci",
-    "pydantic>=1.10.10,<2.0.0",
+    "pydantic>=2.0.0",
 ]
 verda = [
     'verda>=1.22.0',
