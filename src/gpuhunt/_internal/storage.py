@@ -4,12 +4,7 @@ import logging
 from collections.abc import Iterable, Iterator, Mapping
 from typing import IO
 
-from gpuhunt._internal.models import (
-    AcceleratorVendor,
-    CatalogItem,
-    CPUArchitecture,
-    bool_loader,
-)
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, CPUArchitecture
 from gpuhunt._internal.utils import load_optional, load_required
 
 logger = logging.getLogger(__name__)
@@ -62,23 +57,28 @@ def item_to_row(item: CatalogItem) -> dict[str, str]:
         "disk_size": _dump_optional(item.disk_size),
         "gpu_vendor": _dump_optional(item.gpu_vendor.value if item.gpu_vendor else None),
         "flags": " ".join(item.flags),
-        "cpu_arch": _dump_optional(item.cpu_arch.value if item.cpu_arch else None),
+        "cpu_arch": item.cpu_arch.value,
         "provider_data": json.dumps(item.provider_data),
     }
 
 
 def item_from_row(row: Mapping[str, str], *, provider: str) -> CatalogItem:
+    gpu_count = load_required(row.get("gpu_count"), loader=int)
     gpu_name = load_optional(row.get("gpu_name"))
-    gpu_vendor = load_optional(row.get("gpu_vendor"))
+    raw_gpu_vendor = load_optional(row.get("gpu_vendor"))
+    gpu_vendor = AcceleratorVendor.cast(raw_gpu_vendor) if raw_gpu_vendor else None
     # Catalogs published before the `gpu_vendor` column existed encode TPUs by prefixing
-    # the accelerator name. `cpu_arch` predates its column too, and is filled in by
-    # `CatalogItem.__post_init__`. Both heuristics are required as long as we support
+    # the accelerator name, and imply Nvidia otherwise. Required as long as we support
     # historical catalogs.
     if gpu_name and gpu_name.startswith("tpu-"):
         gpu_name = gpu_name[4:]
         if gpu_vendor is None:
-            gpu_vendor = AcceleratorVendor.GOOGLE.value
-    cpu_arch = load_optional(row.get("cpu_arch"))
+            gpu_vendor = AcceleratorVendor.GOOGLE
+    elif gpu_vendor is None and gpu_count:
+        gpu_vendor = AcceleratorVendor.NVIDIA
+    # `cpu_arch` predates its column too, and x86 is what those catalogs contain.
+    raw_cpu_arch = load_optional(row.get("cpu_arch"))
+    cpu_arch = CPUArchitecture.cast(raw_cpu_arch) if raw_cpu_arch else CPUArchitecture.X86
     return CatalogItem(
         provider=provider,
         instance_name=load_required(row.get("instance_name")),
@@ -86,14 +86,14 @@ def item_from_row(row: Mapping[str, str], *, provider: str) -> CatalogItem:
         price=load_required(row.get("price"), loader=float),
         cpu=load_required(row.get("cpu"), loader=int),
         memory=load_required(row.get("memory"), loader=float),
-        gpu_count=load_required(row.get("gpu_count"), loader=int),
+        gpu_count=gpu_count,
         gpu_name=gpu_name,
         gpu_memory=load_optional(row.get("gpu_memory"), loader=float),
-        spot=load_required(row.get("spot"), loader=bool_loader),
+        spot=load_required(row.get("spot"), loader=_load_bool),
         disk_size=load_optional(row.get("disk_size"), loader=float),
-        gpu_vendor=AcceleratorVendor.cast(gpu_vendor) if gpu_vendor else None,
+        gpu_vendor=gpu_vendor,
         flags=(row.get("flags") or "").split(),
-        cpu_arch=CPUArchitecture.cast(cpu_arch) if cpu_arch else None,
+        cpu_arch=cpu_arch,
         provider_data=json.loads(row.get("provider_data") or "{}"),
     )
 
@@ -129,3 +129,7 @@ def convert_catalog_v2_to_v1(path_v2: str, path_v1: str) -> None:
 
 def _dump_optional(value: str | float | None) -> str:
     return "" if value is None else str(value)
+
+
+def _load_bool(value: str) -> bool:
+    return value.lower() == "true"

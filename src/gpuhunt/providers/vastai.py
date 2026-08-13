@@ -9,7 +9,7 @@ import requests
 from typing_extensions import NotRequired, TypedDict
 
 from gpuhunt._internal.constraints import correct_gpu_memory_gib
-from gpuhunt._internal.models import CatalogItem, QueryFilter
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class VastAIProvider(AbstractProvider):
                 price=round(offer["dph_base"] + disk_cost, 5),
                 cpu=int(offer["cpu_cores_effective"]),
                 memory=memory,
-                gpu_vendor=None,
+                gpu_vendor=AcceleratorVendor.NVIDIA if offer["num_gpus"] else None,
                 gpu_count=offer["num_gpus"],
                 gpu_name=gpu_name,
                 gpu_memory=float(gpu_memory),

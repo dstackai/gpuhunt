@@ -80,7 +80,7 @@ class OCIProvider(AbstractProvider):
                     price=resources.total_price(),
                     cpu=resources.cpu.vcpus,
                     memory=resources.memory.gbs,
-                    gpu_vendor=None,
+                    gpu_vendor=(AcceleratorVendor.NVIDIA if resources.gpu.units_count else None),
                     gpu_count=resources.gpu.units_count,
                     gpu_name=resources.gpu.name,
                     gpu_memory=resources.gpu.unit_memory_gb,

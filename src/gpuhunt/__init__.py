@@ -24,7 +24,6 @@ from gpuhunt._internal.models import (
     IntelAcceleratorInfo as IntelAcceleratorInfo,
     NvidiaGPUInfo as NvidiaGPUInfo,
     QueryFilter as QueryFilter,
-    RawCatalogItem as RawCatalogItem,
     TenstorrentAcceleratorInfo as TenstorrentAcceleratorInfo,
     TPUInfo as TPUInfo,
 )

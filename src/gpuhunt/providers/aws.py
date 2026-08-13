@@ -13,7 +13,7 @@ import boto3
 import requests
 from botocore.exceptions import ClientError, ConnectTimeoutError, EndpointConnectionError
 
-from gpuhunt._internal.models import CatalogItem, QueryFilter
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -137,7 +137,7 @@ class AWSProvider(AbstractProvider):
                     price=float(row["PricePerUnit"]),
                     cpu=int(row["vCPU"]),
                     memory=_parse_memory(row["Memory"]),
-                    gpu_vendor=None,
+                    gpu_vendor=AcceleratorVendor.NVIDIA if gpu_count else None,
                     gpu_count=gpu_count,
                     spot=False,
                     gpu_name=None,

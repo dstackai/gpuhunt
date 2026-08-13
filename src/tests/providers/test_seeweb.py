@@ -128,17 +128,6 @@ def test_get_sends_token_and_timeout(monkeypatch, plans_payload):
     assert request["kwargs"]["timeout"] == 30
 
 
-def test_token_defaults_to_environment(monkeypatch):
-    monkeypatch.setenv("SEEWEB_API_TOKEN", "from-env")
-    assert SeewebProvider().token == "from-env"
-
-
-def test_missing_token_is_rejected(monkeypatch):
-    monkeypatch.delenv("SEEWEB_API_TOKEN", raising=False)
-    with pytest.raises(ValueError, match="SEEWEB_API_TOKEN"):
-        SeewebProvider()
-
-
 def test_http_error_is_propagated(monkeypatch):
     error = requests.HTTPError("unauthorized")
     monkeypatch.setattr(

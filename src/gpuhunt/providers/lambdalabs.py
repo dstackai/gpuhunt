@@ -5,6 +5,7 @@ from requests import Session
 
 from gpuhunt._internal.constraints import is_nvidia_superchip
 from gpuhunt._internal.models import (
+    AcceleratorVendor,
     CatalogItem,
     CPUArchitecture,
     QueryFilter,
@@ -56,7 +57,7 @@ class LambdaLabsProvider(AbstractProvider):
                     cpu_arch=cpu_arch,
                     cpu=instance["specs"]["vcpus"],
                     memory=float(instance["specs"]["memory_gib"]) * 1.074,
-                    gpu_vendor=None,
+                    gpu_vendor=AcceleratorVendor.NVIDIA if gpu_count else None,
                     gpu_count=gpu_count,
                     gpu_name=gpu_name,
                     gpu_memory=gpu_memory,

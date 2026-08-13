@@ -1,9 +1,7 @@
-import dataclasses
-
 import pytest
 
 import gpuhunt._internal.catalog as internal_catalog
-from gpuhunt import AcceleratorVendor, Catalog, CatalogItem, RawCatalogItem
+from gpuhunt import AcceleratorVendor, Catalog, CatalogItem
 from gpuhunt.providers.verda import (
     InstanceType,
     VerdaProvider,
@@ -197,14 +195,6 @@ def test_gpu_name(caplog):
     assert get_gpu_name("") is None
 
 
-def transform(raw_catalog_items: list[RawCatalogItem]) -> list[CatalogItem]:
-    items = []
-    for raw in raw_catalog_items:
-        item = CatalogItem(provider="verda", **dataclasses.asdict(raw))
-        items.append(item)
-    return items
-
-
 def test_available_query(mocker, raw_instance_types):
     catalog = Catalog(balance_resources=False, auto_reload=False)
 
@@ -314,13 +304,14 @@ def test_transform_instance(raw_instance_types):
     is_spot = True
     item = transform_instance(instance_types(raw_instance_types[1]), is_spot, location)
 
-    expected = RawCatalogItem(
+    expected = CatalogItem(
+        provider="verda",
         instance_name="2A6000.20V",
         location="ICE-01",
         price=0.7,
         cpu=20,
         memory=120,
-        gpu_vendor=AcceleratorVendor.NVIDIA.value,
+        gpu_vendor=AcceleratorVendor.NVIDIA,
         gpu_count=2,
         gpu_name="A6000",
         gpu_memory=96 / 2,
@@ -328,7 +319,7 @@ def test_transform_instance(raw_instance_types):
         disk_size=None,
     )
 
-    assert RawCatalogItem.from_dict(item) == expected
+    assert item == expected
 
 
 def test_cpu_instance(raw_instance_types):
@@ -336,7 +327,8 @@ def test_cpu_instance(raw_instance_types):
     is_spot = False
     item = transform_instance(instance_types(raw_instance_types[2]), is_spot, location)
 
-    expected = RawCatalogItem(
+    expected = CatalogItem(
+        provider="verda",
         instance_name="CPU.120V.480G",
         location="ICE-01",
         price=3,
@@ -350,7 +342,7 @@ def test_cpu_instance(raw_instance_types):
         disk_size=None,
     )
 
-    assert RawCatalogItem.from_dict(item) == expected
+    assert item == expected
 
 
 def test_order(mocker, raw_instance_types):

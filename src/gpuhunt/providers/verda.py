@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from verda import VerdaClient
 from verda.instance_types import InstanceType
 
-from gpuhunt import CatalogItem, QueryFilter
+from gpuhunt import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -55,18 +55,20 @@ def generate_instances(
         item = transform_instance(copy.copy(instance), spot, location)
         if item is None:
             continue
-        instances.append(CatalogItem.from_dict(item, provider=VerdaProvider.NAME))
+        instances.append(item)
     return instances
 
 
-def transform_instance(instance: InstanceType, spot: bool, location: str) -> dict | None:
+def transform_instance(instance: InstanceType, spot: bool, location: str) -> CatalogItem | None:
     gpu_memory = None
     gpu_count = instance.gpu["number_of_gpus"]
     gpu_name = None
+    gpu_vendor = None
 
     if instance.gpu["number_of_gpus"]:
         gpu_memory = instance.gpu_memory["size_in_gigabytes"] / instance.gpu["number_of_gpus"]
         gpu_name = get_gpu_name(instance.gpu["description"])
+        gpu_vendor = AcceleratorVendor.NVIDIA
 
     if gpu_count and gpu_name is None:
         logger.warning(
@@ -74,18 +76,21 @@ def transform_instance(instance: InstanceType, spot: bool, location: str) -> dic
         )
         return None
 
-    raw = dict(
+    return CatalogItem(
+        provider=VerdaProvider.NAME,
         instance_name=instance.instance_type,
         location=location,
         spot=spot,
-        price=instance.spot_price_per_hour if spot else instance.price_per_hour,
-        cpu=instance.cpu["number_of_cores"],
-        memory=instance.memory["size_in_gigabytes"],
-        gpu_count=gpu_count,
+        # The API reports prices as strings.
+        price=float(instance.spot_price_per_hour if spot else instance.price_per_hour),
+        cpu=int(instance.cpu["number_of_cores"]),
+        memory=float(instance.memory["size_in_gigabytes"]),
+        gpu_count=int(gpu_count),
         gpu_name=gpu_name,
         gpu_memory=gpu_memory,
+        gpu_vendor=gpu_vendor,
+        disk_size=None,
     )
-    return raw
 
 
 GPU_MAP = {
