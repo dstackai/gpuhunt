@@ -169,27 +169,27 @@ class AzureProvider(AbstractProvider):
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
-        items = []
+        catalog_items = []
         instance_name_to_spec_map = self.get_instance_specs()
         for page in self.get_pages():
-            for item in page:
-                if is_retired(item["armSkuName"]):
+            for sku_item in page:
+                if is_retired(sku_item["armSkuName"]):
                     continue
-                if not item["armSkuName"]:
+                if not sku_item["armSkuName"]:
                     continue
-                price = float(item["retailPrice"])
+                price = float(sku_item["retailPrice"])
                 if math.isclose(price, 0):
                     continue
-                spec = instance_name_to_spec_map.get(item["armSkuName"])
+                spec = instance_name_to_spec_map.get(sku_item["armSkuName"])
                 if spec is None:
                     continue
-                item = spec.to_catalog_item(
-                    location=item["armRegionName"],
+                catalog_item = spec.to_catalog_item(
+                    location=sku_item["armRegionName"],
                     price=price,
-                    spot="Spot" in item["meterName"],
+                    spot="Spot" in sku_item["meterName"],
                 )
-                items.append(item)
-        return sorted(items, key=lambda i: i.price)
+                catalog_items.append(catalog_item)
+        return sorted(catalog_items, key=lambda i: i.price)
 
     def get_instance_specs(self) -> dict[str, _InstanceSpec]:
         logger.info("Fetching instance details")
@@ -199,7 +199,7 @@ class AzureProvider(AbstractProvider):
             assert resource.name is not None
             if resource.resource_type != "virtualMachines":
                 continue
-            if is_retired(get_or_error(resource.name)):
+            if is_retired(resource.name):
                 continue
             capabilities = {pair.name: pair.value for pair in get_or_error(resource.capabilities)}
             cpu = capabilities.get("vCPUs")

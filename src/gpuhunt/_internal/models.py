@@ -124,7 +124,7 @@ class RawCatalogItem:
             instance_name=load_required(v.get("instance_name")),
             location=load_required(v.get("location")),
             price=load_required(v.get("price"), loader=float),
-            cpu_arch=load_required(v.get("cpu_arch")),
+            cpu_arch=load_optional(v.get("cpu_arch")),
             cpu=load_required(v.get("cpu"), loader=int),
             memory=load_required(v.get("memory"), loader=float),
             gpu_vendor=load_optional(v.get("gpu_vendor")),

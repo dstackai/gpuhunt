@@ -25,8 +25,7 @@ from gpuhunt.providers import AbstractProvider
 logger = logging.getLogger(__name__)
 compute_service = "services/6F81-5844-456A"
 AcceleratorDetails = namedtuple("AcceleratorDetails", ["name", "memory"])
-# As of 2024-14-08, this mapping contains only Nvidia accelerators; update gpu_vendor
-# inferring code in fill_gpu_vendors_and_names() if a non-Nvidia accelerator is added
+# Update gpu_vendor detection if adding non-nvidia GPUs.
 accelerator_details = {
     "nvidia-b200": AcceleratorDetails("B200", 180.0),
     "nvidia-a100-80gb": AcceleratorDetails("A100", 80.0),
@@ -248,7 +247,7 @@ class GCPProvider(AbstractProvider):
                     memory=round(machine_type.memory_mb / 1024, 1),
                     gpu_count=(machine_type.accelerators[0].guest_accelerator_count if gpu else 0),
                     # gpu_name is canonicalized and gpu_vendor is set later
-                    # in fill_gpu_vendors_and_names(), for now we use AcceleratorType.name
+                    # in make_catalog_items(), for now we use AcceleratorType.name
                     # as a name (it contains a vendor prefix like "nvidia-")
                     gpu_name=(
                         machine_type.accelerators[0].guest_accelerator_type if gpu else None
@@ -286,6 +285,7 @@ class GCPProvider(AbstractProvider):
                             machine_type,
                             gpu_count=n,
                             gpu_name=accelerator.name,
+                            gpu_memory=accelerator_details[accelerator.name].memory,
                         )
                         zone_machine_types.append(machine_type_with_gpu)
             return zone_machine_types
@@ -311,17 +311,20 @@ class GCPProvider(AbstractProvider):
         prices.add_skus(skus)
         items = []
         for machine_type in machine_types:
+            gpu_vendor = None
+            gpu_name = None
+            if machine_type.gpu_name:
+                if machine_type.gpu_name.startswith("nvidia-"):
+                    gpu_vendor = AcceleratorVendor.NVIDIA.value
+                if acc_details := accelerator_details.get(machine_type.gpu_name):
+                    gpu_name = acc_details.name
+                else:
+                    logger.warning("No accelerator details for %s", machine_type.gpu_name)
+                    continue
             for capacity_type in CapacityType:
                 price = prices.get_instance_price(machine_type, capacity_type)
                 if price is None:
                     continue
-                gpu_name = None
-                gpu_vendor = None
-                if machine_type.gpu_name:
-                    if acc_details := accelerator_details[machine_type.gpu_name]:
-                        gpu_name = acc_details.name
-                    if machine_type.gpu_name.startswith("nvidia-"):
-                        gpu_vendor = AcceleratorVendor.NVIDIA.value
                 item = RawCatalogItem(
                     instance_name=machine_type.instance_name,
                     location=machine_type.location,

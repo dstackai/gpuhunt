@@ -91,7 +91,9 @@ class VastAIProvider(AbstractProvider):
             instance_offers.extend(offer_variants)
         return instance_offers
 
-    def make_filters(self, q: QueryFilter) -> dict[str, dict[Operators, FilterValue]]:
+    def make_filters(
+        self, q: QueryFilter
+    ) -> dict[str, FilterValue | dict[Operators, FilterValue]]:
         filters: dict[str, Any] = defaultdict(dict)
         if q.min_cpu is not None:
             filters["cpu_cores"]["gte"] = q.min_cpu

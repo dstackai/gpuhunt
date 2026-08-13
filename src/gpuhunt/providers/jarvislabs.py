@@ -44,11 +44,8 @@ class JarvisLabsCatalogItemProviderData(TypedDict):
 class JarvisLabsProvider(AbstractProvider):
     NAME = "jarvislabs"
 
-    def __init__(self, api_key: str | None = None, api_url: str | None = None):
-        self.api_key = api_key or os.getenv("JL_API_KEY")
-        if not self.api_key:
-            raise ValueError("Set the JL_API_KEY environment variable.")
-
+    def __init__(self, api_key: str, api_url: str | None = None):
+        self.api_key = api_key
         self.api_url = (api_url or os.getenv("JARVISLABS_API_URL", API_URL)).rstrip("/")
 
     def get(

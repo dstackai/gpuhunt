@@ -16,11 +16,8 @@ STANDARD_CLOUD_API_URL = "https://api.digitalocean.com"
 class DigitalOceanProvider(AbstractProvider):
     NAME = "digitalocean"
 
-    def __init__(self, api_key: str | None = None, api_url: str | None = None):
-        self.api_key = api_key or os.getenv("DIGITAL_OCEAN_API_KEY")
-        if not self.api_key:
-            raise ValueError("Set the DIGITAL_OCEAN_API_KEY environment variable.")
-
+    def __init__(self, api_key: str, api_url: str | None = None):
+        self.api_key = api_key
         self.api_url = api_url or os.getenv("DIGITAL_OCEAN_API_URL", STANDARD_CLOUD_API_URL)
 
     def get(

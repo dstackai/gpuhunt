@@ -80,6 +80,3 @@ typeCheckingMode = "standard"
 include = [
     "src/gpuhunt"
 ]
-exclude = [
-    "src/gpuhunt/providers"
-]

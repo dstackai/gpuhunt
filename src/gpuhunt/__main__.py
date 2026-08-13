@@ -66,7 +66,7 @@ def main():
 
         provider = DigitalOceanProvider(
             api_key=os.environ["DIGITAL_OCEAN_API_KEY"],
-            api_url=os.environ["DIGITAL_OCEAN_API_URL"],
+            api_url=os.getenv("DIGITAL_OCEAN_API_URL"),
         )
     elif args.provider == "gcp":
         from gpuhunt.providers.gcp import GCPProvider
@@ -84,7 +84,7 @@ def main():
 
         provider = JarvisLabsProvider(
             api_key=os.environ["JL_API_KEY"],
-            api_url=os.environ["JARVISLABS_API_URL"],
+            api_url=os.getenv("JARVISLABS_API_URL"),
         )
     elif args.provider == "lambdalabs":
         from gpuhunt.providers.lambdalabs import LambdaLabsProvider

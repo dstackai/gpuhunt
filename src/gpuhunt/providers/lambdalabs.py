@@ -30,6 +30,7 @@ class LambdaLabsProvider(AbstractProvider):
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[RawCatalogItem]:
         offers = []
+        regions = self.list_regions()
         resp = self.session.get(INSTANCE_TYPES_URL, timeout=TIMEOUT)
         resp.raise_for_status()
         data = resp.json()["data"]
@@ -42,12 +43,12 @@ class LambdaLabsProvider(AbstractProvider):
                 logger.warning("Can't parse GPU info from description: %s", description)
                 continue
             gpu_count, gpu_name, gpu_memory = result
-            flags: list[str] = []
-            cpu_arch = CPUArchitecture.X86
-            if is_nvidia_superchip(gpu_name):
-                cpu_arch = CPUArchitecture.ARM
-                flags.append(FLAG_ARM)
-            for region in self.list_regions():
+            for region in regions:
+                flags: list[str] = []
+                cpu_arch = CPUArchitecture.X86
+                if is_nvidia_superchip(gpu_name):
+                    cpu_arch = CPUArchitecture.ARM
+                    flags.append(FLAG_ARM)
                 offer = RawCatalogItem(
                     instance_name=instance["name"],
                     price=instance["price_cents_per_hour"] / 100,

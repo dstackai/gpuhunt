@@ -416,7 +416,8 @@ def _get_gpu_memory_gib(gpu_name: str, reported_memory_mib: int) -> float:
 
 def _parse_memory(s: str) -> float:
     r = re.match(r"^([0-9.]+) GiB$", s)
-    assert r is not None
+    if r is None:
+        raise ValueError(f"Cannot parse memory: {s!r}")
     return float(r.group(1))
 
 
