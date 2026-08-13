@@ -7,7 +7,7 @@ from typing import (
     Union,
 )
 
-from gpuhunt._internal.utils import empty_as_none
+from gpuhunt._internal.utils import load_optional, load_required
 
 JSONType = Union[
     None,
@@ -72,15 +72,15 @@ class RawCatalogItem:
     See `CatalogItem` for field descriptions.
     """
 
-    instance_name: str | None
-    location: str | None
-    price: float | None
-    cpu: int | None
-    memory: float | None
-    gpu_count: int | None
+    instance_name: str
+    location: str
+    price: float
+    cpu: int
+    memory: float
+    gpu_count: int
     gpu_name: str | None
     gpu_memory: float | None
-    spot: bool | None
+    spot: bool
     disk_size: float | None
     gpu_vendor: str | None = None
     flags: list[str] = field(default_factory=list)
@@ -119,22 +119,22 @@ class RawCatalogItem:
             self.cpu_arch = cpu_arch.value
 
     @staticmethod
-    def from_dict(v: dict) -> "RawCatalogItem":
+    def from_dict(v: dict[str, str | None]) -> "RawCatalogItem":
         return RawCatalogItem(
-            instance_name=empty_as_none(v.get("instance_name")),
-            location=empty_as_none(v.get("location")),
-            price=empty_as_none(v.get("price"), loader=float),
-            cpu_arch=empty_as_none(v.get("cpu_arch")),
-            cpu=empty_as_none(v.get("cpu"), loader=int),
-            memory=empty_as_none(v.get("memory"), loader=float),
-            gpu_vendor=empty_as_none(v.get("gpu_vendor")),
-            gpu_count=empty_as_none(v.get("gpu_count"), loader=int),
-            gpu_name=empty_as_none(v.get("gpu_name")),
-            gpu_memory=empty_as_none(v.get("gpu_memory"), loader=float),
-            spot=empty_as_none(v.get("spot"), loader=bool_loader),
-            disk_size=empty_as_none(v.get("disk_size"), loader=float),
-            flags=v.get("flags", "").split(),
-            provider_data=json.loads(v.get("provider_data", "{}")),
+            instance_name=load_required(v.get("instance_name")),
+            location=load_required(v.get("location")),
+            price=load_required(v.get("price"), loader=float),
+            cpu_arch=load_required(v.get("cpu_arch")),
+            cpu=load_required(v.get("cpu"), loader=int),
+            memory=load_required(v.get("memory"), loader=float),
+            gpu_vendor=load_optional(v.get("gpu_vendor")),
+            gpu_count=load_required(v.get("gpu_count"), loader=int),
+            gpu_name=load_optional(v.get("gpu_name")),
+            gpu_memory=load_optional(v.get("gpu_memory"), loader=float),
+            spot=load_required(v.get("spot"), loader=bool_loader),
+            disk_size=load_optional(v.get("disk_size"), loader=float),
+            flags=(v.get("flags") or "").split(),
+            provider_data=json.loads(v.get("provider_data") or "{}"),
         )
 
     def dict(self) -> dict[str, str | int | float | bool | None]:

@@ -38,6 +38,7 @@ from gpuhunt._internal.models import (
     QueryFilter,
     RawCatalogItem,
 )
+from gpuhunt._internal.utils import get_or_error
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -105,8 +106,7 @@ class NebiusProvider(AbstractProvider):
                                 items.append(item)
         finally:
             sdk.sync_close(timeout=TIMEOUT)
-        items.sort(key=lambda i: i.price)
-        return items
+        return sorted(items, key=lambda i: i.price)
 
 
 class NebiusCatalogItemProviderData(TypedDict):
@@ -147,7 +147,7 @@ def get_price(
     estimate = calculator.estimate(
         request=EstimateRequest(resource_spec=ResourceSpec(compute_instance_spec=spec))
     ).wait()
-    return float(estimate.hourly_cost.general.total.cost)
+    return float(get_or_error(estimate.hourly_cost.general).total.cost)
 
 
 def list_platforms(sdk: SDK, project_id: str) -> ListPlatformsResponse:

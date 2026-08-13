@@ -1,7 +1,6 @@
 import copy
 import logging
 import re
-from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from typing import Annotated, TypeVar
 
@@ -13,7 +12,7 @@ from typing_extensions import TypedDict
 
 from gpuhunt._internal.constraints import find_accelerators
 from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
-from gpuhunt._internal.utils import to_camel_case
+from gpuhunt._internal.utils import get_or_error, to_camel_case
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -51,7 +50,7 @@ class OCIProvider(AbstractProvider):
     ) -> list[RawCatalogItem]:
         shapes = self.cost_estimator.get_shapes()
         products = self.cost_estimator.get_products()
-        regions: list[Region] = self.api_client.list_regions().data
+        regions: list[Region] = get_or_error(self.api_client.list_regions()).data
 
         result = []
 
@@ -72,25 +71,25 @@ class OCIProvider(AbstractProvider):
                     "Skipping shape %s due to unexpected Cost Estimator data: %s", shape.name, e
                 )
                 continue
-
-            on_demand_item = RawCatalogItem(
-                instance_name=shape.name,
-                location=None,
-                price=resources.total_price(),
-                cpu=resources.cpu.vcpus,
-                memory=resources.memory.gbs,
-                gpu_vendor=None,
-                gpu_count=resources.gpu.units_count,
-                gpu_name=resources.gpu.name,
-                gpu_memory=resources.gpu.unit_memory_gb,
-                spot=False,
-                disk_size=None,
-            )
-            item_variations = [on_demand_item]
-            if shape.allow_preemptible:
-                item_variations.append(self._make_spot_item(on_demand_item))
-            for item in item_variations:
-                result.extend(self._duplicate_item_in_regions(item, regions))
+            for region in regions:
+                assert isinstance(region.name, str)
+                on_demand_item = RawCatalogItem(
+                    instance_name=shape.name,
+                    location=region.name,
+                    price=resources.total_price(),
+                    cpu=resources.cpu.vcpus,
+                    memory=resources.memory.gbs,
+                    gpu_vendor=None,
+                    gpu_count=resources.gpu.units_count,
+                    gpu_name=resources.gpu.name,
+                    gpu_memory=resources.gpu.unit_memory_gb,
+                    spot=False,
+                    disk_size=None,
+                )
+                item_variations = [on_demand_item]
+                if shape.allow_preemptible:
+                    item_variations.append(self._make_spot_item(on_demand_item))
+                result.extend(item_variations)
 
         return sorted(result, key=lambda i: i.price)
 
@@ -103,17 +102,6 @@ class OCIProvider(AbstractProvider):
         item.price *= 0.5
         item.flags.append("oci-spot")
         return item
-
-    @staticmethod
-    def _duplicate_item_in_regions(
-        item: RawCatalogItem, regions: Iterable[Region]
-    ) -> list[RawCatalogItem]:
-        result = []
-        for region in regions:
-            regional_item = copy.deepcopy(item)
-            regional_item.location = region.name
-            result.append(regional_item)
-        return result
 
 
 class CostEstimatorTypeField(BaseModel):

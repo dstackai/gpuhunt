@@ -189,7 +189,7 @@ class AWSProvider(AbstractProvider):
                             if "GpuInfo" in i:
                                 gpu = i["GpuInfo"]["Gpus"][0]
                                 gpus[i["InstanceType"]] = (
-                                    GPU_NAME_MAPPING.get(gpu["Name"], gpu["Name"]),
+                                    GPU_NAME_MAPPING.get(gpu["Name"]) or gpu["Name"],
                                     _get_gpu_memory_gib(
                                         gpu["Name"], gpu["MemoryInfo"]["SizeInMiB"]
                                     ),
@@ -258,7 +258,7 @@ class AWSProvider(AbstractProvider):
                     }
                 ],
                 InstanceTypes=list(instance_types),
-                StartTime=datetime.datetime.utcnow(),
+                StartTime=datetime.datetime.now(tz=datetime.timezone.utc),
             )
 
             instance_prices = defaultdict(list)
@@ -416,6 +416,7 @@ def _get_gpu_memory_gib(gpu_name: str, reported_memory_mib: int) -> float:
 
 def _parse_memory(s: str) -> float:
     r = re.match(r"^([0-9.]+) GiB$", s)
+    assert r is not None
     return float(r.group(1))
 
 
@@ -430,7 +431,7 @@ def _parse_gpu_count(s: str) -> int | None:
 
 
 def _get_ec2_api_regions() -> set[str]:
-    session = boto3.session.Session()
+    session = boto3.session.Session()  # pyright: ignore[reportAttributeAccessIssue]
     return {
         region
         for partition in session.get_available_partitions()

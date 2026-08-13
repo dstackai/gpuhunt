@@ -1,5 +1,4 @@
 import base64
-import copy
 import datetime
 import hashlib
 import hmac
@@ -183,33 +182,26 @@ def _make_gpu_items(
     gpu_name, gpu_vendor, gpu_memory = gpu_info
     on_demand_per_gpu, spot_per_gpu = pricing
     num_gpu = spec["num_gpu"]
-
-    template = RawCatalogItem(
-        instance_name=product_name,
-        location=None,
-        price=None,
-        cpu=spec["cpu_cores"],
-        memory=float(spec["memory_gb"]),
-        gpu_vendor=gpu_vendor.value,
-        gpu_count=num_gpu,
-        gpu_name=gpu_name,
-        gpu_memory=gpu_memory,
-        spot=None,
-        disk_size=float(spec["disk_gb"]) if spec.get("disk_gb") else None,
-        cpu_arch=_get_cpu_arch(spec),
-        # disk_gb: ephemeral NVMe size in GB (0 = no ephemeral disk).
-        # Used by dstack to decide whether to create a persistent data disk.
-        provider_data={"disk_gb": spec.get("disk_gb", 0)},
-    )
-
     items = []
     for location in locations:
-        on_demand = copy.deepcopy(template)
-        on_demand.location = location
-        on_demand.spot = False
-        on_demand.price = round(num_gpu * on_demand_per_gpu, 2)
-        items.append(on_demand)
-
+        on_demand_item = RawCatalogItem(
+            instance_name=product_name,
+            location=location,
+            price=round(num_gpu * on_demand_per_gpu, 2),
+            cpu=spec["cpu_cores"],
+            memory=float(spec["memory_gb"]),
+            gpu_vendor=gpu_vendor.value,
+            gpu_count=num_gpu,
+            gpu_name=gpu_name,
+            gpu_memory=gpu_memory,
+            spot=False,
+            disk_size=float(spec["disk_gb"]) if spec.get("disk_gb") else None,
+            cpu_arch=_get_cpu_arch(spec),
+            # disk_gb: ephemeral NVMe size in GB (0 = no ephemeral disk).
+            # Used by dstack to decide whether to create a persistent data disk.
+            provider_data={"disk_gb": spec.get("disk_gb", 0)},
+        )
+        items.append(on_demand_item)
         # TODO: Enable spot offers once we confirm how to request spot billing
         # via the VM create API (POST /v1alpha5/projects/{pid}/compute/vms/instances).
         # The API schema doesn't have an obvious spot/billing_type field.
@@ -223,29 +215,23 @@ def _make_cpu_items(product_name: str, spec: dict, locations: list[str]) -> list
     if per_vcpu is None:
         logger.warning("No pricing for CPU prefix %s (%s), skipping", prefix, product_name)
         return []
-
     cpu_cores = spec["cpu_cores"]
-    template = RawCatalogItem(
-        instance_name=product_name,
-        location=None,
-        price=None,
-        cpu=cpu_cores,
-        memory=float(spec["memory_gb"]),
-        gpu_vendor=None,
-        gpu_count=0,
-        gpu_name=None,
-        gpu_memory=None,
-        spot=False,
-        disk_size=float(spec["disk_gb"]) if spec.get("disk_gb") else None,
-        cpu_arch=_get_cpu_arch(spec),
-        provider_data={"disk_gb": spec.get("disk_gb", 0)},
-    )
-
     items = []
     for location in locations:
-        item = copy.deepcopy(template)
-        item.location = location
-        item.price = round(cpu_cores * per_vcpu, 2)
+        item = RawCatalogItem(
+            instance_name=product_name,
+            location=location,
+            price=round(cpu_cores * per_vcpu, 2),
+            cpu=cpu_cores,
+            memory=float(spec["memory_gb"]),
+            gpu_vendor=None,
+            gpu_count=0,
+            gpu_name=None,
+            gpu_memory=None,
+            spot=False,
+            disk_size=float(spec["disk_gb"]) if spec.get("disk_gb") else None,
+            cpu_arch=_get_cpu_arch(spec),
+            provider_data={"disk_gb": spec.get("disk_gb", 0)},
+        )
         items.append(item)
-
     return items

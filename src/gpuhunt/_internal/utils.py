@@ -12,22 +12,54 @@ def configure_logging() -> None:
     )
 
 
+T = TypeVar("T")
+
+
+def get_or_error(v: T | None) -> T:
+    """
+    Unpacks an optional value. Used to denote that None is not possible in the current context.
+    """
+    if v is None:
+        raise ValueError("Optional value is None")
+    return v
+
+
 R = TypeVar("R")
 
 
 @overload
-def empty_as_none(value: str | None, loader: Callable[[str], R]) -> R | None:
+def load_optional(value: str | None, loader: Callable[[str], R]) -> R | None:
     pass
 
 
 @overload
-def empty_as_none(value: str | None, loader: None = None) -> str | None:
+def load_optional(value: str | None, loader: None = None) -> str | None:
     pass
 
 
-def empty_as_none(value: str | None, loader: Callable[[str], R] | None = None) -> str | R | None:
+def load_optional(value: str | None, loader: Callable[[str], R] | None = None) -> str | R | None:
     if value is None or value == "":
         return None
+    if loader is not None:
+        return loader(value)
+    return value
+
+
+@overload
+def load_required(value: str | None, loader: Callable[[str], R]) -> R:
+    pass
+
+
+@overload
+def load_required(value: str | None, loader: None = None) -> str:
+    pass
+
+
+def load_required(value: str | None, loader: Callable[[str], R] | None = None) -> str | R:
+    if value is None:
+        raise ValueError("Required value is None")
+    if value == "":
+        raise ValueError("Required value is empty")
     if loader is not None:
         return loader(value)
     return value

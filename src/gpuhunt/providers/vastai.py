@@ -92,7 +92,7 @@ class VastAIProvider(AbstractProvider):
         return instance_offers
 
     def make_filters(self, q: QueryFilter) -> dict[str, dict[Operators, FilterValue]]:
-        filters = defaultdict(dict)
+        filters: dict[str, Any] = defaultdict(dict)
         if q.min_cpu is not None:
             filters["cpu_cores"]["gte"] = q.min_cpu
         if q.max_cpu is not None:

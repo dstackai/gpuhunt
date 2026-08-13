@@ -28,7 +28,7 @@ class CloudRiftProvider(AbstractProvider):
     def _get_instance_types(self):
         request_data = {"selector": {"ByServiceAndLocation": {"services": ["vm"]}}}
         response_data = _make_request("instance-types/list", request_data)
-        return response_data["instance_types"]
+        return response_data["instance_types"]  # pyright: ignore[reportArgumentType]
 
 
 def generate_instances(instance) -> list[RawCatalogItem]:
@@ -70,7 +70,7 @@ GPU_MAP = [
 ]
 
 
-def _make_request(endpoint: str, request_data: dict) -> dict | str | None:
+def _make_request(endpoint: str, request_data: dict) -> dict | str:
     server = os.environ.get("CLOUDRIFT_SERVER_ADDRESS", CLOUDRIFT_SERVER_ADDRESS)
     response = requests.request(
         "POST",
@@ -80,10 +80,7 @@ def _make_request(endpoint: str, request_data: dict) -> dict | str | None:
     )
     if not response.ok:
         response.raise_for_status()
-    try:
-        response_json = response.json()
-        if isinstance(response_json, str):
-            return response_json
-        return response_json["data"]
-    except requests.exceptions.JSONDecodeError:
-        return None
+    response_json = response.json()
+    if isinstance(response_json, str):
+        return response_json
+    return response_json["data"]

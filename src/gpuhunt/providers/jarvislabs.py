@@ -255,7 +255,7 @@ def _as_int(value: object) -> int | None:
     if value is None or value == "":
         return None
     try:
-        return int(value)
+        return int(value)  # pyright: ignore[reportArgumentType]
     except (TypeError, ValueError):
         return None
 
@@ -264,6 +264,6 @@ def _as_float(value: object) -> float | None:
     if value is None or value == "":
         return None
     try:
-        return float(value)
+        return float(value)  # pyright: ignore[reportArgumentType]
     except (TypeError, ValueError):
         return None
