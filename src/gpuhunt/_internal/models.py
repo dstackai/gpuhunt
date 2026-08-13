@@ -215,7 +215,7 @@ class CatalogItem:
             self.cpu_arch = CPUArchitecture.cast(cpu_arch)
 
     @staticmethod
-    def from_dict(v: dict, *, provider: str | None = None) -> "CatalogItem":
+    def from_dict(v: dict, *, provider: str) -> "CatalogItem":
         return CatalogItem(provider=provider, **asdict(RawCatalogItem.from_dict(v)))
 
 

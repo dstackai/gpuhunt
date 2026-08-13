@@ -45,7 +45,7 @@ Method = Callable[P, R]
 CatalogMethod = Callable[Concatenate[Catalog, P], R]
 
 
-def with_signature(method: CatalogMethod) -> Callable[[Method], Method]:
+def with_signature(method: CatalogMethod[P, R]) -> Callable[[Method[P, R]], Method[P, R]]:
     """
     Returns:
         decorator to add the signature of the Catalog method to the decorated method
@@ -62,7 +62,7 @@ def with_signature(method: CatalogMethod) -> Callable[[Method], Method]:
 
 
 @with_signature(Catalog.query)
-def query(*args: P.args, **kwargs: P.kwargs) -> R:
+def query(*args, **kwargs):
     """
     Query the `default_catalog`.
     See `Catalog.query` for more details on parameters

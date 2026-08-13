@@ -1,6 +1,7 @@
 import logging
 import sys
 from collections.abc import Callable
+from typing import TypeVar, overload
 
 
 def configure_logging() -> None:
@@ -11,7 +12,20 @@ def configure_logging() -> None:
     )
 
 
-def empty_as_none(value: str | None, loader: Callable | None = None):
+R = TypeVar("R")
+
+
+@overload
+def empty_as_none(value: str | None, loader: Callable[[str], R]) -> R | None:
+    pass
+
+
+@overload
+def empty_as_none(value: str | None, loader: None = None) -> str | None:
+    pass
+
+
+def empty_as_none(value: str | None, loader: Callable[[str], R] | None = None) -> str | R | None:
     if value is None or value == "":
         return None
     if loader is not None:

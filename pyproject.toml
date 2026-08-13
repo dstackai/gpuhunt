@@ -74,3 +74,9 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = ["gpuhunt"]
 combine-as-imports = true
+
+[tool.pyright]
+typeCheckingMode = "standard"
+include = [
+    "src/gpuhunt/_internal"
+]
