@@ -29,12 +29,10 @@ class VerdaProvider(AbstractProvider):
     ) -> list[CatalogItem]:
         instance_types = self._get_instance_types()
         locations = self._get_locations()
-
         spots = (True, False)
         location_codes = [loc["code"] for loc in locations]
-        instances = generate_instances(spots, location_codes, instance_types)
-
-        return sorted(instances, key=lambda x: x.price)
+        offers = _make_offers(spots, location_codes, instance_types)
+        return sorted(offers, key=lambda x: x.price)
 
     def _get_instance_types(self) -> list[InstanceType]:
         return self.verda_client.instance_types.get()
@@ -47,19 +45,19 @@ class VerdaProvider(AbstractProvider):
         return [o for o in offers if o.gpu_name not in ALL_AMD_GPUS]  # skip AMD GPU
 
 
-def generate_instances(
+def _make_offers(
     spots: Iterable[bool], location_codes: Iterable[str], instance_types: Iterable[InstanceType]
 ) -> list[CatalogItem]:
-    instances = []
+    offers: list[CatalogItem] = []
     for spot, location, instance in itertools.product(spots, location_codes, instance_types):
-        item = transform_instance(copy.copy(instance), spot, location)
-        if item is None:
+        offer = _make_offer(copy.copy(instance), spot, location)
+        if offer is None:
             continue
-        instances.append(item)
-    return instances
+        offers.append(offer)
+    return offers
 
 
-def transform_instance(instance: InstanceType, spot: bool, location: str) -> CatalogItem | None:
+def _make_offer(instance: InstanceType, spot: bool, location: str) -> CatalogItem | None:
     gpu_memory = None
     gpu_count = instance.gpu["number_of_gpus"]
     gpu_name = None

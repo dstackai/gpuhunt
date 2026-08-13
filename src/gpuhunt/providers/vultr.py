@@ -39,13 +39,13 @@ def fetch_offers() -> list[CatalogItem]:
         All optimized Cloud Types (voc)"""
     bare_metal_plans_response = _make_request("GET", "/plans-metal?per_page=500")
     other_plans_response = _make_request("GET", "/plans?type=all&per_page=500")
-    return convert_response_to_raw_catalog_items(bare_metal_plans_response, other_plans_response)
+    return _make_offers(bare_metal_plans_response, other_plans_response)
 
 
-def convert_response_to_raw_catalog_items(
+def _make_offers(
     bare_metal_plans_response: Response, other_plans_response: Response
 ) -> list[CatalogItem]:
-    catalog_items = []
+    offers: list[CatalogItem] = []
 
     bare_metal_plans = bare_metal_plans_response.json()["plans_metal"]
     other_plans = other_plans_response.json()["plans"]
@@ -54,15 +54,15 @@ def convert_response_to_raw_catalog_items(
         for location in plan["locations"]:
             catalog_item = get_bare_metal_plans(plan, location)
             if catalog_item:
-                catalog_items.append(catalog_item)
+                offers.append(catalog_item)
 
     for plan in other_plans:
         for location in plan["locations"]:
             catalog_item = get_instance_plans(plan, location)
             if catalog_item:
-                catalog_items.append(catalog_item)
+                offers.append(catalog_item)
 
-    return catalog_items
+    return offers
 
 
 def get_bare_metal_plans(plan: dict, location: str) -> CatalogItem | None:

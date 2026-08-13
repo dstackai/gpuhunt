@@ -173,13 +173,13 @@ class GCPProvider(AbstractProvider):
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[CatalogItem]:
-        machine_types = self.list_machine_types()
-        self.add_gpus(machine_types)
-        items = self.make_catalog_items(machine_types)
-        items.extend(get_tpu_offers(self.project))
-        set_flags(items)
-        items = add_legacy_g4_preview(items)
-        return sorted(items, key=lambda i: i.price)
+        machine_types = self._list_machine_types()
+        machine_types += self._make_gpu_machine_types(machine_types)
+        offers = self._make_offers(machine_types)
+        offers.extend(_make_tpu_offers(self.project))
+        _set_flags(offers)
+        offers = _with_legacy_g4_preview(offers)
+        return sorted(offers, key=lambda i: i.price)
 
     @classmethod
     def filter(cls, offers: list[CatalogItem]) -> list[CatalogItem]:
@@ -225,9 +225,9 @@ class GCPProvider(AbstractProvider):
             )
         ]
 
-    def list_machine_types(self) -> list[_MachineType]:
-        def _list_zone_machine_types(zone: str) -> list[CatalogItem]:
-            zone_machine_types = []
+    def _list_machine_types(self) -> list[_MachineType]:
+        def _list_zone_machine_types(zone: str) -> list[_MachineType]:
+            zone_machine_types: list[_MachineType] = []
             logger.info("Fetching machine types for zone %s", zone)
             for machine_type in self.machine_types_client.list(project=self.project, zone=zone):
                 if machine_type.deprecated.state == compute_v1.DeprecationStatus.State.DEPRECATED:
@@ -247,7 +247,7 @@ class GCPProvider(AbstractProvider):
                     memory=round(machine_type.memory_mb / 1024, 1),
                     gpu_count=(machine_type.accelerators[0].guest_accelerator_count if gpu else 0),
                     # gpu_name is canonicalized and gpu_vendor is set later
-                    # in make_catalog_items(), for now we use AcceleratorType.name
+                    # in _make_offers(), for now we use AcceleratorType.name
                     # as a name (it contains a vendor prefix like "nvidia-")
                     gpu_name=(
                         machine_type.accelerators[0].guest_accelerator_type if gpu else None
@@ -257,7 +257,7 @@ class GCPProvider(AbstractProvider):
                 zone_machine_types.append(machine_type)
             return zone_machine_types
 
-        machine_types = []
+        machine_types: list[_MachineType] = []
         futures = []
         with ThreadPoolExecutor(max_workers=8) as ex:
             for region in self.regions_client.list(project=self.project):
@@ -268,12 +268,12 @@ class GCPProvider(AbstractProvider):
             machine_types.extend(future.result())
         return machine_types
 
-    def add_gpus(self, machine_types: list[_MachineType]):
-        def _list_zone_machine_types(
+    def _make_gpu_machine_types(self, machine_types: list[_MachineType]) -> list[_MachineType]:
+        def _make_zone_gpu_machine_types(
             zone: str, zone_n1_machine_types: list[_MachineType]
         ) -> list[_MachineType]:
             logger.info("Fetching GPUs for zone %s", zone)
-            zone_machine_types = []
+            zone_machine_types: list[_MachineType] = []
             for accelerator in self.accelerator_types_client.list(project=self.project, zone=zone):
                 if accelerator.name not in accelerator_limits:
                     continue
@@ -295,21 +295,23 @@ class GCPProvider(AbstractProvider):
             if mt.instance_name.startswith("n1-"):
                 n1_machine_types[mt.location].append(mt)
 
-        machine_types_with_gpus = []
+        machine_types_with_gpus: list[_MachineType] = []
         futures = []
         with ThreadPoolExecutor(max_workers=8) as ex:
             for zone, zone_n1_machine_types in n1_machine_types.items():
-                futures.append(ex.submit(_list_zone_machine_types, zone, zone_n1_machine_types))
+                futures.append(
+                    ex.submit(_make_zone_gpu_machine_types, zone, zone_n1_machine_types)
+                )
         for future in as_completed(futures):
             machine_types_with_gpus.extend(future.result())
-        machine_types += machine_types_with_gpus
+        return machine_types_with_gpus
 
-    def make_catalog_items(self, machine_types: list[_MachineType]) -> list[CatalogItem]:
+    def _make_offers(self, machine_types: list[_MachineType]) -> list[CatalogItem]:
         logger.info("Fetching prices")
         skus = self.cloud_catalog_client.list_skus(parent=compute_service)
         prices = Prices()
         prices.add_skus(skus)
-        items = []
+        offers: list[CatalogItem] = []
         for machine_type in machine_types:
             gpu_vendor = None
             gpu_name = None
@@ -342,8 +344,8 @@ class GCPProvider(AbstractProvider):
                         "is_dws_calendar_mode": capacity_type is CapacityType.DWS_CALENDAR_MODE
                     },
                 )
-                items.append(item)
-        return items
+                offers.append(item)
+        return offers
 
 
 class GCPCatalogItemProviderData(TypedDict):
@@ -510,8 +512,8 @@ class Prices:
         return instance_name.split("-")[0]
 
 
-def set_flags(catalog_items: list[CatalogItem]) -> None:
-    for item in catalog_items:
+def _set_flags(offers: list[CatalogItem]) -> None:
+    for item in offers:
         if cast(GCPCatalogItemProviderData, item.provider_data).get("is_dws_calendar_mode"):
             item.flags.append("gcp-dws-calendar-mode")
         if item.instance_name.startswith("a4-"):
@@ -521,31 +523,31 @@ def set_flags(catalog_items: list[CatalogItem]) -> None:
 
 
 # TODO: drop when dstack 0.19.33 is no longer relevant
-def add_legacy_g4_preview(catalog_items: list[CatalogItem]) -> list[CatalogItem]:
+def _with_legacy_g4_preview(offers: list[CatalogItem]) -> list[CatalogItem]:
     """
     For each g4-standard-* instance, add a duplicate item with the "gcp-g4-preview" flag.
 
     This is only needed for dstack 0.19.33, where the flag "gcp-g4-preview"
     is used instead of "gcp-g4".
     """
-    new_items = []
-    for item in catalog_items:
-        new_items.append(item)
+    new_offers: list[CatalogItem] = []
+    for item in offers:
+        new_offers.append(item)
         if item.instance_name.startswith("g4-standard-"):
             preview_item = copy.deepcopy(item)
             preview_item.flags.remove("gcp-g4")
             preview_item.flags.append("gcp-g4-preview")
-            new_items.append(preview_item)
-    return new_items
+            new_offers.append(preview_item)
+    return new_offers
 
 
-def get_tpu_offers(project_id: str) -> list[CatalogItem]:
+def _make_tpu_offers(project_id: str) -> list[CatalogItem]:
     logger.info("Fetching TPU offers")
-    raw_catalog_items: list[CatalogItem] = []
-    catalog_items: list[dict] = get_catalog_items(project_id)
+    offers: list[CatalogItem] = []
+    tpu_configs: list[dict] = _get_priced_tpu_configs(project_id)
     # For some TPU offers in some regions, GCP does not list prices at all. Skip such offers.
-    filtered_catalog_items = [item for item in catalog_items if item["price"] is not None]
-    for item in filtered_catalog_items:
+    priced_tpu_configs = [config for config in tpu_configs if config["price"] is not None]
+    for item in priced_tpu_configs:
         hardware_spec = get_tpu_hardware_spec(item["instance_name"])
         if hardware_spec is None:
             logger.debug("No TPU hardware spec for %s", item["instance_name"])
@@ -564,16 +566,16 @@ def get_tpu_offers(project_id: str) -> list[CatalogItem]:
             spot=False,
             disk_size=None,
         )
-        raw_catalog_items.append(on_demand_item)
+        offers.append(on_demand_item)
         if item["spot"]:
             spot_item = copy.deepcopy(on_demand_item)
             spot_item.price = item["spot"]
             spot_item.spot = True
-            raw_catalog_items.append(spot_item)
-    return raw_catalog_items
+            offers.append(spot_item)
+    return offers
 
 
-def get_catalog_items(project_id: str) -> list[dict]:
+def _get_priced_tpu_configs(project_id: str) -> list[dict]:
     """
     Returns TPU configurations with pricing info.
     Each configuration contains on-demand price and spot price but any price can be missing.
@@ -747,7 +749,7 @@ def find_base_price_v5(
 
 def get_tpu_configs(project_id: str) -> list[dict]:
     def _list_zone_configs(zone: str) -> list[dict]:
-        zone_instances = []
+        zone_instances: list[dict] = []
         if zone in ["us-east1-b"]:
             # These zones return
             # google.api_core.exceptions.ServiceUnavailable: 503 502:Bad Gateway

@@ -82,7 +82,7 @@ class NebiusProvider(AbstractProvider):
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[CatalogItem]:
-        items: list[CatalogItem] = []
+        offers: list[CatalogItem] = []
         sdk = SDK(credentials=self.credentials)
         calculator = CalculatorServiceClient(sdk)
         try:
@@ -99,14 +99,14 @@ class NebiusProvider(AbstractProvider):
                             price = get_price(
                                 calculator, project_id, platform.metadata.name, preset.name, spot
                             )
-                            item = make_item(
+                            offer = _make_offer(
                                 platform.metadata.name, preset, gpu, region, spot, price
                             )
-                            if item is not None:
-                                items.append(item)
+                            if offer is not None:
+                                offers.append(offer)
         finally:
             sdk.sync_close(timeout=TIMEOUT)
-        return sorted(items, key=lambda i: i.price)
+        return sorted(offers, key=lambda i: i.price)
 
 
 class NebiusCatalogItemProviderData(TypedDict):
@@ -147,7 +147,7 @@ def get_price(
     estimate = calculator.estimate(
         request=EstimateRequest(resource_spec=ResourceSpec(compute_instance_spec=spec))
     ).wait()
-    return float(get_or_error(estimate.hourly_cost.general).total.cost)
+    return float(get_or_error(estimate.hourly_cost.general, "general hourly cost").total.cost)
 
 
 def list_platforms(sdk: SDK, project_id: str) -> ListPlatformsResponse:
@@ -173,7 +173,7 @@ def get_gpu_info(platform: Platform) -> AcceleratorInfo | None:
     return accelerator_info[0]
 
 
-def make_item(
+def _make_offer(
     platform: str,
     preset: Preset,
     gpu: AcceleratorInfo | None,

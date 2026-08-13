@@ -171,7 +171,7 @@ class AzureProvider(AbstractProvider):
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[CatalogItem]:
-        catalog_items = []
+        offers: list[CatalogItem] = []
         instance_name_to_spec_map = self.get_instance_specs()
         for page in self.get_pages():
             for sku_item in page:
@@ -185,13 +185,13 @@ class AzureProvider(AbstractProvider):
                 spec = instance_name_to_spec_map.get(sku_item["armSkuName"])
                 if spec is None:
                     continue
-                catalog_item = spec.to_catalog_item(
+                offer = spec.to_catalog_item(
                     location=sku_item["armRegionName"],
                     price=price,
                     spot="Spot" in sku_item["meterName"],
                 )
-                catalog_items.append(catalog_item)
-        return sorted(catalog_items, key=lambda i: i.price)
+                offers.append(offer)
+        return sorted(offers, key=lambda i: i.price)
 
     def get_instance_specs(self) -> dict[str, _InstanceSpec]:
         logger.info("Fetching instance details")
@@ -203,7 +203,10 @@ class AzureProvider(AbstractProvider):
                 continue
             if is_retired(resource.name):
                 continue
-            capabilities = {pair.name: pair.value for pair in get_or_error(resource.capabilities)}
+            capabilities = {
+                pair.name: pair.value
+                for pair in get_or_error(resource.capabilities, "resource capabilities")
+            }
             cpu = capabilities.get("vCPUs")
             memory = capabilities.get("MemoryGB")
             if not cpu:
@@ -214,7 +217,7 @@ class AzureProvider(AbstractProvider):
                 continue
             gpu_count, gpu_name, gpu_memory = 0, None, None
             if "GPUs" in capabilities:
-                gpu_count = int(get_or_error(capabilities["GPUs"]))
+                gpu_count = int(get_or_error(capabilities["GPUs"], "GPUs capability"))
                 gpu_name, gpu_memory = get_gpu_name_memory(resource.name)
                 if gpu_name is None and gpu_count:
                     logger.warning("Can't parse VM name: %s", resource.name)

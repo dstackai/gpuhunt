@@ -30,7 +30,7 @@ class LambdaLabsProvider(AbstractProvider):
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[CatalogItem]:
-        offers = []
+        offers: list[CatalogItem] = []
         regions = self.list_regions()
         resp = self.session.get(INSTANCE_TYPES_URL, timeout=TIMEOUT)
         resp.raise_for_status()

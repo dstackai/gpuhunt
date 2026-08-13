@@ -56,7 +56,7 @@ class JarvisLabsProvider(AbstractProvider):
 
     def fetch_offers(self, query_filter: QueryFilter | None = None) -> list[CatalogItem]:
         response = self._make_request("GET", SERVER_META_PATH)
-        return convert_response_to_raw_catalog_items(response.json())
+        return _make_offers(response.json())
 
     def _make_request(self, method: str, path: str) -> Response:
         response = requests.request(
@@ -69,15 +69,15 @@ class JarvisLabsProvider(AbstractProvider):
         return response
 
 
-def convert_response_to_raw_catalog_items(data: dict) -> list[CatalogItem]:
-    offers = []
+def _make_offers(data: dict) -> list[CatalogItem]:
+    offers: list[CatalogItem] = []
     for gpu in data.get("server_meta") or []:
-        offers.extend(_make_gpu_catalog_items(gpu))
-    offers.extend(_make_cpu_catalog_items(data.get("cpu_meta") or {}))
+        offers.extend(_make_gpu_offers(gpu))
+    offers.extend(_make_cpu_offers(data.get("cpu_meta") or {}))
     return offers
 
 
-def _make_gpu_catalog_items(gpu: dict) -> list[CatalogItem]:
+def _make_gpu_offers(gpu: dict) -> list[CatalogItem]:
     region = gpu.get("region")
     if not region:
         return []
@@ -119,7 +119,7 @@ def _make_gpu_catalog_items(gpu: dict) -> list[CatalogItem]:
         logger.warning("Skipping JarvisLabs GPU offer without CPU/RAM: %s", gpu_type)
         return []
 
-    items = _make_gpu_catalog_items_for_price(
+    offers = _make_gpu_offers_for_price(
         region=region,
         gpu_name=gpu_name,
         gpu_memory=gpu_memory,
@@ -134,10 +134,10 @@ def _make_gpu_catalog_items(gpu: dict) -> list[CatalogItem]:
 
     # JarvisLabs supports spot for containers/templates, not VMs. This provider
     # only publishes VM-capable offers because dstack provisions JarvisLabs VMs.
-    return items
+    return offers
 
 
-def _make_gpu_catalog_items_for_price(
+def _make_gpu_offers_for_price(
     *,
     region: str,
     gpu_name: str,
@@ -150,12 +150,12 @@ def _make_gpu_catalog_items_for_price(
     provider_data: JSONObject,
     spot: bool,
 ) -> list[CatalogItem]:
-    items = []
+    offers: list[CatalogItem] = []
     for gpu_count in _supported_gpu_counts(
         available_devices=available_devices,
         max_gpus_per_instance=max_gpus_per_instance,
     ):
-        items.append(
+        offers.append(
             CatalogItem(
                 provider=JarvisLabsProvider.NAME,
                 instance_name=_gpu_instance_name(gpu_name, gpu_count),
@@ -172,11 +172,11 @@ def _make_gpu_catalog_items_for_price(
                 provider_data=provider_data,
             )
         )
-    return items
+    return offers
 
 
-def _make_cpu_catalog_items(cpu_meta: dict) -> list[CatalogItem]:
-    offers = []
+def _make_cpu_offers(cpu_meta: dict) -> list[CatalogItem]:
+    offers: list[CatalogItem] = []
     # The JarvisLabs SDK resolves CPU VMs from cpu_meta.combinations and creates them via
     # templates/vm/cpu/create; cpu_meta.workload_type is not the GPU workload selector.
     for combo in cpu_meta.get("combinations") or []:
@@ -251,18 +251,18 @@ def _gpu_instance_name(gpu_name: str, gpu_count: int) -> str:
 
 
 def _as_int(value: object) -> int | None:
-    if value is None or value == "":
+    if not isinstance(value, str | int | float) or value == "":
         return None
     try:
-        return int(value)  # pyright: ignore[reportArgumentType]
-    except (TypeError, ValueError):
+        return int(value)
+    except ValueError:
         return None
 
 
 def _as_float(value: object) -> float | None:
-    if value is None or value == "":
+    if not isinstance(value, str | int | float) or value == "":
         return None
     try:
-        return float(value)  # pyright: ignore[reportArgumentType]
-    except (TypeError, ValueError):
+        return float(value)
+    except ValueError:
         return None

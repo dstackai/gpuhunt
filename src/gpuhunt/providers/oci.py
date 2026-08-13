@@ -50,9 +50,12 @@ class OCIProvider(AbstractProvider):
     ) -> list[CatalogItem]:
         shapes = self.cost_estimator.get_shapes()
         products = self.cost_estimator.get_products()
-        regions: list[Region] = get_or_error(self.api_client.list_regions()).data
+        regions: list[Region] = get_or_error(
+            self.api_client.list_regions(), "list_regions response"
+        ).data
+        region_names = [get_or_error(region.name, "region name") for region in regions]
 
-        result = []
+        offers: list[CatalogItem] = []
 
         for shape in shapes.items:
             if (
@@ -71,12 +74,11 @@ class OCIProvider(AbstractProvider):
                     "Skipping shape %s due to unexpected Cost Estimator data: %s", shape.name, e
                 )
                 continue
-            for region in regions:
-                assert isinstance(region.name, str)
+            for region_name in region_names:
                 on_demand_item = CatalogItem(
                     provider=OCIProvider.NAME,
                     instance_name=shape.name,
-                    location=region.name,
+                    location=region_name,
                     price=resources.total_price(),
                     cpu=resources.cpu.vcpus,
                     memory=resources.memory.gbs,
@@ -89,13 +91,13 @@ class OCIProvider(AbstractProvider):
                 )
                 item_variations = [on_demand_item]
                 if shape.allow_preemptible:
-                    item_variations.append(self._make_spot_item(on_demand_item))
-                result.extend(item_variations)
+                    item_variations.append(self._make_spot_offer(on_demand_item))
+                offers.extend(item_variations)
 
-        return sorted(result, key=lambda i: i.price)
+        return sorted(offers, key=lambda i: i.price)
 
     @staticmethod
-    def _make_spot_item(item: CatalogItem) -> CatalogItem:
+    def _make_spot_offer(item: CatalogItem) -> CatalogItem:
         item = copy.deepcopy(item)
         item.spot = True
         # > Preemptible capacity costs 50% less than on-demand capacity

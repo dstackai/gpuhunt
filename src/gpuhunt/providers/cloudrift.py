@@ -20,18 +20,18 @@ class CloudRiftProvider(AbstractProvider):
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[CatalogItem]:
         instance_types = self._get_instance_types()
-        instance_types = [
-            inst for instance in instance_types for inst in generate_instances(instance)
-        ]
-        return sorted(instance_types, key=lambda x: x.price)
+        offers = [offer for instance in instance_types for offer in _make_offers(instance)]
+        return sorted(offers, key=lambda i: i.price)
 
-    def _get_instance_types(self):
+    def _get_instance_types(self) -> list[dict]:
         request_data = {"selector": {"ByServiceAndLocation": {"services": ["vm"]}}}
         response_data = _make_request("instance-types/list", request_data)
-        return response_data["instance_types"]  # pyright: ignore[reportArgumentType]
+        if not isinstance(response_data, dict):
+            raise ValueError(f"Unexpected instance-types/list response: {response_data!r}")
+        return response_data["instance_types"]
 
 
-def generate_instances(instance) -> list[CatalogItem]:
+def _make_offers(instance: dict) -> list[CatalogItem]:
     instance_gpu_brand = instance["brand_short"]
     gpu_info = next(
         (gpu_record for gpu_record in GPU_MAP if gpu_record[0] in instance_gpu_brand), None

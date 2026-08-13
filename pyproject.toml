@@ -54,6 +54,7 @@ dev = [
     "pre-commit",
     "pytest~=7.0",
     "pytest-mock",
+    "pyright==1.1.403",  # Should match the pinned version in CI
     "ruff==0.5.3",  # Should match .pre-commit-config.yaml
     "requests-mock",
 ]
@@ -78,5 +79,5 @@ combine-as-imports = true
 [tool.pyright]
 typeCheckingMode = "standard"
 include = [
-    "src/gpuhunt"
+    "src/"
 ]

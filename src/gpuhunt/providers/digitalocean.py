@@ -29,7 +29,7 @@ class DigitalOceanProvider(AbstractProvider):
     def fetch_offers(self) -> list[CatalogItem]:
         url = "/v2/sizes"
         response = self._make_request("GET", url)
-        return convert_response_to_raw_catalog_items(response)
+        return _make_offers(response)
 
     def _make_request(self, method: str, url: str):
         full_url = f"{self.api_url}{url}"
@@ -45,9 +45,9 @@ class DigitalOceanProvider(AbstractProvider):
         return response
 
 
-def convert_response_to_raw_catalog_items(response) -> list[CatalogItem]:
+def _make_offers(response) -> list[CatalogItem]:
     data = response.json()
-    offers = []
+    offers: list[CatalogItem] = []
 
     for size in data["sizes"]:
         gpu_info = size.get("gpu_info")

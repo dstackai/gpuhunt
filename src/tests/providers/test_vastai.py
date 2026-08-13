@@ -4,7 +4,7 @@ from gpuhunt.providers.vastai import VastAIProvider
 
 def test_make_filters_defaults_to_datacenter_only():
     filters = VastAIProvider(community_cloud=False).make_filters(QueryFilter())
-    assert filters["datacenter"]["eq"] is True
+    assert filters["datacenter"] == {"eq": True}
     assert "external" not in filters
 
 

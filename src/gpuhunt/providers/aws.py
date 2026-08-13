@@ -119,13 +119,13 @@ class AWSProvider(AbstractProvider):
         if not os.path.exists(self.cache_path):
             self._download_pricing_file()
 
-        offers = []
+        offers: list[CatalogItem] = []
         with open(self.cache_path, newline="") as f:
             for _ in range(disclaimer_rows_skip):
                 f.readline()
             reader: Iterable[dict[str, str]] = csv.DictReader(f)
             for row in reader:
-                if self.skip(row):
+                if self._skip(row):
                     continue
                 gpu_count = _parse_gpu_count(row["GPU"])
                 if gpu_count is None:
@@ -145,11 +145,11 @@ class AWSProvider(AbstractProvider):
                     disk_size=None,
                 )
                 offers.append(offer)
-        self.fill_gpu_details(offers)
-        offers = self.add_spots(offers)
+        self._fill_gpu_details(offers)
+        offers = self._with_spot_offers(offers)
         return sorted(offers, key=lambda i: i.price)
 
-    def skip(self, row: dict[str, str]) -> bool:
+    def _skip(self, row: dict[str, str]) -> bool:
         if any(row["Instance Type"].startswith(family) for family in previous_generation_families):
             return True
         for key, values in pricing_filters.items():
@@ -157,7 +157,7 @@ class AWSProvider(AbstractProvider):
                 return True
         return False
 
-    def fill_gpu_details(self, offers: list[CatalogItem]):
+    def _fill_gpu_details(self, offers: list[CatalogItem]) -> None:
         regions = defaultdict(list)
         non_ec2_api_regions = set()
         for offer in offers:
@@ -332,7 +332,7 @@ class AWSProvider(AbstractProvider):
                     e,
                 )
 
-    def add_spots(self, offers: list[CatalogItem]) -> list[CatalogItem]:
+    def _with_spot_offers(self, offers: list[CatalogItem]) -> list[CatalogItem]:
         region_instances = defaultdict(set)
         non_ec2_api_regions = set()
         for offer in offers:
@@ -355,7 +355,7 @@ class AWSProvider(AbstractProvider):
             for future in as_completed(future_to_region):
                 spot_prices.update(future.result())
 
-        spot_offers = []
+        spot_offers: list[CatalogItem] = []
         for offer in offers:
             if (price := spot_prices.get((offer.instance_name, offer.location))) is None:
                 continue

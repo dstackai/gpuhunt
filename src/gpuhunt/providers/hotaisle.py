@@ -33,7 +33,7 @@ class HotAisleProvider(AbstractProvider):
         for details."""
         url = f"/teams/{self.team_handle}/virtual_machines/available/"
         response = self._make_request("GET", url)
-        return convert_response_to_raw_catalog_items(response)
+        return _make_offers(response)
 
     def _make_request(self, method: str, url: str) -> Response:
         full_url = f"{API_URL}{url}"
@@ -58,9 +58,9 @@ def get_gpu_memory(gpu_name: str) -> float | None:
     return None
 
 
-def convert_response_to_raw_catalog_items(response: Response) -> list[CatalogItem]:
+def _make_offers(response: Response) -> list[CatalogItem]:
     data = response.json()
-    offers = []
+    offers: list[CatalogItem] = []
     for item in data:
         price_in_cents = item["OnDemandPrice"]
         price = float(price_in_cents) / 100

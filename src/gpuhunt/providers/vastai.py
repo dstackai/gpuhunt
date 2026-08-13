@@ -2,7 +2,7 @@ import copy
 import logging
 import re
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any, Literal, cast
 
 import requests
@@ -45,7 +45,7 @@ class VastAIProvider(AbstractProvider):
         resp.raise_for_status()
         data = resp.json()
 
-        instance_offers = []
+        offers: list[CatalogItem] = []
         for offer in data["offers"]:
             cpu_cores = offer["cpu_cores"]
             # although this is not stated in the docs, the value can be None
@@ -89,12 +89,15 @@ class VastAIProvider(AbstractProvider):
                 offer_variants.append(spot_offer)
 
             offer_variants.sort(key=lambda i: i.price)
-            instance_offers.extend(offer_variants)
-        return instance_offers
+            offers.extend(offer_variants)
+        return offers
 
-    def make_filters(
-        self, q: QueryFilter
-    ) -> dict[str, FilterValue | dict[Operators, FilterValue]]:
+    def make_filters(self, q: QueryFilter) -> dict[str, Any]:
+        """
+        Build the bundles request body: per-field operator constraints, plus the
+        `limit` and `order` query params.
+        """
+
         filters: dict[str, Any] = defaultdict(dict)
         if q.min_cpu is not None:
             filters["cpu_cores"]["gte"] = q.min_cpu
@@ -146,15 +149,18 @@ class VastAIProvider(AbstractProvider):
         return filters
 
     @staticmethod
-    def satisfies_filters(offer: dict, filters: dict[str, dict[Operators, FilterValue]]) -> bool:
-        for key in filters:
+    def satisfies_filters(offer: dict, filters: Mapping[str, Any]) -> bool:
+        for key, constraints in filters.items():
             # `datacenter`/`external` are query scope controls.
             # They don't map to offer fields with strict eq semantics.
             if key in {"datacenter", "external"}:
                 continue
             if key not in offer:
                 continue
-            for op, value in filters[key].items():
+            if not isinstance(constraints, dict):
+                # `limit`/`order` are query params, not per-field constraints
+                continue
+            for op, value in constraints.items():
                 if op == "lt" and offer[key] >= value:
                     return False
                 if op == "lte" and offer[key] > value:

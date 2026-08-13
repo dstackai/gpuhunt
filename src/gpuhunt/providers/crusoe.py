@@ -87,15 +87,15 @@ class CrusoeProvider(AbstractProvider):
         capacities = self._get_capacities()
         available = _get_available_type_locations(capacities)
 
-        offers = []
+        offers: list[CatalogItem] = []
         for product_name, locations in available.items():
             spec = type_specs.get(product_name)
             if spec is None:
                 logger.warning("Capacity for unknown instance type %s, skipping", product_name)
                 continue
 
-            items = _make_catalog_items(product_name, spec, locations)
-            offers.extend(items)
+            product_offers = _make_offers(product_name, spec, locations)
+            offers.extend(product_offers)
 
         return sorted(offers, key=lambda i: i.price)
 
@@ -154,17 +154,17 @@ def _get_available_type_locations(capacities: list[dict]) -> dict[str, list[str]
     return dict(result)
 
 
-def _make_catalog_items(product_name: str, spec: dict, locations: list[str]) -> list[CatalogItem]:
+def _make_offers(product_name: str, spec: dict, locations: list[str]) -> list[CatalogItem]:
     gpu_type = spec.get("gpu_type", "")
     num_gpu = spec.get("num_gpu", 0)
 
     if num_gpu > 0 and gpu_type:
-        return _make_gpu_items(product_name, spec, gpu_type, locations)
+        return _make_gpu_offers(product_name, spec, gpu_type, locations)
     else:
-        return _make_cpu_items(product_name, spec, locations)
+        return _make_cpu_offers(product_name, spec, locations)
 
 
-def _make_gpu_items(
+def _make_gpu_offers(
     product_name: str, spec: dict, gpu_type: str, locations: list[str]
 ) -> list[CatalogItem]:
     gpu_info = GPU_TYPE_MAP.get(gpu_type)
@@ -180,7 +180,7 @@ def _make_gpu_items(
     gpu_name, gpu_vendor, gpu_memory = gpu_info
     on_demand_per_gpu, spot_per_gpu = pricing
     num_gpu = spec["num_gpu"]
-    items = []
+    offers: list[CatalogItem] = []
     for location in locations:
         on_demand_item = CatalogItem(
             provider=CrusoeProvider.NAME,
@@ -200,22 +200,22 @@ def _make_gpu_items(
             # Used by dstack to decide whether to create a persistent data disk.
             provider_data={"disk_gb": spec.get("disk_gb", 0)},
         )
-        items.append(on_demand_item)
+        offers.append(on_demand_item)
         # TODO: Enable spot offers once we confirm how to request spot billing
         # via the VM create API (POST /v1alpha5/projects/{pid}/compute/vms/instances).
         # The API schema doesn't have an obvious spot/billing_type field.
 
-    return items
+    return offers
 
 
-def _make_cpu_items(product_name: str, spec: dict, locations: list[str]) -> list[CatalogItem]:
+def _make_cpu_offers(product_name: str, spec: dict, locations: list[str]) -> list[CatalogItem]:
     prefix = product_name.split(".")[0]
     per_vcpu = CPU_PRICING.get(prefix)
     if per_vcpu is None:
         logger.warning("No pricing for CPU prefix %s (%s), skipping", prefix, product_name)
         return []
     cpu_cores = spec["cpu_cores"]
-    items = []
+    offers: list[CatalogItem] = []
     for location in locations:
         item = CatalogItem(
             provider=CrusoeProvider.NAME,
@@ -233,5 +233,5 @@ def _make_cpu_items(product_name: str, spec: dict, locations: list[str]) -> list
             cpu_arch=_get_cpu_arch(spec),
             provider_data={"disk_gb": spec.get("disk_gb", 0)},
         )
-        items.append(item)
-    return items
+        offers.append(item)
+    return offers

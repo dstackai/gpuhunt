@@ -82,20 +82,20 @@ class TestQuery:
         assert len(catalog.query(gpu_name=["a10", "A100"])) == 3
 
 
-def catalog_item(**kwargs) -> CatalogItem:
-    values = dict(
-        provider="vultr",
+def catalog_item(
+    provider: str = "vultr", price: float = 1, gpu_name: str | None = "gpu"
+) -> CatalogItem:
+    return CatalogItem(
+        provider=provider,
         instance_name="instance",
         cpu=1,
         memory=1,
         gpu_vendor=AcceleratorVendor.NVIDIA,
         gpu_count=1,
-        gpu_name="gpu",
+        gpu_name=gpu_name,
         gpu_memory=1,
         location="location",
-        price=1,
+        price=price,
         spot=False,
         disk_size=None,
     )
-    values.update(kwargs)
-    return CatalogItem(**values)

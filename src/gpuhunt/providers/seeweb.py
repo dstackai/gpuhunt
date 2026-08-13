@@ -64,11 +64,11 @@ class SeewebProvider(AbstractProvider):
             if not isinstance(plan, dict):
                 logger.warning("Skipping malformed Seeweb plan: %r", plan)
                 continue
-            offers.extend(_convert_plan(plan))
+            offers.extend(_make_offers(plan))
         return sorted(offers, key=lambda item: item.price if item.price is not None else 0.0)
 
 
-def _convert_plan(plan: dict) -> list[CatalogItem]:
+def _make_offers(plan: dict) -> list[CatalogItem]:
     plan_name = plan.get("name")
     gpu_label = plan.get("gpu_label")
     # In the /plans response, "available" means that the plan is active. It does not indicate
@@ -109,7 +109,7 @@ def _convert_plan(plan: dict) -> list[CatalogItem]:
         )
         return []
 
-    offers = []
+    offers: list[CatalogItem] = []
     seen_regions = set()
     # These are regions where the plan is active/compatible, not a real-time capacity signal.
     # Consumers that need current capacity should query /plans/availables separately.

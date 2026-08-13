@@ -5,9 +5,9 @@ from gpuhunt import AcceleratorVendor, Catalog, CatalogItem
 from gpuhunt.providers.verda import (
     InstanceType,
     VerdaProvider,
-    generate_instances,
+    _make_offer,
+    _make_offers,
     get_gpu_name,
-    transform_instance,
 )
 
 
@@ -183,7 +183,7 @@ def list_available_instances(raw_instance_types, locations):
     spots = (True, False)
     locations = [loc["loc"] for loc in locations]
     instances = [instance_types(raw_instance_types[0])]
-    list_instances = generate_instances(spots, locations, instances)
+    list_instances = _make_offers(spots, locations, instances)
 
     assert len(list_instances) == 4
     assert [i.price for i in list_instances if i.spot] == [1, 70] * 2
@@ -302,7 +302,7 @@ def test_available_query_with_instance(mocker, raw_instance_types):
 def test_transform_instance(raw_instance_types):
     location = "ICE-01"
     is_spot = True
-    item = transform_instance(instance_types(raw_instance_types[1]), is_spot, location)
+    item = _make_offer(instance_types(raw_instance_types[1]), is_spot, location)
 
     expected = CatalogItem(
         provider="verda",
@@ -325,7 +325,7 @@ def test_transform_instance(raw_instance_types):
 def test_cpu_instance(raw_instance_types):
     location = "ICE-01"
     is_spot = False
-    item = transform_instance(instance_types(raw_instance_types[2]), is_spot, location)
+    item = _make_offer(instance_types(raw_instance_types[2]), is_spot, location)
 
     expected = CatalogItem(
         provider="verda",

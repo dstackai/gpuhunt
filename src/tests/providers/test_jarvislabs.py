@@ -3,7 +3,7 @@ from gpuhunt import Catalog
 from gpuhunt._internal.models import QueryFilter
 from gpuhunt.providers.jarvislabs import (
     JarvisLabsProvider,
-    convert_response_to_raw_catalog_items,
+    _make_offers,
 )
 
 SERVER_META_RESPONSE = {
@@ -124,8 +124,8 @@ SERVER_META_RESPONSE = {
 }
 
 
-def test_convert_response_to_raw_catalog_items():
-    offers = convert_response_to_raw_catalog_items(SERVER_META_RESPONSE)
+def test_make_offers():
+    offers = _make_offers(SERVER_META_RESPONSE)
     assert not any(o.spot for o in offers)
 
     l4_vm = [o for o in offers if o.gpu_name == "L4" and not o.spot]
@@ -174,7 +174,7 @@ def test_convert_response_to_raw_catalog_items():
 
 
 def test_convert_response_warns_and_skips_unsupported_regions(caplog):
-    convert_response_to_raw_catalog_items(SERVER_META_RESPONSE)
+    _make_offers(SERVER_META_RESPONSE)
 
     assert "Skipping JarvisLabs GPU VM offer in unsupported region unknown-region" in caplog.text
     assert "Skipping JarvisLabs CPU VM offer in unsupported region unknown-region" in caplog.text
@@ -196,7 +196,7 @@ def test_convert_response_skips_unmapped_gpu_types_with_spaces(caplog):
         ],
     }
 
-    assert convert_response_to_raw_catalog_items(response) == []
+    assert _make_offers(response) == []
     assert "Skipping JarvisLabs GPU offer with unmapped gpu_type: RTX A6000" in caplog.text
 
 
@@ -237,7 +237,7 @@ def test_convert_response_skips_malformed_specs(caplog):
         },
     }
 
-    offers = convert_response_to_raw_catalog_items(response)
+    offers = _make_offers(response)
 
     assert offers == []
     assert "Skipping JarvisLabs GPU offer without price: L4" in caplog.text

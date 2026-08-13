@@ -11,7 +11,7 @@ def test_cpu_size_ladder():
     assert _cpu_size_ladder(3, 20) == [3, 6, 12, 20]
 
 
-def test_make_cpu_catalog_items():
+def test_make_cpu_offers():
     provider = object.__new__(RunpodProvider)
     cpu_flavors = [
         {
@@ -28,7 +28,7 @@ def test_make_cpu_catalog_items():
         }
     ]
 
-    items = provider._make_cpu_catalog_items("AP-JP-1", cpu_flavors)
+    items = provider._make_cpu_offers("AP-JP-1", cpu_flavors)
 
     assert [item.instance_name for item in items] == [
         "cpu3g-2-8",
@@ -50,7 +50,7 @@ def test_make_cpu_catalog_items():
     assert items[-1].provider_data == {}
 
 
-def test_make_cpu_catalog_items_skips_invalid_flavors():
+def test_make_cpu_offers_skips_invalid_flavors():
     provider = object.__new__(RunpodProvider)
     cpu_flavors = [
         {
@@ -127,7 +127,7 @@ def test_make_cpu_catalog_items_skips_invalid_flavors():
         },
     ]
 
-    assert provider._make_cpu_catalog_items("AP-JP-1", cpu_flavors) == []
+    assert provider._make_cpu_offers("AP-JP-1", cpu_flavors) == []
 
 
 def test_fetch_cpu_offers_handles_partial_datacenter_failures(monkeypatch):
