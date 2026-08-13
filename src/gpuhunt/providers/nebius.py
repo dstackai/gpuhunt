@@ -40,6 +40,7 @@ from gpuhunt._internal.models import (
 )
 from gpuhunt._internal.utils import get_or_error
 from gpuhunt.providers import AbstractProvider
+from gpuhunt.version import __version__
 
 logger = logging.getLogger(__name__)
 TIMEOUT = 7
@@ -83,7 +84,10 @@ class NebiusProvider(AbstractProvider):
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
     ) -> list[CatalogItem]:
         offers: list[CatalogItem] = []
-        sdk = SDK(credentials=self.credentials)
+        sdk = SDK(
+            credentials=self.credentials,
+            user_agent_prefix=f"gpuhunt/{__version__}",
+        )
         calculator = CalculatorServiceClient(sdk)
         try:
             region_to_project_id = get_sample_projects(sdk)
