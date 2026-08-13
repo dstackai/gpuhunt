@@ -82,9 +82,9 @@ class RawCatalogItem:
     gpu_memory: float | None
     spot: bool
     disk_size: float | None
-    gpu_vendor: str | None = None
+    gpu_vendor: AcceleratorVendor | None = None
     flags: list[str] = field(default_factory=list)
-    cpu_arch: str | None = None
+    cpu_arch: CPUArchitecture | None = None
     provider_data: JSONObject = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -104,30 +104,36 @@ class RawCatalogItem:
                 # None or 0
                 return
             if is_tpu:
-                self.gpu_vendor = AcceleratorVendor.GOOGLE.value
+                self.gpu_vendor = AcceleratorVendor.GOOGLE
             else:
-                self.gpu_vendor = AcceleratorVendor.NVIDIA.value
+                self.gpu_vendor = AcceleratorVendor.NVIDIA
         elif isinstance(gpu_vendor, AcceleratorVendor):
-            self.gpu_vendor = gpu_vendor.value
+            self.gpu_vendor = gpu_vendor
 
     def _process_cpu_arch(self) -> None:
         # This heuristic will be required indefinitely since we support historical catalogs.
         cpu_arch = self.cpu_arch
         if cpu_arch is None:
-            self.cpu_arch = CPUArchitecture.X86.value
+            self.cpu_arch = CPUArchitecture.X86
         elif isinstance(cpu_arch, CPUArchitecture):
-            self.cpu_arch = cpu_arch.value
+            self.cpu_arch = cpu_arch
 
     @staticmethod
     def from_dict(v: dict[str, str | None]) -> "RawCatalogItem":
+        cpu_arch = None
+        if raw_cpu_arch := load_optional(v.get("cpu_arch")):
+            cpu_arch = CPUArchitecture(raw_cpu_arch)
+        gpu_vendor = None
+        if raw_gpu_vendor := load_optional(v.get("gpu_vendor")) is not None:
+            gpu_vendor = AcceleratorVendor(raw_gpu_vendor)
         return RawCatalogItem(
             instance_name=load_required(v.get("instance_name")),
             location=load_required(v.get("location")),
             price=load_required(v.get("price"), loader=float),
-            cpu_arch=load_optional(v.get("cpu_arch")),
+            cpu_arch=cpu_arch,
             cpu=load_required(v.get("cpu"), loader=int),
             memory=load_required(v.get("memory"), loader=float),
-            gpu_vendor=load_optional(v.get("gpu_vendor")),
+            gpu_vendor=gpu_vendor,
             gpu_count=load_required(v.get("gpu_count"), loader=int),
             gpu_name=load_optional(v.get("gpu_name")),
             gpu_memory=load_optional(v.get("gpu_memory"), loader=float),
@@ -140,6 +146,8 @@ class RawCatalogItem:
     def dict(self) -> dict[str, str | int | float | bool | None]:
         return {
             **asdict(self),
+            "cpu_arch": self.cpu_arch.value if self.cpu_arch else None,
+            "gpu_vendor": self.gpu_vendor.value if self.gpu_vendor else None,
             "flags": " ".join(self.flags),
             "provider_data": json.dumps(self.provider_data),
         }

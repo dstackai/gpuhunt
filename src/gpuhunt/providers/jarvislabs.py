@@ -162,7 +162,7 @@ def _make_gpu_catalog_items_for_price(
                 price=round(price * gpu_count, 5),
                 cpu=cpu_per_gpu * gpu_count,
                 memory=ram_per_gpu * gpu_count,
-                gpu_vendor=AcceleratorVendor.NVIDIA.value,
+                gpu_vendor=AcceleratorVendor.NVIDIA,
                 gpu_count=gpu_count,
                 gpu_name=gpu_name,
                 gpu_memory=gpu_memory,

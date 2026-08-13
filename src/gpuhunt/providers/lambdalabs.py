@@ -52,7 +52,7 @@ class LambdaLabsProvider(AbstractProvider):
                 offer = RawCatalogItem(
                     instance_name=instance["name"],
                     price=instance["price_cents_per_hour"] / 100,
-                    cpu_arch=cpu_arch.value,
+                    cpu_arch=cpu_arch,
                     cpu=instance["specs"]["vcpus"],
                     memory=float(instance["specs"]["memory_gib"]) * 1.074,
                     gpu_vendor=None,

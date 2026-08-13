@@ -134,11 +134,11 @@ class CrusoeProvider(AbstractProvider):
         return requests.request(method, url, headers=headers, params=params, timeout=TIMEOUT)
 
 
-def _get_cpu_arch(spec: dict) -> str:
+def _get_cpu_arch(spec: dict) -> CPUArchitecture:
     cpu_type = spec.get("cpu_type", "")
     if cpu_type == "arm64":
-        return CPUArchitecture.ARM.value
-    return CPUArchitecture.X86.value
+        return CPUArchitecture.ARM
+    return CPUArchitecture.X86
 
 
 def _get_available_type_locations(capacities: list[dict]) -> dict[str, list[str]]:
@@ -190,7 +190,7 @@ def _make_gpu_items(
             price=round(num_gpu * on_demand_per_gpu, 2),
             cpu=spec["cpu_cores"],
             memory=float(spec["memory_gb"]),
-            gpu_vendor=gpu_vendor.value,
+            gpu_vendor=gpu_vendor,
             gpu_count=num_gpu,
             gpu_name=gpu_name,
             gpu_memory=gpu_memory,

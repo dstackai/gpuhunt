@@ -136,7 +136,7 @@ def _convert_plan(plan: dict) -> list[RawCatalogItem]:
                 gpu_count=gpu_count,
                 gpu_name=gpu_name,
                 gpu_memory=gpu_memory,
-                gpu_vendor=AcceleratorVendor.NVIDIA.value,
+                gpu_vendor=AcceleratorVendor.NVIDIA,
                 spot=False,
                 disk_size=disk_size,
             )

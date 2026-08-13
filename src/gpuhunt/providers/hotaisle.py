@@ -76,7 +76,7 @@ def convert_response_to_raw_catalog_items(response: Response) -> list[RawCatalog
         gpu = gpus[0]
         gpu_count = gpu["count"]
         gpu_name = gpu["model"]
-        gpu_vendor = AcceleratorVendor.AMD.value  # All GPUs are AMD with HotAisle.
+        gpu_vendor = AcceleratorVendor.AMD  # All GPUs are AMD with HotAisle.
         gpu_memory = get_gpu_memory(gpu_name)
 
         # Create instance name: cpu_model-cores-ram-gpucount-gpu

@@ -315,7 +315,7 @@ class GCPProvider(AbstractProvider):
             gpu_name = None
             if machine_type.gpu_name:
                 if machine_type.gpu_name.startswith("nvidia-"):
-                    gpu_vendor = AcceleratorVendor.NVIDIA.value
+                    gpu_vendor = AcceleratorVendor.NVIDIA
                 if acc_details := accelerator_details.get(machine_type.gpu_name):
                     gpu_name = acc_details.name
                 else:
@@ -555,7 +555,7 @@ def get_tpu_offers(project_id: str) -> list[RawCatalogItem]:
             price=item["price"],
             cpu=hardware_spec.cpu,
             memory=hardware_spec.memory_gb,
-            gpu_vendor=AcceleratorVendor.GOOGLE.value,
+            gpu_vendor=AcceleratorVendor.GOOGLE,
             gpu_count=1,
             gpu_name=item["instance_name"],
             gpu_memory=hardware_spec.hbm_gb,

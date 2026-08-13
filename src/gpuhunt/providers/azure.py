@@ -16,6 +16,7 @@ from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.compute import ComputeManagementClient
 
+from gpuhunt import AcceleratorVendor
 from gpuhunt._internal.models import QueryFilter, RawCatalogItem
 from gpuhunt._internal.utils import get_or_error
 from gpuhunt.providers import AbstractProvider
@@ -75,7 +76,7 @@ class _InstanceSpec:
     gpu_count: int
     gpu_name: str | None
     gpu_memory: float | None
-    gpu_vendor: str | None
+    gpu_vendor: AcceleratorVendor | None
 
     def to_catalog_item(self, *, location: str, price: float, spot: bool) -> RawCatalogItem:
         return RawCatalogItem(
@@ -221,7 +222,7 @@ class AzureProvider(AbstractProvider):
                 instance_name=resource.name,
                 cpu=int(cpu),
                 memory=float(memory),
-                gpu_vendor=None,
+                gpu_vendor=AcceleratorVendor.NVIDIA,
                 gpu_count=gpu_count,
                 gpu_name=gpu_name,
                 gpu_memory=gpu_memory,
