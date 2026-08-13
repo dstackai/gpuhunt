@@ -78,5 +78,8 @@ combine-as-imports = true
 [tool.pyright]
 typeCheckingMode = "standard"
 include = [
-    "src/gpuhunt/_internal"
+    "src/gpuhunt"
+]
+exclude = [
+    "src/gpuhunt/providers"
 ]

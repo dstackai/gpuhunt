@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 
 import requests
@@ -44,10 +43,7 @@ class SeewebProvider(AbstractProvider):
 
     NAME = "seeweb"
 
-    def __init__(self, token: str | None = None):
-        token = token or os.getenv("SEEWEB_API_TOKEN")
-        if not token:
-            raise ValueError("Set the SEEWEB_API_TOKEN environment variable.")
+    def __init__(self, token: str):
         self.token = token
 
     def get(

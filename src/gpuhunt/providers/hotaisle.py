@@ -1,5 +1,4 @@
 import logging
-import os
 from typing import TypedDict, cast
 
 import requests
@@ -17,15 +16,10 @@ API_URL = "https://admin.hotaisle.app/api"
 class HotAisleProvider(AbstractProvider):
     NAME = "hotaisle"
 
-    def __init__(self, api_key: str | None = None, team_handle: str | None = None):
+    def __init__(self, api_key: str, team_handle: str):
         """Hotaisle requries an API key and team handle to access the API."""
-        self.api_key = api_key or os.getenv("HOTAISLE_API_KEY")
-        self.team_handle = team_handle or os.getenv("HOTAISLE_TEAM_HANDLE")
-
-        if not self.api_key:
-            raise ValueError("Set the HOTAISLE_API_KEY environment variable.")
-        if not self.team_handle:
-            raise ValueError("Set the HOTAISLE_TEAM_HANDLE environment variable.")
+        self.api_key = api_key
+        self.team_handle = team_handle
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True

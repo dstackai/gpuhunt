@@ -41,14 +41,14 @@ def main():
     elif args.provider == "azure":
         from gpuhunt.providers.azure import AzureProvider
 
-        provider = AzureProvider(os.getenv("AZURE_SUBSCRIPTION_ID"))
+        provider = AzureProvider(os.environ["AZURE_SUBSCRIPTION_ID"])
     elif args.provider == "crusoe":
         from gpuhunt.providers.crusoe import CrusoeProvider
 
         provider = CrusoeProvider(
-            access_key=os.getenv("CRUSOE_ACCESS_KEY"),
-            secret_key=os.getenv("CRUSOE_SECRET_KEY"),
-            project_id=os.getenv("CRUSOE_PROJECT_ID"),
+            access_key=os.environ["CRUSOE_ACCESS_KEY"],
+            secret_key=os.environ["CRUSOE_SECRET_KEY"],
+            project_id=os.environ["CRUSOE_PROJECT_ID"],
         )
     elif args.provider == "cloudrift":
         from gpuhunt.providers.cloudrift import CloudRiftProvider
@@ -57,33 +57,39 @@ def main():
     elif args.provider == "verda":
         from gpuhunt.providers.verda import VerdaProvider
 
-        provider = VerdaProvider(os.getenv("VERDA_CLIENT_ID"), os.getenv("VERDA_CLIENT_SECRET"))
+        provider = VerdaProvider(
+            client_id=os.environ["VERDA_CLIENT_ID"],
+            client_secret=os.environ["VERDA_CLIENT_SECRET"],
+        )
     elif args.provider == "digitalocean":
         from gpuhunt.providers.digitalocean import DigitalOceanProvider
 
         provider = DigitalOceanProvider(
-            api_key=os.getenv("DIGITAL_OCEAN_API_KEY"), api_url=os.getenv("DIGITAL_OCEAN_API_URL")
+            api_key=os.environ["DIGITAL_OCEAN_API_KEY"],
+            api_url=os.environ["DIGITAL_OCEAN_API_URL"],
         )
     elif args.provider == "gcp":
         from gpuhunt.providers.gcp import GCPProvider
 
-        provider = GCPProvider(os.getenv("GCP_PROJECT_ID"))
+        provider = GCPProvider(project=os.environ["GCP_PROJECT_ID"])
     elif args.provider == "hotaisle":
         from gpuhunt.providers.hotaisle import HotAisleProvider
 
         provider = HotAisleProvider(
-            api_key=os.getenv("HOTAISLE_API_KEY"), team_handle=os.getenv("HOTAISLE_TEAM_HANDLE")
+            api_key=os.environ["HOTAISLE_API_KEY"],
+            team_handle=os.environ["HOTAISLE_TEAM_HANDLE"],
         )
     elif args.provider == "jarvislabs":
         from gpuhunt.providers.jarvislabs import JarvisLabsProvider
 
         provider = JarvisLabsProvider(
-            api_key=os.getenv("JL_API_KEY"), api_url=os.getenv("JARVISLABS_API_URL")
+            api_key=os.environ["JL_API_KEY"],
+            api_url=os.environ["JARVISLABS_API_URL"],
         )
     elif args.provider == "lambdalabs":
         from gpuhunt.providers.lambdalabs import LambdaLabsProvider
 
-        provider = LambdaLabsProvider(os.getenv("LAMBDALABS_TOKEN"))
+        provider = LambdaLabsProvider(token=os.environ["LAMBDALABS_TOKEN"])
     elif args.provider == "nebius":
         from nebius.base.service_account.pk_file import Reader as PKReader
 
@@ -95,9 +101,9 @@ def main():
                 os.getenv("NEBIUS_ACCESS_TOKEN")
                 # or service account credentials
                 or PKReader(
-                    filename=os.getenv("NEBIUS_PRIVATE_KEY_FILE"),
-                    public_key_id=os.getenv("NEBIUS_PUBLIC_KEY_ID"),
-                    service_account_id=os.getenv("NEBIUS_SERVICE_ACCOUNT_ID"),
+                    filename=os.environ["NEBIUS_PRIVATE_KEY_FILE"],
+                    public_key_id=os.environ["NEBIUS_PUBLIC_KEY_ID"],
+                    service_account_id=os.environ["NEBIUS_SERVICE_ACCOUNT_ID"],
                 )
             )
         )
@@ -120,7 +126,7 @@ def main():
     elif args.provider == "seeweb":
         from gpuhunt.providers.seeweb import SeewebProvider
 
-        provider = SeewebProvider(os.getenv("SEEWEB_API_TOKEN"))
+        provider = SeewebProvider(os.environ["SEEWEB_API_TOKEN"])
     elif args.provider == "vastai":
         from gpuhunt.providers.vastai import VastAIProvider
 

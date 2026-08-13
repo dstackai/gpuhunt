@@ -4,7 +4,6 @@ import datetime
 import hashlib
 import hmac
 import logging
-import os
 from collections import defaultdict
 
 import requests
@@ -68,20 +67,13 @@ class CrusoeProvider(AbstractProvider):
 
     def __init__(
         self,
-        access_key: str | None = None,
-        secret_key: str | None = None,
-        project_id: str | None = None,
+        access_key: str,
+        secret_key: str,
+        project_id: str,
     ):
-        self.access_key = access_key or os.getenv("CRUSOE_ACCESS_KEY")
-        self.secret_key = secret_key or os.getenv("CRUSOE_SECRET_KEY")
-        self.project_id = project_id or os.getenv("CRUSOE_PROJECT_ID")
-
-        if not self.access_key:
-            raise ValueError("Set the CRUSOE_ACCESS_KEY environment variable.")
-        if not self.secret_key:
-            raise ValueError("Set the CRUSOE_SECRET_KEY environment variable.")
-        if not self.project_id:
-            raise ValueError("Set the CRUSOE_PROJECT_ID environment variable.")
+        self.access_key = access_key
+        self.secret_key = secret_key
+        self.project_id = project_id
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
