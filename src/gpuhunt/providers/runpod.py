@@ -1,4 +1,3 @@
-import copy
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import cast
@@ -141,35 +140,25 @@ class RunpodProvider(AbstractProvider):
         if lowest_price_input_variables["secureCloud"]:
             location = lowest_price_input_variables["dataCenterId"]
             on_demand_gpu_price = pod["securePrice"]
-            spot_gpu_price = pod["secureSpotPrice"]
         else:
             location = lowest_price_input_variables["countryCode"]
             on_demand_gpu_price = pod["communityPrice"]
-            spot_gpu_price = pod["communitySpotPrice"]
-        item_template = RawCatalogItem(
-            instance_name=pod["id"],
-            location=location,
-            price=None,  # set below
-            cpu=pod["lowestPrice"]["minVcpu"],
-            memory=pod["lowestPrice"]["minMemory"],
-            gpu_vendor=listed_gpu_vendor_and_name[0],
-            gpu_count=lowest_price_input_variables["gpuCount"],
-            gpu_name=listed_gpu_vendor_and_name[1],
-            gpu_memory=pod["memoryInGb"],
-            spot=None,  # set below
-            disk_size=None,
-            provider_data={},
-        )
         items = []
         if on_demand_gpu_price:
-            item = copy.deepcopy(item_template)
-            item.spot = False
-            item.price = item.gpu_count * on_demand_gpu_price
-            items.append(item)
-        if spot_gpu_price:
-            item = copy.deepcopy(item_template)
-            item.spot = True
-            item.price = item.gpu_count * spot_gpu_price
+            item = RawCatalogItem(
+                instance_name=pod["id"],
+                location=location,
+                price=lowest_price_input_variables["gpuCount"] * on_demand_gpu_price,
+                cpu=pod["lowestPrice"]["minVcpu"],
+                memory=pod["lowestPrice"]["minMemory"],
+                gpu_vendor=listed_gpu_vendor_and_name[0],
+                gpu_count=lowest_price_input_variables["gpuCount"],
+                gpu_name=listed_gpu_vendor_and_name[1],
+                gpu_memory=pod["memoryInGb"],
+                spot=False,
+                disk_size=None,
+                provider_data={},
+            )
             items.append(item)
         return items
 
@@ -457,13 +446,10 @@ query GpuTypes($lowestPriceInput: GpuLowestPriceInput, $gpuTypesInput: GpuTypeFi
     displayName
     memoryInGb
     securePrice
-    secureSpotPrice
     communityPrice
-    communitySpotPrice
     oneMonthPrice
     threeMonthPrice
     sixMonthPrice
-    secureSpotPrice
     __typename
   }
 }
