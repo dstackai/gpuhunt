@@ -7,7 +7,7 @@ from requests import RequestException
 from typing_extensions import NotRequired, TypedDict
 
 from gpuhunt._internal.constraints import find_accelerators
-from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -31,12 +31,12 @@ class RunpodProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         offers = self._fetch_offers()
         return sorted(offers, key=lambda i: i.price or 0)
 
     @classmethod
-    def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
+    def filter(cls, offers: list[CatalogItem]) -> list[CatalogItem]:
         return [
             o
             for o in offers
@@ -46,7 +46,7 @@ class RunpodProvider(AbstractProvider):
             ]
         ]
 
-    def _fetch_offers(self) -> list[RawCatalogItem]:
+    def _fetch_offers(self) -> list[CatalogItem]:
         query_variables = self._build_query_variables()
         with ThreadPoolExecutor(max_workers=10) as executor:
             futures = [
@@ -129,7 +129,7 @@ class RunpodProvider(AbstractProvider):
         )
         return resp["data"]["gpuTypes"]
 
-    def _make_catalog_items(self, query_variables: dict, pod: dict) -> list[RawCatalogItem]:
+    def _make_catalog_items(self, query_variables: dict, pod: dict) -> list[CatalogItem]:
         lowest_price_input_variables = query_variables["lowestPriceInput"]
         if pod["lowestPrice"]["stockStatus"] is None:
             return []
@@ -145,7 +145,8 @@ class RunpodProvider(AbstractProvider):
             on_demand_gpu_price = pod["communityPrice"]
         items = []
         if on_demand_gpu_price:
-            item = RawCatalogItem(
+            item = CatalogItem(
+                provider=RunpodProvider.NAME,
                 instance_name=pod["id"],
                 location=location,
                 price=lowest_price_input_variables["gpuCount"] * on_demand_gpu_price,
@@ -162,7 +163,7 @@ class RunpodProvider(AbstractProvider):
             items.append(item)
         return items
 
-    def _fetch_cluster_offers(self) -> list[RawCatalogItem]:
+    def _fetch_cluster_offers(self) -> list[CatalogItem]:
         cluster_catalog_items = []
         query_variables = {
             "gpuTypesInput": {
@@ -191,7 +192,8 @@ class RunpodProvider(AbstractProvider):
                 logger.warning(f"{pod_type['id']} cluster offer missing minMemory")
                 continue
             for location in pod_type["nodeGroupDatacenters"]:
-                catalog_item = RawCatalogItem(
+                catalog_item = CatalogItem(
+                    provider=RunpodProvider.NAME,
                     instance_name=pod_type["id"],
                     location=location["id"],
                     price=pod_type["clusterPrice"] * pod_type["maxGpuCount"],
@@ -212,7 +214,7 @@ class RunpodProvider(AbstractProvider):
                 cluster_catalog_items.append(catalog_item)
         return cluster_catalog_items
 
-    def _fetch_cpu_offers(self) -> list[RawCatalogItem]:
+    def _fetch_cpu_offers(self) -> list[CatalogItem]:
         response = _make_request({"query": cpu_data_centers_query, "variables": {}})
         data_centers = [dc["id"] for dc in response["data"]["dataCenters"] if dc["listed"]]
         if len(data_centers) == 0:
@@ -245,8 +247,8 @@ class RunpodProvider(AbstractProvider):
 
     def _make_cpu_catalog_items(
         self, data_center_id: str, cpu_flavors: list[dict]
-    ) -> list[RawCatalogItem]:
-        items: list[RawCatalogItem] = []
+    ) -> list[CatalogItem]:
+        items: list[CatalogItem] = []
         for flavor in cpu_flavors:
             specifics = flavor.get("specifics") or {}
             if specifics.get("stockStatus") is None:
@@ -278,7 +280,8 @@ class RunpodProvider(AbstractProvider):
                 scale = vcpu / min_vcpu
                 price = base_secure_price * scale
                 items.append(
-                    RawCatalogItem(
+                    CatalogItem(
+                        provider=RunpodProvider.NAME,
                         instance_name=f"{flavor['id']}-{vcpu}-{memory}",
                         location=data_center_id,
                         price=price,

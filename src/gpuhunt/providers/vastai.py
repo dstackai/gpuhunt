@@ -9,7 +9,7 @@ import requests
 from typing_extensions import NotRequired, TypedDict
 
 from gpuhunt._internal.constraints import correct_gpu_memory_gib
-from gpuhunt._internal.models import QueryFilter, RawCatalogItem
+from gpuhunt._internal.models import CatalogItem, QueryFilter
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ class VastAIProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         filters: dict[str, Any] = self.make_filters(query_filter or QueryFilter())
         if self.extra_filters:
             for key, constraints in self.extra_filters.items():
@@ -62,7 +62,8 @@ class VastAIProvider(AbstractProvider):
             gpu_name = get_dstack_gpu_name(offer["gpu_name"])
             gpu_memory = correct_gpu_memory_gib(gpu_name, offer["gpu_ram"])
             disk_cost = disk_size * offer["storage_cost"] / 30 / 24
-            ondemand_offer = RawCatalogItem(
+            ondemand_offer = CatalogItem(
+                provider=VastAIProvider.NAME,
                 instance_name=str(offer["id"]),
                 location=get_location(offer["geolocation"]),
                 # storage_cost is $/gb/month

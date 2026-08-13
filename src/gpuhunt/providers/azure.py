@@ -17,7 +17,7 @@ from azure.identity import DefaultAzureCredential
 from azure.mgmt.compute import ComputeManagementClient
 
 from gpuhunt import AcceleratorVendor
-from gpuhunt._internal.models import QueryFilter, RawCatalogItem
+from gpuhunt._internal.models import CatalogItem, QueryFilter
 from gpuhunt._internal.utils import get_or_error
 from gpuhunt.providers import AbstractProvider
 
@@ -78,8 +78,9 @@ class _InstanceSpec:
     gpu_memory: float | None
     gpu_vendor: AcceleratorVendor | None
 
-    def to_catalog_item(self, *, location: str, price: float, spot: bool) -> RawCatalogItem:
-        return RawCatalogItem(
+    def to_catalog_item(self, *, location: str, price: float, spot: bool) -> CatalogItem:
+        return CatalogItem(
+            provider=AzureProvider.NAME,
             instance_name=self.instance_name,
             location=location,
             price=price,
@@ -169,7 +170,7 @@ class AzureProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         catalog_items = []
         instance_name_to_spec_map = self.get_instance_specs()
         for page in self.get_pages():
@@ -230,7 +231,7 @@ class AzureProvider(AbstractProvider):
         return instance_name_to_spec_map
 
     @classmethod
-    def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
+    def filter(cls, offers: list[CatalogItem]) -> list[CatalogItem]:
         vm_series = [
             VMSeries(r"D(\d+)s_v6", None, None),  # Dsv6-series
             VMSeries(

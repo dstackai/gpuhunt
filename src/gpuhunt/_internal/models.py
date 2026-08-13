@@ -124,7 +124,7 @@ class RawCatalogItem:
         if raw_cpu_arch := load_optional(v.get("cpu_arch")):
             cpu_arch = CPUArchitecture(raw_cpu_arch)
         gpu_vendor = None
-        if raw_gpu_vendor := load_optional(v.get("gpu_vendor")) is not None:
+        if raw_gpu_vendor := load_optional(v.get("gpu_vendor")):
             gpu_vendor = AcceleratorVendor(raw_gpu_vendor)
         return RawCatalogItem(
             instance_name=load_required(v.get("instance_name")),
@@ -180,6 +180,7 @@ class CatalogItem:
             Prefer defining a TypedDict within provider implementation.
     """
 
+    provider: str
     instance_name: str
     location: str
     price: float
@@ -190,7 +191,6 @@ class CatalogItem:
     gpu_memory: float | None
     spot: bool
     disk_size: float | None
-    provider: str
     gpu_vendor: AcceleratorVendor | None = None
     flags: list[str] = field(default_factory=list)
     cpu_arch: CPUArchitecture | None = None

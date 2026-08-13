@@ -4,7 +4,7 @@ import re
 import requests
 
 from gpuhunt._internal.constraints import find_accelerators
-from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ class SeewebProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         response = requests.get(
             f"{API_URL}/plans",
             headers={"X-APITOKEN": self.token},
@@ -59,7 +59,7 @@ class SeewebProvider(AbstractProvider):
         if not isinstance(data, dict) or not isinstance(data.get("plans"), list):
             raise ValueError("Unexpected response from Seeweb /plans endpoint")
 
-        offers: list[RawCatalogItem] = []
+        offers: list[CatalogItem] = []
         for plan in data["plans"]:
             if not isinstance(plan, dict):
                 logger.warning("Skipping malformed Seeweb plan: %r", plan)
@@ -68,7 +68,7 @@ class SeewebProvider(AbstractProvider):
         return sorted(offers, key=lambda item: item.price if item.price is not None else 0.0)
 
 
-def _convert_plan(plan: dict) -> list[RawCatalogItem]:
+def _convert_plan(plan: dict) -> list[CatalogItem]:
     plan_name = plan.get("name")
     gpu_label = plan.get("gpu_label")
     # In the /plans response, "available" means that the plan is active. It does not indicate
@@ -126,7 +126,8 @@ def _convert_plan(plan: dict) -> list[RawCatalogItem]:
             continue
         seen_regions.add(location)
         offers.append(
-            RawCatalogItem(
+            CatalogItem(
+                provider=SeewebProvider.NAME,
                 instance_name=plan_name,
                 location=location,
                 price=price,

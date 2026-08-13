@@ -19,7 +19,7 @@ from google.cloud.billing_v1.types.cloud_catalog import Sku
 from google.cloud.location import locations_pb2
 from typing_extensions import NotRequired, TypedDict
 
-from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -172,7 +172,7 @@ class GCPProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         machine_types = self.list_machine_types()
         self.add_gpus(machine_types)
         items = self.make_catalog_items(machine_types)
@@ -182,7 +182,7 @@ class GCPProvider(AbstractProvider):
         return sorted(items, key=lambda i: i.price)
 
     @classmethod
-    def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
+    def filter(cls, offers: list[CatalogItem]) -> list[CatalogItem]:
         return [
             i
             for i in offers
@@ -226,7 +226,7 @@ class GCPProvider(AbstractProvider):
         ]
 
     def list_machine_types(self) -> list[_MachineType]:
-        def _list_zone_machine_types(zone: str) -> list[RawCatalogItem]:
+        def _list_zone_machine_types(zone: str) -> list[CatalogItem]:
             zone_machine_types = []
             logger.info("Fetching machine types for zone %s", zone)
             for machine_type in self.machine_types_client.list(project=self.project, zone=zone):
@@ -304,7 +304,7 @@ class GCPProvider(AbstractProvider):
             machine_types_with_gpus.extend(future.result())
         machine_types += machine_types_with_gpus
 
-    def make_catalog_items(self, machine_types: list[_MachineType]) -> list[RawCatalogItem]:
+    def make_catalog_items(self, machine_types: list[_MachineType]) -> list[CatalogItem]:
         logger.info("Fetching prices")
         skus = self.cloud_catalog_client.list_skus(parent=compute_service)
         prices = Prices()
@@ -325,7 +325,8 @@ class GCPProvider(AbstractProvider):
                 price = prices.get_instance_price(machine_type, capacity_type)
                 if price is None:
                     continue
-                item = RawCatalogItem(
+                item = CatalogItem(
+                    provider=GCPProvider.NAME,
                     instance_name=machine_type.instance_name,
                     location=machine_type.location,
                     price=round(price, 6),
@@ -509,7 +510,7 @@ class Prices:
         return instance_name.split("-")[0]
 
 
-def set_flags(catalog_items: list[RawCatalogItem]) -> None:
+def set_flags(catalog_items: list[CatalogItem]) -> None:
     for item in catalog_items:
         if cast(GCPCatalogItemProviderData, item.provider_data).get("is_dws_calendar_mode"):
             item.flags.append("gcp-dws-calendar-mode")
@@ -520,7 +521,7 @@ def set_flags(catalog_items: list[RawCatalogItem]) -> None:
 
 
 # TODO: drop when dstack 0.19.33 is no longer relevant
-def add_legacy_g4_preview(catalog_items: list[RawCatalogItem]) -> list[RawCatalogItem]:
+def add_legacy_g4_preview(catalog_items: list[CatalogItem]) -> list[CatalogItem]:
     """
     For each g4-standard-* instance, add a duplicate item with the "gcp-g4-preview" flag.
 
@@ -538,9 +539,9 @@ def add_legacy_g4_preview(catalog_items: list[RawCatalogItem]) -> list[RawCatalo
     return new_items
 
 
-def get_tpu_offers(project_id: str) -> list[RawCatalogItem]:
+def get_tpu_offers(project_id: str) -> list[CatalogItem]:
     logger.info("Fetching TPU offers")
-    raw_catalog_items: list[RawCatalogItem] = []
+    raw_catalog_items: list[CatalogItem] = []
     catalog_items: list[dict] = get_catalog_items(project_id)
     # For some TPU offers in some regions, GCP does not list prices at all. Skip such offers.
     filtered_catalog_items = [item for item in catalog_items if item["price"] is not None]
@@ -549,7 +550,8 @@ def get_tpu_offers(project_id: str) -> list[RawCatalogItem]:
         if hardware_spec is None:
             logger.debug("No TPU hardware spec for %s", item["instance_name"])
             continue
-        on_demand_item = RawCatalogItem(
+        on_demand_item = CatalogItem(
+            provider=GCPProvider.NAME,
             instance_name=item["instance_name"],
             location=item["location"],
             price=item["price"],

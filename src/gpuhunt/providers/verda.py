@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from verda import VerdaClient
 from verda.instance_types import InstanceType
 
-from gpuhunt import QueryFilter, RawCatalogItem
+from gpuhunt import CatalogItem, QueryFilter
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class VerdaProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         instance_types = self._get_instance_types()
         locations = self._get_locations()
 
@@ -43,19 +43,19 @@ class VerdaProvider(AbstractProvider):
         return self.verda_client.locations.get()
 
     @classmethod
-    def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
+    def filter(cls, offers: list[CatalogItem]) -> list[CatalogItem]:
         return [o for o in offers if o.gpu_name not in ALL_AMD_GPUS]  # skip AMD GPU
 
 
 def generate_instances(
     spots: Iterable[bool], location_codes: Iterable[str], instance_types: Iterable[InstanceType]
-) -> list[RawCatalogItem]:
+) -> list[CatalogItem]:
     instances = []
     for spot, location, instance in itertools.product(spots, location_codes, instance_types):
         item = transform_instance(copy.copy(instance), spot, location)
         if item is None:
             continue
-        instances.append(RawCatalogItem.from_dict(item))
+        instances.append(CatalogItem.from_dict(item, provider=VerdaProvider.NAME))
     return instances
 
 

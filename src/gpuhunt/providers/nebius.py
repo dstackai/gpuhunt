@@ -34,9 +34,9 @@ from gpuhunt._internal.constraints import find_accelerators
 from gpuhunt._internal.models import (
     AcceleratorInfo,
     AcceleratorVendor,
+    CatalogItem,
     JSONObject,
     QueryFilter,
-    RawCatalogItem,
 )
 from gpuhunt._internal.utils import get_or_error
 from gpuhunt.providers import AbstractProvider
@@ -81,8 +81,8 @@ class NebiusProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
-        items: list[RawCatalogItem] = []
+    ) -> list[CatalogItem]:
+        items: list[CatalogItem] = []
         sdk = SDK(credentials=self.credentials)
         calculator = CalculatorServiceClient(sdk)
         try:
@@ -180,14 +180,15 @@ def make_item(
     region: str,
     spot: bool,
     price: float,
-) -> RawCatalogItem | None:
+) -> CatalogItem | None:
     fabrics = []
     if preset.allow_gpu_clustering:
         fabrics = [
             f.name for f in INFINIBAND_FABRICS if f.platform == platform and f.region == region
         ]
 
-    item = RawCatalogItem(
+    item = CatalogItem(
+        provider=NebiusProvider.NAME,
         instance_name=f"{platform} {preset.name}",
         location=region,
         price=price,

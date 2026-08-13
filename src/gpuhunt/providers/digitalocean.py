@@ -4,7 +4,7 @@ import os
 import requests
 
 from gpuhunt._internal.constraints import get_gpu_vendor
-from gpuhunt._internal.models import QueryFilter, RawCatalogItem
+from gpuhunt._internal.models import CatalogItem, QueryFilter
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -22,11 +22,11 @@ class DigitalOceanProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         offers = self.fetch_offers()
         return sorted(offers, key=lambda i: i.price)
 
-    def fetch_offers(self) -> list[RawCatalogItem]:
+    def fetch_offers(self) -> list[CatalogItem]:
         url = "/v2/sizes"
         response = self._make_request("GET", url)
         return convert_response_to_raw_catalog_items(response)
@@ -45,7 +45,7 @@ class DigitalOceanProvider(AbstractProvider):
         return response
 
 
-def convert_response_to_raw_catalog_items(response) -> list[RawCatalogItem]:
+def convert_response_to_raw_catalog_items(response) -> list[CatalogItem]:
     data = response.json()
     offers = []
 
@@ -80,7 +80,8 @@ def convert_response_to_raw_catalog_items(response) -> list[RawCatalogItem]:
         # Creates an offer for each available region.
         # If regions list is empty, instance type is not available.
         for region in size["regions"]:
-            offer = RawCatalogItem(
+            offer = CatalogItem(
+                provider=DigitalOceanProvider.NAME,
                 instance_name=size["slug"],
                 location=region,
                 price=size["price_hourly"],

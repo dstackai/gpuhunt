@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from gpuhunt._internal.models import QueryFilter, RawCatalogItem
+from gpuhunt._internal.models import CatalogItem, QueryFilter
 
 
 class AbstractProvider(ABC):
@@ -16,7 +16,7 @@ class AbstractProvider(ABC):
     @abstractmethod
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         """
         Return a list of available instance offers. Offers should be ordered by priority. In most
         cases - by price, ascending.
@@ -34,7 +34,7 @@ class AbstractProvider(ABC):
         pass
 
     @classmethod
-    def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
+    def filter(cls, offers: list[CatalogItem]) -> list[CatalogItem]:
         """
         Return a subset of offers that should be stored in the catalog.
 

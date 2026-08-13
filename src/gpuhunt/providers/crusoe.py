@@ -9,9 +9,9 @@ import requests
 
 from gpuhunt._internal.models import (
     AcceleratorVendor,
+    CatalogItem,
     CPUArchitecture,
     QueryFilter,
-    RawCatalogItem,
 )
 from gpuhunt.providers import AbstractProvider
 
@@ -76,7 +76,7 @@ class CrusoeProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         instance_types = self._get_instance_types()
         type_specs = {t["product_name"]: t for t in instance_types}
 
@@ -154,9 +154,7 @@ def _get_available_type_locations(capacities: list[dict]) -> dict[str, list[str]
     return dict(result)
 
 
-def _make_catalog_items(
-    product_name: str, spec: dict, locations: list[str]
-) -> list[RawCatalogItem]:
+def _make_catalog_items(product_name: str, spec: dict, locations: list[str]) -> list[CatalogItem]:
     gpu_type = spec.get("gpu_type", "")
     num_gpu = spec.get("num_gpu", 0)
 
@@ -168,7 +166,7 @@ def _make_catalog_items(
 
 def _make_gpu_items(
     product_name: str, spec: dict, gpu_type: str, locations: list[str]
-) -> list[RawCatalogItem]:
+) -> list[CatalogItem]:
     gpu_info = GPU_TYPE_MAP.get(gpu_type)
     if gpu_info is None:
         logger.warning("Unknown GPU type %s for %s, skipping", gpu_type, product_name)
@@ -184,7 +182,8 @@ def _make_gpu_items(
     num_gpu = spec["num_gpu"]
     items = []
     for location in locations:
-        on_demand_item = RawCatalogItem(
+        on_demand_item = CatalogItem(
+            provider=CrusoeProvider.NAME,
             instance_name=product_name,
             location=location,
             price=round(num_gpu * on_demand_per_gpu, 2),
@@ -209,7 +208,7 @@ def _make_gpu_items(
     return items
 
 
-def _make_cpu_items(product_name: str, spec: dict, locations: list[str]) -> list[RawCatalogItem]:
+def _make_cpu_items(product_name: str, spec: dict, locations: list[str]) -> list[CatalogItem]:
     prefix = product_name.split(".")[0]
     per_vcpu = CPU_PRICING.get(prefix)
     if per_vcpu is None:
@@ -218,7 +217,8 @@ def _make_cpu_items(product_name: str, spec: dict, locations: list[str]) -> list
     cpu_cores = spec["cpu_cores"]
     items = []
     for location in locations:
-        item = RawCatalogItem(
+        item = CatalogItem(
+            provider=CrusoeProvider.NAME,
             instance_name=product_name,
             location=location,
             price=round(cpu_cores * per_vcpu, 2),

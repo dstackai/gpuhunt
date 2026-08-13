@@ -13,7 +13,7 @@ import boto3
 import requests
 from botocore.exceptions import ClientError, ConnectTimeoutError, EndpointConnectionError
 
-from gpuhunt._internal.models import QueryFilter, RawCatalogItem
+from gpuhunt._internal.models import CatalogItem, QueryFilter
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -115,7 +115,7 @@ class AWSProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         if not os.path.exists(self.cache_path):
             self._download_pricing_file()
 
@@ -130,7 +130,8 @@ class AWSProvider(AbstractProvider):
                 gpu_count = _parse_gpu_count(row["GPU"])
                 if gpu_count is None:
                     continue
-                offer = RawCatalogItem(
+                offer = CatalogItem(
+                    provider=AWSProvider.NAME,
                     instance_name=row["Instance Type"],
                     location=row["Region Code"],
                     price=float(row["PricePerUnit"]),
@@ -156,7 +157,7 @@ class AWSProvider(AbstractProvider):
                 return True
         return False
 
-    def fill_gpu_details(self, offers: list[RawCatalogItem]):
+    def fill_gpu_details(self, offers: list[CatalogItem]):
         regions = defaultdict(list)
         non_ec2_api_regions = set()
         for offer in offers:
@@ -331,7 +332,7 @@ class AWSProvider(AbstractProvider):
                     e,
                 )
 
-    def add_spots(self, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
+    def add_spots(self, offers: list[CatalogItem]) -> list[CatalogItem]:
         region_instances = defaultdict(set)
         non_ec2_api_regions = set()
         for offer in offers:
@@ -365,7 +366,7 @@ class AWSProvider(AbstractProvider):
         return offers + spot_offers
 
     @classmethod
-    def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
+    def filter(cls, offers: list[CatalogItem]) -> list[CatalogItem]:
         return [
             i
             for i in offers

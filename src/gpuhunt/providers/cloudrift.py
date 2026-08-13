@@ -3,7 +3,7 @@ import os
 
 import requests
 
-from gpuhunt import QueryFilter, RawCatalogItem
+from gpuhunt import CatalogItem, QueryFilter
 from gpuhunt._internal.models import AcceleratorVendor
 from gpuhunt.providers import AbstractProvider
 
@@ -18,7 +18,7 @@ class CloudRiftProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         instance_types = self._get_instance_types()
         instance_types = [
             inst for instance in instance_types for inst in generate_instances(instance)
@@ -31,7 +31,7 @@ class CloudRiftProvider(AbstractProvider):
         return response_data["instance_types"]  # pyright: ignore[reportArgumentType]
 
 
-def generate_instances(instance) -> list[RawCatalogItem]:
+def generate_instances(instance) -> list[CatalogItem]:
     instance_gpu_brand = instance["brand_short"]
     gpu_info = next(
         (gpu_record for gpu_record in GPU_MAP if gpu_record[0] in instance_gpu_brand), None
@@ -44,7 +44,8 @@ def generate_instances(instance) -> list[RawCatalogItem]:
     instance_types = []
     for variant in instance["variants"]:
         for location, _count in variant["nodes_per_dc"].items():
-            raw = RawCatalogItem(
+            raw = CatalogItem(
+                provider=CloudRiftProvider.NAME,
                 instance_name=variant["name"],
                 location=location,
                 spot=False,

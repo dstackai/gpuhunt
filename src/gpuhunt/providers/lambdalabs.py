@@ -5,9 +5,9 @@ from requests import Session
 
 from gpuhunt._internal.constraints import is_nvidia_superchip
 from gpuhunt._internal.models import (
+    CatalogItem,
     CPUArchitecture,
     QueryFilter,
-    RawCatalogItem,
 )
 from gpuhunt.providers import AbstractProvider
 
@@ -28,7 +28,7 @@ class LambdaLabsProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         offers = []
         regions = self.list_regions()
         resp = self.session.get(INSTANCE_TYPES_URL, timeout=TIMEOUT)
@@ -49,7 +49,8 @@ class LambdaLabsProvider(AbstractProvider):
                 if is_nvidia_superchip(gpu_name):
                     cpu_arch = CPUArchitecture.ARM
                     flags.append(FLAG_ARM)
-                offer = RawCatalogItem(
+                offer = CatalogItem(
+                    provider=LambdaLabsProvider.NAME,
                     instance_name=instance["name"],
                     price=instance["price_cents_per_hour"] / 100,
                     cpu_arch=cpu_arch,

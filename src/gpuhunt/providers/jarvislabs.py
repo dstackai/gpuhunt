@@ -6,7 +6,7 @@ import requests
 from requests import Response
 from typing_extensions import NotRequired, TypedDict
 
-from gpuhunt._internal.models import AcceleratorVendor, JSONObject, QueryFilter, RawCatalogItem
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, JSONObject, QueryFilter
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -50,11 +50,11 @@ class JarvisLabsProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         offers = self.fetch_offers(query_filter=query_filter)
         return sorted(offers, key=lambda i: i.price)
 
-    def fetch_offers(self, query_filter: QueryFilter | None = None) -> list[RawCatalogItem]:
+    def fetch_offers(self, query_filter: QueryFilter | None = None) -> list[CatalogItem]:
         response = self._make_request("GET", SERVER_META_PATH)
         return convert_response_to_raw_catalog_items(response.json())
 
@@ -69,7 +69,7 @@ class JarvisLabsProvider(AbstractProvider):
         return response
 
 
-def convert_response_to_raw_catalog_items(data: dict) -> list[RawCatalogItem]:
+def convert_response_to_raw_catalog_items(data: dict) -> list[CatalogItem]:
     offers = []
     for gpu in data.get("server_meta") or []:
         offers.extend(_make_gpu_catalog_items(gpu))
@@ -77,7 +77,7 @@ def convert_response_to_raw_catalog_items(data: dict) -> list[RawCatalogItem]:
     return offers
 
 
-def _make_gpu_catalog_items(gpu: dict) -> list[RawCatalogItem]:
+def _make_gpu_catalog_items(gpu: dict) -> list[CatalogItem]:
     region = gpu.get("region")
     if not region:
         return []
@@ -149,14 +149,15 @@ def _make_gpu_catalog_items_for_price(
     max_gpus_per_instance: int,
     provider_data: JSONObject,
     spot: bool,
-) -> list[RawCatalogItem]:
+) -> list[CatalogItem]:
     items = []
     for gpu_count in _supported_gpu_counts(
         available_devices=available_devices,
         max_gpus_per_instance=max_gpus_per_instance,
     ):
         items.append(
-            RawCatalogItem(
+            CatalogItem(
+                provider=JarvisLabsProvider.NAME,
                 instance_name=_gpu_instance_name(gpu_name, gpu_count),
                 location=region,
                 price=round(price * gpu_count, 5),
@@ -174,7 +175,7 @@ def _make_gpu_catalog_items_for_price(
     return items
 
 
-def _make_cpu_catalog_items(cpu_meta: dict) -> list[RawCatalogItem]:
+def _make_cpu_catalog_items(cpu_meta: dict) -> list[CatalogItem]:
     offers = []
     # The JarvisLabs SDK resolves CPU VMs from cpu_meta.combinations and creates them via
     # templates/vm/cpu/create; cpu_meta.workload_type is not the GPU workload selector.
@@ -198,7 +199,8 @@ def _make_cpu_catalog_items(cpu_meta: dict) -> list[RawCatalogItem]:
                 )
                 continue
             offers.append(
-                RawCatalogItem(
+                CatalogItem(
+                    provider=JarvisLabsProvider.NAME,
                     instance_name=f"cpu-{vcpus}x{int(ram_gb)}",
                     location=region,
                     price=price,

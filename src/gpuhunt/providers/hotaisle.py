@@ -5,7 +5,7 @@ import requests
 from requests import Response
 
 from gpuhunt._internal.constraints import find_accelerators
-from gpuhunt._internal.models import AcceleratorVendor, JSONObject, QueryFilter, RawCatalogItem
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, JSONObject, QueryFilter
 from gpuhunt.providers import AbstractProvider
 
 logger = logging.getLogger(__name__)
@@ -23,11 +23,11 @@ class HotAisleProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         offers = self.fetch_offers()
         return sorted(offers, key=lambda i: i.price)
 
-    def fetch_offers(self) -> list[RawCatalogItem]:
+    def fetch_offers(self) -> list[CatalogItem]:
         """Fetch available virtual machines from HotAisle API.
         See API documentation(https://admin.hotaisle.app/api/docs)
         for details."""
@@ -58,7 +58,7 @@ def get_gpu_memory(gpu_name: str) -> float | None:
     return None
 
 
-def convert_response_to_raw_catalog_items(response: Response) -> list[RawCatalogItem]:
+def convert_response_to_raw_catalog_items(response: Response) -> list[CatalogItem]:
     data = response.json()
     offers = []
     for item in data:
@@ -82,7 +82,8 @@ def convert_response_to_raw_catalog_items(response: Response) -> list[RawCatalog
         # Create instance name: cpu_model-cores-ram-gpucount-gpu
         instance_name = f"{gpu_count}x {gpu_name} {cpu_cores}x {cpu_model}"
 
-        offer = RawCatalogItem(
+        offer = CatalogItem(
+            provider=HotAisleProvider.NAME,
             instance_name=instance_name,
             location="us-michigan-1",  # Hardcoded for now, as HotAisle only has one location.
             price=price,
@@ -97,7 +98,7 @@ def convert_response_to_raw_catalog_items(response: Response) -> list[RawCatalog
             provider_data=cast(
                 JSONObject,
                 HotAisleCatalogItemProviderData(
-                    # The specs object may duplicate some RawCatalogItem fields, but we store it in
+                    # The specs object may duplicate some CatalogItem fields, but we store it in
                     # full because we need to pass it back to the API when creating VMs.
                     vm_specs=specs,
                 ),
