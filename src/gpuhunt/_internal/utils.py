@@ -1,6 +1,6 @@
 import logging
 import sys
-from collections.abc import Callable
+from typing import TypeVar
 
 
 def configure_logging() -> None:
@@ -11,12 +11,16 @@ def configure_logging() -> None:
     )
 
 
-def empty_as_none(value: str | None, loader: Callable | None = None):
-    if value is None or value == "":
-        return None
-    if loader is not None:
-        return loader(value)
-    return value
+T = TypeVar("T")
+
+
+def get_or_error(v: T | None, name: str = "value") -> T:
+    """
+    Unpacks an optional value. Used to denote that None is not possible in the current context.
+    """
+    if v is None:
+        raise ValueError(f"Expected {name} to be set")
+    return v
 
 
 def parse_compute_capability(

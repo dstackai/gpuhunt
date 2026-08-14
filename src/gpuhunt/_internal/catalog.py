@@ -1,5 +1,3 @@
-import csv
-import dataclasses
 import heapq
 import io
 import logging
@@ -13,9 +11,10 @@ from concurrent.futures import ThreadPoolExecutor, wait
 from pathlib import Path
 
 import gpuhunt._internal.constraints as constraints
+import gpuhunt._internal.storage as storage
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, CPUArchitecture, QueryFilter
 from gpuhunt._internal.utils import parse_compute_capability
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import AbstractProvider
 
 logger = logging.getLogger(__name__)
 
@@ -212,9 +211,10 @@ class Catalog:
             for provider in OFFLINE_PROVIDERS:
                 try:
                     with zip_file.open(f"{provider}.csv", "r") as csv_file:
-                        reader = csv.DictReader(io.TextIOWrapper(csv_file, "utf-8"))
-                        for row in reader:
-                            item = CatalogItem.from_dict(row, provider=provider)
+                        items = storage.load(
+                            io.TextIOWrapper(csv_file, "utf-8"), provider=provider
+                        )
+                        for item in items:
                             catalog.setdefault(provider, []).append(item)
                 except KeyError:
                     logger.error(
@@ -253,9 +253,9 @@ class Catalog:
         catalog_dir = os.getenv("GPUHUNT_CATALOG_DIR")
         if catalog_dir is not None:
             with open(Path(catalog_dir) / f"{provider_name}.csv", "rb") as csv_file:
-                reader = csv.DictReader(io.TextIOWrapper(csv_file, "utf-8"))
-                for row in reader:
-                    item = CatalogItem.from_dict(row, provider=provider_name)
+                for item in storage.load(
+                    io.TextIOWrapper(csv_file, "utf-8"), provider=provider_name
+                ):
                     if constraints.matches(item, query_filter):
                         items.append(item)
             return items
@@ -282,10 +282,9 @@ class Catalog:
             if provider.NAME != provider_name:
                 continue
             found = True
-            for i in provider.get(
+            for item in provider.get(
                 query_filter=query_filter, balance_resources=self.balance_resources
             ):
-                item = CatalogItem(provider=provider_name, **dataclasses.asdict(i))
                 if constraints.matches(item, query_filter):
                     items.append(item)
         if not found:

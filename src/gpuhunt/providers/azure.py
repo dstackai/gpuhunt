@@ -6,6 +6,7 @@ import re
 import time
 from collections import namedtuple
 from collections.abc import Iterable
+from dataclasses import dataclass
 from queue import Queue
 from threading import Thread
 
@@ -15,8 +16,10 @@ from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.compute import ComputeManagementClient
 
-from gpuhunt._internal.models import QueryFilter, RawCatalogItem
-from gpuhunt.providers import AbstractProvider
+from gpuhunt import AcceleratorVendor
+from gpuhunt._internal.models import CatalogItem, QueryFilter
+from gpuhunt._internal.utils import get_or_error
+from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
 prices_url = "https://prices.azure.com/api/retail/prices"
@@ -65,7 +68,34 @@ retired_vm_series = [
 ]
 
 
-class AzureProvider(AbstractProvider):
+@dataclass
+class _InstanceSpec:
+    instance_name: str
+    cpu: int
+    memory: float
+    gpu_count: int
+    gpu_name: str | None
+    gpu_memory: float | None
+    gpu_vendor: AcceleratorVendor | None
+
+    def to_catalog_item(self, *, location: str, price: float, spot: bool) -> CatalogItem:
+        return CatalogItem(
+            provider=AzureProvider.NAME,
+            instance_name=self.instance_name,
+            location=location,
+            price=price,
+            cpu=self.cpu,
+            memory=self.memory,
+            gpu_count=self.gpu_count,
+            gpu_name=self.gpu_name,
+            gpu_memory=self.gpu_memory,
+            spot=spot,
+            disk_size=None,
+            gpu_vendor=self.gpu_vendor,
+        )
+
+
+class AzureProvider(OfflineProvider):
     NAME = "azure"
 
     def __init__(
@@ -140,44 +170,43 @@ class AzureProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
-        offers = []
+    ) -> list[CatalogItem]:
+        offers: list[CatalogItem] = []
+        instance_name_to_spec_map = self.get_instance_specs()
         for page in self.get_pages():
-            for item in page:
-                if is_retired(item["armSkuName"]):
+            for sku_item in page:
+                if is_retired(sku_item["armSkuName"]):
                     continue
-                if not item["armSkuName"]:
+                if not sku_item["armSkuName"]:
                     continue
-                price = float(item["retailPrice"])
+                price = float(sku_item["retailPrice"])
                 if math.isclose(price, 0):
                     continue
-                offer = RawCatalogItem(
-                    instance_name=item["armSkuName"],
-                    location=item["armRegionName"],
+                spec = instance_name_to_spec_map.get(sku_item["armSkuName"])
+                if spec is None:
+                    continue
+                offer = spec.to_catalog_item(
+                    location=sku_item["armRegionName"],
                     price=price,
-                    spot="Spot" in item["meterName"],
-                    cpu=None,
-                    memory=None,
-                    gpu_vendor=None,
-                    gpu_count=None,
-                    gpu_name=None,
-                    gpu_memory=None,
-                    disk_size=None,
+                    spot="Spot" in sku_item["meterName"],
                 )
                 offers.append(offer)
-        offers = self.fill_details(offers)
         return sorted(offers, key=lambda i: i.price)
 
-    def fill_details(self, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
+    def get_instance_specs(self) -> dict[str, _InstanceSpec]:
         logger.info("Fetching instance details")
-        instances = {}
+        instance_name_to_spec_map = {}
         resources = self.client.resource_skus.list()
         for resource in resources:
+            assert resource.name is not None
             if resource.resource_type != "virtualMachines":
                 continue
             if is_retired(resource.name):
                 continue
-            capabilities = {pair.name: pair.value for pair in resource.capabilities}
+            capabilities = {
+                pair.name: pair.value
+                for pair in get_or_error(resource.capabilities, "resource capabilities")
+            }
             cpu = capabilities.get("vCPUs")
             memory = capabilities.get("MemoryGB")
             if not cpu:
@@ -188,39 +217,24 @@ class AzureProvider(AbstractProvider):
                 continue
             gpu_count, gpu_name, gpu_memory = 0, None, None
             if "GPUs" in capabilities:
-                gpu_count = int(capabilities["GPUs"])
+                gpu_count = int(get_or_error(capabilities["GPUs"], "GPUs capability"))
                 gpu_name, gpu_memory = get_gpu_name_memory(resource.name)
                 if gpu_name is None and gpu_count:
                     logger.warning("Can't parse VM name: %s", resource.name)
                     continue
-            instances[resource.name] = RawCatalogItem(
+            instance_name_to_spec_map[resource.name] = _InstanceSpec(
                 instance_name=resource.name,
-                cpu=cpu,
+                cpu=int(cpu),
                 memory=float(memory),
-                gpu_vendor=None,
+                gpu_vendor=AcceleratorVendor.NVIDIA if gpu_count else None,
                 gpu_count=gpu_count,
                 gpu_name=gpu_name,
                 gpu_memory=gpu_memory,
-                location=None,
-                price=None,
-                spot=None,
-                disk_size=None,
             )
-        with_details = []
-        for offer in offers:
-            if (resources := instances.get(offer.instance_name)) is None:
-                continue
-            offer.cpu = resources.cpu
-            offer.memory = resources.memory
-            offer.gpu_count = resources.gpu_count
-            offer.gpu_name = resources.gpu_name
-            offer.gpu_memory = resources.gpu_memory
-            offer.gpu_vendor = resources.gpu_vendor
-            with_details.append(offer)
-        return with_details
+        return instance_name_to_spec_map
 
     @classmethod
-    def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
+    def filter(cls, offers: list[CatalogItem]) -> list[CatalogItem]:
         vm_series = [
             VMSeries(r"D(\d+)s_v6", None, None),  # Dsv6-series
             VMSeries(

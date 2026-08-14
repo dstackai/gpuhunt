@@ -1,5 +1,4 @@
 import csv
-from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -41,17 +40,6 @@ def test_locations(data_rows):
     # TODO: CA-MTL-2 looks absent in recent live Runpod snapshots.
     # Re-evaluate this expectation later and tighten back to <= 3.
     assert len(expected - locations) <= 4
-
-
-def test_spot(data_rows):
-    spots = select_row(data_rows, "spot")
-
-    expected = set(("True", "False"))
-    assert set(spots) == expected
-
-    count = Counter(spots)
-    for spot_key in ("True", "False"):
-        assert count[spot_key] > 1
 
 
 def test_gpu_present(data_rows):

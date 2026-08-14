@@ -1,4 +1,5 @@
 import copy
+import dataclasses
 import enum
 import importlib.resources
 import json
@@ -18,14 +19,13 @@ from google.cloud.billing_v1.types.cloud_catalog import Sku
 from google.cloud.location import locations_pb2
 from typing_extensions import NotRequired, TypedDict
 
-from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
-from gpuhunt.providers import AbstractProvider
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
+from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
 compute_service = "services/6F81-5844-456A"
 AcceleratorDetails = namedtuple("AcceleratorDetails", ["name", "memory"])
-# As of 2024-14-08, this mapping contains only Nvidia accelerators; update gpu_vendor
-# inferring code in fill_gpu_vendors_and_names() if a non-Nvidia accelerator is added
+# Update gpu_vendor detection if adding non-nvidia GPUs.
 accelerator_details = {
     "nvidia-b200": AcceleratorDetails("B200", 180.0),
     "nvidia-a100-80gb": AcceleratorDetails("A100", 80.0),
@@ -146,7 +146,20 @@ def load_tpu_pricing() -> dict:
 TPU_PRICING_TABLE = load_tpu_pricing()
 
 
-class GCPProvider(AbstractProvider):
+@dataclass
+class _MachineType:
+    """A machine type in a zone, with accelerators attached but no price yet."""
+
+    instance_name: str
+    location: str  # zone
+    cpu: int
+    memory: float
+    gpu_count: int
+    gpu_name: str | None
+    gpu_memory: float | None
+
+
+class GCPProvider(OfflineProvider):
     NAME = "gcp"
 
     def __init__(self, project: str):
@@ -157,135 +170,19 @@ class GCPProvider(AbstractProvider):
         self.regions_client = compute_v1.RegionsClient()
         self.cloud_catalog_client = billing_v1.CloudCatalogClient()
 
-    def list_preconfigured_instances(self) -> list[RawCatalogItem]:
-        def _list_zone_instances(zone: str) -> list[RawCatalogItem]:
-            zone_instances = []
-            logger.info("Fetching instances for zone %s", zone)
-            for machine_type in self.machine_types_client.list(project=self.project, zone=zone):
-                if machine_type.deprecated.state == compute_v1.DeprecationStatus.State.DEPRECATED:
-                    continue
-                gpu = None
-                if machine_type.accelerators:
-                    accelerator = machine_type.accelerators[0].guest_accelerator_type
-                    gpu = accelerator_details.get(accelerator)
-                    if gpu is None:
-                        logger.warning("Unknown accelerator type: %s", accelerator)
-                        continue
-
-                instance = RawCatalogItem(
-                    instance_name=machine_type.name,
-                    location=zone,
-                    cpu=machine_type.guest_cpus,
-                    memory=round(machine_type.memory_mb / 1024, 1),
-                    gpu_count=(machine_type.accelerators[0].guest_accelerator_count if gpu else 0),
-                    # gpu_name is canonicalized and gpu_vendor is set later
-                    # in fill_gpu_vendors_and_names(), for now we use AcceleratorType.name
-                    # as a name (it contains a vendor prefix like "nvidia-")
-                    gpu_name=(
-                        machine_type.accelerators[0].guest_accelerator_type if gpu else None
-                    ),
-                    gpu_vendor=None,
-                    gpu_memory=gpu.memory if gpu else None,
-                    price=None,
-                    spot=None,
-                    disk_size=None,
-                )
-                zone_instances.append(instance)
-            return zone_instances
-
-        instances = []
-        futures = []
-        with ThreadPoolExecutor(max_workers=8) as ex:
-            for region in self.regions_client.list(project=self.project):
-                for zone_url in region.zones:
-                    zone = zone_url.split("/")[-1]
-                    futures.append(ex.submit(_list_zone_instances, zone))
-        for future in as_completed(futures):
-            instances.extend(future.result())
-        return instances
-
-    def add_gpus(self, instances: list[RawCatalogItem]):
-        def _list_zone_instances(
-            zone: str, zone_n1_instances: list[RawCatalogItem]
-        ) -> list[RawCatalogItem]:
-            logger.info("Fetching GPUs for zone %s", zone)
-            zone_instances = []
-            for accelerator in self.accelerator_types_client.list(project=self.project, zone=zone):
-                if accelerator.name not in accelerator_limits:
-                    continue
-                for n, limit in zip(accelerator_counts, accelerator_limits[accelerator.name]):
-                    for instance in zone_n1_instances:
-                        if instance.cpu > limit.cpu or instance.memory > limit.memory:
-                            continue
-                        i = copy.deepcopy(instance)
-                        i.gpu_count = n
-                        i.gpu_name = accelerator.name
-                        i.gpu_memory = accelerator_details[accelerator.name].memory
-                        zone_instances.append(i)
-            return zone_instances
-
-        n1_instances = defaultdict(list)
-        for instance in instances:
-            if instance.instance_name.startswith("n1-"):
-                n1_instances[instance.location].append(instance)
-
-        instances_with_gpus = []
-        futures = []
-        with ThreadPoolExecutor(max_workers=8) as ex:
-            for zone, zone_n1_instances in n1_instances.items():
-                futures.append(ex.submit(_list_zone_instances, zone, zone_n1_instances))
-        for future in as_completed(futures):
-            instances_with_gpus.extend(future.result())
-        instances += instances_with_gpus
-
-    def fill_prices(self, instances: list[RawCatalogItem]) -> list[RawCatalogItem]:
-        logger.info("Fetching prices")
-        skus = self.cloud_catalog_client.list_skus(parent=compute_service)
-        prices = Prices()
-        prices.add_skus(skus)
-
-        offers = []
-        for instance in instances:
-            for capacity_type in CapacityType:
-                price = prices.get_instance_price(instance, capacity_type)
-                if price is None:
-                    continue
-
-                offer = copy.deepcopy(instance)
-                offer.price = round(price, 6)
-                offer.spot = capacity_type is CapacityType.SPOT
-                cast(GCPCatalogItemProviderData, offer.provider_data)["is_dws_calendar_mode"] = (
-                    capacity_type is CapacityType.DWS_CALENDAR_MODE
-                )
-                offers.append(offer)
-        return offers
-
-    def fill_gpu_vendors_and_names(self, offers: list[RawCatalogItem]) -> None:
-        # Modifies offers in the list in-place
-        for offer in offers:
-            accelerator_type = offer.gpu_name
-            if not accelerator_type:
-                continue
-            offer.gpu_name = accelerator_details[accelerator_type].name
-            if accelerator_type.startswith("nvidia-"):
-                offer.gpu_vendor = AcceleratorVendor.NVIDIA.value
-            else:
-                logger.warning("Unknown accelerator vendor: %s", accelerator_type)
-
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
-        instances = self.list_preconfigured_instances()
-        self.add_gpus(instances)
-        offers = self.fill_prices(instances)
-        self.fill_gpu_vendors_and_names(offers)
-        offers.extend(get_tpu_offers(self.project))
-        set_flags(offers)
-        offers = add_legacy_g4_preview(offers)
+    ) -> list[CatalogItem]:
+        machine_types = self._list_machine_types()
+        machine_types += self._make_gpu_machine_types(machine_types)
+        offers = self._make_offers(machine_types)
+        offers.extend(_make_tpu_offers(self.project))
+        _set_flags(offers)
+        offers = _with_legacy_g4_preview(offers)
         return sorted(offers, key=lambda i: i.price)
 
     @classmethod
-    def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
+    def filter(cls, offers: list[CatalogItem]) -> list[CatalogItem]:
         return [
             i
             for i in offers
@@ -327,6 +224,128 @@ class GCPProvider(AbstractProvider):
                 )
             )
         ]
+
+    def _list_machine_types(self) -> list[_MachineType]:
+        def _list_zone_machine_types(zone: str) -> list[_MachineType]:
+            zone_machine_types: list[_MachineType] = []
+            logger.info("Fetching machine types for zone %s", zone)
+            for machine_type in self.machine_types_client.list(project=self.project, zone=zone):
+                if machine_type.deprecated.state == compute_v1.DeprecationStatus.State.DEPRECATED:
+                    continue
+                gpu = None
+                if machine_type.accelerators:
+                    accelerator = machine_type.accelerators[0].guest_accelerator_type
+                    gpu = accelerator_details.get(accelerator)
+                    if gpu is None:
+                        logger.warning("Unknown accelerator type: %s", accelerator)
+                        continue
+
+                machine_type = _MachineType(
+                    instance_name=machine_type.name,
+                    location=zone,
+                    cpu=machine_type.guest_cpus,
+                    memory=round(machine_type.memory_mb / 1024, 1),
+                    gpu_count=(machine_type.accelerators[0].guest_accelerator_count if gpu else 0),
+                    # gpu_name is canonicalized and gpu_vendor is set later
+                    # in _make_offers(), for now we use AcceleratorType.name
+                    # as a name (it contains a vendor prefix like "nvidia-")
+                    gpu_name=(
+                        machine_type.accelerators[0].guest_accelerator_type if gpu else None
+                    ),
+                    gpu_memory=gpu.memory if gpu else None,
+                )
+                zone_machine_types.append(machine_type)
+            return zone_machine_types
+
+        machine_types: list[_MachineType] = []
+        futures = []
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for region in self.regions_client.list(project=self.project):
+                for zone_url in region.zones:
+                    zone = zone_url.split("/")[-1]
+                    futures.append(ex.submit(_list_zone_machine_types, zone))
+        for future in as_completed(futures):
+            machine_types.extend(future.result())
+        return machine_types
+
+    def _make_gpu_machine_types(self, machine_types: list[_MachineType]) -> list[_MachineType]:
+        def _make_zone_gpu_machine_types(
+            zone: str, zone_n1_machine_types: list[_MachineType]
+        ) -> list[_MachineType]:
+            logger.info("Fetching GPUs for zone %s", zone)
+            zone_machine_types: list[_MachineType] = []
+            for accelerator in self.accelerator_types_client.list(project=self.project, zone=zone):
+                if accelerator.name not in accelerator_limits:
+                    continue
+                for n, limit in zip(accelerator_counts, accelerator_limits[accelerator.name]):
+                    for machine_type in zone_n1_machine_types:
+                        if machine_type.cpu > limit.cpu or machine_type.memory > limit.memory:
+                            continue
+                        machine_type_with_gpu = dataclasses.replace(
+                            machine_type,
+                            gpu_count=n,
+                            gpu_name=accelerator.name,
+                            gpu_memory=accelerator_details[accelerator.name].memory,
+                        )
+                        zone_machine_types.append(machine_type_with_gpu)
+            return zone_machine_types
+
+        n1_machine_types = defaultdict(list)
+        for mt in machine_types:
+            if mt.instance_name.startswith("n1-"):
+                n1_machine_types[mt.location].append(mt)
+
+        machine_types_with_gpus: list[_MachineType] = []
+        futures = []
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for zone, zone_n1_machine_types in n1_machine_types.items():
+                futures.append(
+                    ex.submit(_make_zone_gpu_machine_types, zone, zone_n1_machine_types)
+                )
+        for future in as_completed(futures):
+            machine_types_with_gpus.extend(future.result())
+        return machine_types_with_gpus
+
+    def _make_offers(self, machine_types: list[_MachineType]) -> list[CatalogItem]:
+        logger.info("Fetching prices")
+        skus = self.cloud_catalog_client.list_skus(parent=compute_service)
+        prices = Prices()
+        prices.add_skus(skus)
+        offers: list[CatalogItem] = []
+        for machine_type in machine_types:
+            gpu_vendor = None
+            gpu_name = None
+            if machine_type.gpu_name:
+                if machine_type.gpu_name.startswith("nvidia-"):
+                    gpu_vendor = AcceleratorVendor.NVIDIA
+                if acc_details := accelerator_details.get(machine_type.gpu_name):
+                    gpu_name = acc_details.name
+                else:
+                    logger.warning("No accelerator details for %s", machine_type.gpu_name)
+                    continue
+            for capacity_type in CapacityType:
+                price = prices.get_instance_price(machine_type, capacity_type)
+                if price is None:
+                    continue
+                item = CatalogItem(
+                    provider=GCPProvider.NAME,
+                    instance_name=machine_type.instance_name,
+                    location=machine_type.location,
+                    price=round(price, 6),
+                    cpu=machine_type.cpu,
+                    memory=machine_type.memory,
+                    gpu_vendor=gpu_vendor,
+                    gpu_count=machine_type.gpu_count,
+                    gpu_name=gpu_name,
+                    gpu_memory=machine_type.gpu_memory,
+                    spot=capacity_type is CapacityType.SPOT,
+                    disk_size=None,
+                    provider_data={
+                        "is_dws_calendar_mode": capacity_type is CapacityType.DWS_CALENDAR_MODE
+                    },
+                )
+                offers.append(item)
+        return offers
 
 
 class GCPCatalogItemProviderData(TypedDict):
@@ -449,17 +468,20 @@ class Prices:
             family_prices[(region, capacity_type)] = price
 
     def get_instance_price(
-        self, instance: RawCatalogItem, capacity_type: CapacityType
+        self, machine_type: _MachineType, capacity_type: CapacityType
     ) -> float | None:
-        vm_family = self.get_vm_family(instance.instance_name)
+        vm_family = self.get_vm_family(machine_type.instance_name)
         if vm_family in ["g1", "f1", "m2"]:  # shared-core and reservation-only
             return None
 
-        region_capacity_type = (instance.location[:-2], capacity_type)
+        region_capacity_type = (machine_type.location[:-2], capacity_type)
 
         # For some instances, the price is proportional to the number of GPUs
-        if instance.gpu_name and region_capacity_type in self.gpu_slice[instance.gpu_name]:
-            return instance.gpu_count * self.gpu_slice[instance.gpu_name][region_capacity_type]
+        if machine_type.gpu_name and region_capacity_type in self.gpu_slice[machine_type.gpu_name]:
+            return (
+                machine_type.gpu_count
+                * self.gpu_slice[machine_type.gpu_name][region_capacity_type]
+            )
 
         # For others, the price consists of several components
         price = 0
@@ -468,15 +490,16 @@ class Prices:
             or region_capacity_type not in self.ram[vm_family]
         ):
             return None
-        price += instance.cpu * self.cpu[vm_family][region_capacity_type]
-        price += instance.memory * self.ram[vm_family][region_capacity_type]
-        if instance.gpu_name:
-            if region_capacity_type not in self.gpu[instance.gpu_name]:
+        price += machine_type.cpu * self.cpu[vm_family][region_capacity_type]
+        price += machine_type.memory * self.ram[vm_family][region_capacity_type]
+        if machine_type.gpu_name:
+            if region_capacity_type not in self.gpu[machine_type.gpu_name]:
                 return None
-            price += instance.gpu_count * self.gpu[instance.gpu_name][region_capacity_type]
-        if instance.instance_name in local_ssd_sizes_gib:
+            price += machine_type.gpu_count * self.gpu[machine_type.gpu_name][region_capacity_type]
+        if machine_type.instance_name in local_ssd_sizes_gib:
             price += (
-                local_ssd_sizes_gib[instance.instance_name] * self.local_ssd[region_capacity_type]
+                local_ssd_sizes_gib[machine_type.instance_name]
+                * self.local_ssd[region_capacity_type]
             )
 
         return price
@@ -489,8 +512,8 @@ class Prices:
         return instance_name.split("-")[0]
 
 
-def set_flags(catalog_items: list[RawCatalogItem]) -> None:
-    for item in catalog_items:
+def _set_flags(offers: list[CatalogItem]) -> None:
+    for item in offers:
         if cast(GCPCatalogItemProviderData, item.provider_data).get("is_dws_calendar_mode"):
             item.flags.append("gcp-dws-calendar-mode")
         if item.instance_name.startswith("a4-"):
@@ -500,58 +523,59 @@ def set_flags(catalog_items: list[RawCatalogItem]) -> None:
 
 
 # TODO: drop when dstack 0.19.33 is no longer relevant
-def add_legacy_g4_preview(catalog_items: list[RawCatalogItem]) -> list[RawCatalogItem]:
+def _with_legacy_g4_preview(offers: list[CatalogItem]) -> list[CatalogItem]:
     """
     For each g4-standard-* instance, add a duplicate item with the "gcp-g4-preview" flag.
 
     This is only needed for dstack 0.19.33, where the flag "gcp-g4-preview"
     is used instead of "gcp-g4".
     """
-    new_items = []
-    for item in catalog_items:
-        new_items.append(item)
+    new_offers: list[CatalogItem] = []
+    for item in offers:
+        new_offers.append(item)
         if item.instance_name.startswith("g4-standard-"):
             preview_item = copy.deepcopy(item)
             preview_item.flags.remove("gcp-g4")
             preview_item.flags.append("gcp-g4-preview")
-            new_items.append(preview_item)
-    return new_items
+            new_offers.append(preview_item)
+    return new_offers
 
 
-def get_tpu_offers(project_id: str) -> list[RawCatalogItem]:
+def _make_tpu_offers(project_id: str) -> list[CatalogItem]:
     logger.info("Fetching TPU offers")
-    raw_catalog_items: list[RawCatalogItem] = []
-    catalog_items: list[dict] = get_catalog_items(project_id)
+    offers: list[CatalogItem] = []
+    tpu_configs: list[dict] = _get_priced_tpu_configs(project_id)
     # For some TPU offers in some regions, GCP does not list prices at all. Skip such offers.
-    filtered_catalog_items = [item for item in catalog_items if item["price"] is not None]
-    for item in filtered_catalog_items:
+    priced_tpu_configs = [config for config in tpu_configs if config["price"] is not None]
+    for item in priced_tpu_configs:
         hardware_spec = get_tpu_hardware_spec(item["instance_name"])
         if hardware_spec is None:
             logger.debug("No TPU hardware spec for %s", item["instance_name"])
             continue
-        on_demand_item = RawCatalogItem(
+        on_demand_item = CatalogItem(
+            provider=GCPProvider.NAME,
             instance_name=item["instance_name"],
             location=item["location"],
             price=item["price"],
             cpu=hardware_spec.cpu,
             memory=hardware_spec.memory_gb,
-            gpu_vendor=AcceleratorVendor.GOOGLE.value,
+            gpu_vendor=AcceleratorVendor.GOOGLE,
             gpu_count=1,
             gpu_name=item["instance_name"],
             gpu_memory=hardware_spec.hbm_gb,
             spot=False,
             disk_size=None,
         )
-        raw_catalog_items.append(on_demand_item)
+        offers.append(on_demand_item)
         if item["spot"]:
             spot_item = copy.deepcopy(on_demand_item)
             spot_item.price = item["spot"]
             spot_item.spot = True
-            raw_catalog_items.append(spot_item)
-    return raw_catalog_items
+            offers.append(spot_item)
+    return offers
 
 
-def get_catalog_items(project_id: str) -> list[dict]:
+def _get_priced_tpu_configs(project_id: str) -> list[dict]:
     """
     Returns TPU configurations with pricing info.
     Each configuration contains on-demand price and spot price but any price can be missing.
@@ -725,7 +749,7 @@ def find_base_price_v5(
 
 def get_tpu_configs(project_id: str) -> list[dict]:
     def _list_zone_configs(zone: str) -> list[dict]:
-        zone_instances = []
+        zone_instances: list[dict] = []
         if zone in ["us-east1-b"]:
             # These zones return
             # google.api_core.exceptions.ServiceUnavailable: 503 502:Bad Gateway

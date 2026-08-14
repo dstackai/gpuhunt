@@ -1,4 +1,3 @@
-import copy
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import cast
@@ -8,8 +7,8 @@ from requests import RequestException
 from typing_extensions import NotRequired, TypedDict
 
 from gpuhunt._internal.constraints import find_accelerators
-from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
-from gpuhunt.providers import AbstractProvider
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
+from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
 API_URL = "https://api.runpod.io/graphql"
@@ -21,7 +20,7 @@ class RunpodCatalogItemProviderData(TypedDict):
     pod_counts: NotRequired[list[int]]
 
 
-class RunpodProvider(AbstractProvider):
+class RunpodProvider(OfflineProvider):
     NAME = "runpod"
     # Minimum CUDA version on the host. Used to filter available offers
     # and should also be used when provisioning pods.
@@ -32,12 +31,12 @@ class RunpodProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         offers = self._fetch_offers()
         return sorted(offers, key=lambda i: i.price or 0)
 
     @classmethod
-    def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
+    def filter(cls, offers: list[CatalogItem]) -> list[CatalogItem]:
         return [
             o
             for o in offers
@@ -47,7 +46,7 @@ class RunpodProvider(AbstractProvider):
             ]
         ]
 
-    def _fetch_offers(self) -> list[RawCatalogItem]:
+    def _fetch_offers(self) -> list[CatalogItem]:
         query_variables = self._build_query_variables()
         with ThreadPoolExecutor(max_workers=10) as executor:
             futures = [
@@ -61,16 +60,16 @@ class RunpodProvider(AbstractProvider):
             except RequestException as e:
                 logger.exception("Failed to get pods data: %s", e)
 
-        catalog_items = []
+        offers: list[CatalogItem] = []
         for query_variable, pods in zip(query_variables, pods_by_query):
             for pod in pods:
-                catalog_items.extend(self._make_catalog_items(query_variable, pod))
+                offers.extend(self._make_offers(query_variable, pod))
 
-        cluster_catalog_items = self._fetch_cluster_offers()
-        catalog_items.extend(cluster_catalog_items)
-        cpu_catalog_items = self._fetch_cpu_offers()
-        catalog_items.extend(cpu_catalog_items)
-        return catalog_items
+        cluster_offers = self._fetch_cluster_offers()
+        offers.extend(cluster_offers)
+        cpu_offers = self._fetch_cpu_offers()
+        offers.extend(cpu_offers)
+        return offers
 
     def _build_query_variables(self) -> list[dict]:
         """Prepare different combinations of API query filters to cover all available GPUs."""
@@ -130,7 +129,7 @@ class RunpodProvider(AbstractProvider):
         )
         return resp["data"]["gpuTypes"]
 
-    def _make_catalog_items(self, query_variables: dict, pod: dict) -> list[RawCatalogItem]:
+    def _make_offers(self, query_variables: dict, pod: dict) -> list[CatalogItem]:
         lowest_price_input_variables = query_variables["lowestPriceInput"]
         if pod["lowestPrice"]["stockStatus"] is None:
             return []
@@ -141,40 +140,31 @@ class RunpodProvider(AbstractProvider):
         if lowest_price_input_variables["secureCloud"]:
             location = lowest_price_input_variables["dataCenterId"]
             on_demand_gpu_price = pod["securePrice"]
-            spot_gpu_price = pod["secureSpotPrice"]
         else:
             location = lowest_price_input_variables["countryCode"]
             on_demand_gpu_price = pod["communityPrice"]
-            spot_gpu_price = pod["communitySpotPrice"]
-        item_template = RawCatalogItem(
-            instance_name=pod["id"],
-            location=location,
-            price=None,  # set below
-            cpu=pod["lowestPrice"]["minVcpu"],
-            memory=pod["lowestPrice"]["minMemory"],
-            gpu_vendor=listed_gpu_vendor_and_name[0],
-            gpu_count=lowest_price_input_variables["gpuCount"],
-            gpu_name=listed_gpu_vendor_and_name[1],
-            gpu_memory=pod["memoryInGb"],
-            spot=None,  # set below
-            disk_size=None,
-            provider_data={},
-        )
-        items = []
+        offers: list[CatalogItem] = []
         if on_demand_gpu_price:
-            item = copy.deepcopy(item_template)
-            item.spot = False
-            item.price = item.gpu_count * on_demand_gpu_price
-            items.append(item)
-        if spot_gpu_price:
-            item = copy.deepcopy(item_template)
-            item.spot = True
-            item.price = item.gpu_count * spot_gpu_price
-            items.append(item)
-        return items
+            offer = CatalogItem(
+                provider=RunpodProvider.NAME,
+                instance_name=pod["id"],
+                location=location,
+                price=lowest_price_input_variables["gpuCount"] * on_demand_gpu_price,
+                cpu=pod["lowestPrice"]["minVcpu"],
+                memory=pod["lowestPrice"]["minMemory"],
+                gpu_vendor=listed_gpu_vendor_and_name[0],
+                gpu_count=lowest_price_input_variables["gpuCount"],
+                gpu_name=listed_gpu_vendor_and_name[1],
+                gpu_memory=pod["memoryInGb"],
+                spot=False,
+                disk_size=None,
+                provider_data={},
+            )
+            offers.append(offer)
+        return offers
 
-    def _fetch_cluster_offers(self) -> list[RawCatalogItem]:
-        cluster_catalog_items = []
+    def _fetch_cluster_offers(self) -> list[CatalogItem]:
+        cluster_offers: list[CatalogItem] = []
         query_variables = {
             "gpuTypesInput": {
                 "cluster": True,
@@ -202,7 +192,8 @@ class RunpodProvider(AbstractProvider):
                 logger.warning(f"{pod_type['id']} cluster offer missing minMemory")
                 continue
             for location in pod_type["nodeGroupDatacenters"]:
-                catalog_item = RawCatalogItem(
+                offer = CatalogItem(
+                    provider=RunpodProvider.NAME,
                     instance_name=pod_type["id"],
                     location=location["id"],
                     price=pod_type["clusterPrice"] * pod_type["maxGpuCount"],
@@ -220,10 +211,10 @@ class RunpodProvider(AbstractProvider):
                         dict, RunpodCatalogItemProviderData(pod_counts=list(range(2, 9)))
                     ),
                 )
-                cluster_catalog_items.append(catalog_item)
-        return cluster_catalog_items
+                cluster_offers.append(offer)
+        return cluster_offers
 
-    def _fetch_cpu_offers(self) -> list[RawCatalogItem]:
+    def _fetch_cpu_offers(self) -> list[CatalogItem]:
         response = _make_request({"query": cpu_data_centers_query, "variables": {}})
         data_centers = [dc["id"] for dc in response["data"]["dataCenters"] if dc["listed"]]
         if len(data_centers) == 0:
@@ -240,13 +231,13 @@ class RunpodProvider(AbstractProvider):
                 except RequestException as e:
                     logger.exception("Failed to get cpuFlavors data for %s: %s", dc_id, e)
 
-        catalog_items = []
+        offers: list[CatalogItem] = []
         for dc_id in data_centers:
             cpu_flavors = cpu_flavors_by_data_center.get(dc_id)
             if cpu_flavors is None:
                 continue
-            catalog_items.extend(self._make_cpu_catalog_items(dc_id, cpu_flavors))
-        return catalog_items
+            offers.extend(self._make_cpu_offers(dc_id, cpu_flavors))
+        return offers
 
     def _get_cpu_flavors(self, data_center_id: str) -> list[dict]:
         response = _make_request(
@@ -254,10 +245,8 @@ class RunpodProvider(AbstractProvider):
         )
         return response["data"]["cpuFlavors"]
 
-    def _make_cpu_catalog_items(
-        self, data_center_id: str, cpu_flavors: list[dict]
-    ) -> list[RawCatalogItem]:
-        items: list[RawCatalogItem] = []
+    def _make_cpu_offers(self, data_center_id: str, cpu_flavors: list[dict]) -> list[CatalogItem]:
+        offers: list[CatalogItem] = []
         for flavor in cpu_flavors:
             specifics = flavor.get("specifics") or {}
             if specifics.get("stockStatus") is None:
@@ -288,8 +277,9 @@ class RunpodProvider(AbstractProvider):
                 disk_size = float(vcpu * int(disk_limit_per_vcpu))
                 scale = vcpu / min_vcpu
                 price = base_secure_price * scale
-                items.append(
-                    RawCatalogItem(
+                offers.append(
+                    CatalogItem(
+                        provider=RunpodProvider.NAME,
                         instance_name=f"{flavor['id']}-{vcpu}-{memory}",
                         location=data_center_id,
                         price=price,
@@ -304,7 +294,7 @@ class RunpodProvider(AbstractProvider):
                         provider_data={},
                     )
                 )
-        return items
+        return offers
 
     def _get_gpu_vendor_and_name(
         self,
@@ -457,13 +447,10 @@ query GpuTypes($lowestPriceInput: GpuLowestPriceInput, $gpuTypesInput: GpuTypeFi
     displayName
     memoryInGb
     securePrice
-    secureSpotPrice
     communityPrice
-    communitySpotPrice
     oneMonthPrice
     threeMonthPrice
     sixMonthPrice
-    secureSpotPrice
     __typename
   }
 }

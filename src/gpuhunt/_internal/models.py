@@ -1,13 +1,10 @@
 import enum
-import json
 from collections.abc import Container
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import dataclass, field, fields
 from typing import (
     ClassVar,
     Union,
 )
-
-from gpuhunt._internal.utils import empty_as_none
 
 JSONType = Union[
     None,
@@ -19,12 +16,6 @@ JSONType = Union[
     "JSONObject",
 ]
 JSONObject = dict[str, JSONType]
-
-
-def bool_loader(x: bool | str) -> bool:
-    if isinstance(x, bool):
-        return x
-    return x.lower() == "true"
 
 
 class AMDArchitecture(enum.Enum):
@@ -66,86 +57,6 @@ class CPUArchitecture(str, enum.Enum):
 
 
 @dataclass
-class RawCatalogItem:
-    """
-    An item stored in the catalog.
-    See `CatalogItem` for field descriptions.
-    """
-
-    instance_name: str | None
-    location: str | None
-    price: float | None
-    cpu: int | None
-    memory: float | None
-    gpu_count: int | None
-    gpu_name: str | None
-    gpu_memory: float | None
-    spot: bool | None
-    disk_size: float | None
-    gpu_vendor: str | None = None
-    flags: list[str] = field(default_factory=list)
-    cpu_arch: str | None = None
-    provider_data: JSONObject = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        self._process_gpu_vendor()
-        self._process_cpu_arch()
-
-    def _process_gpu_vendor(self) -> None:
-        # This heuristic will be required indefinitely since we support historical catalogs.
-        is_tpu = False
-        gpu_name = self.gpu_name
-        if gpu_name and gpu_name.startswith("tpu-"):
-            is_tpu = True
-            self.gpu_name = gpu_name[4:]
-        gpu_vendor = self.gpu_vendor
-        if gpu_vendor is None:
-            if not self.gpu_count:
-                # None or 0
-                return
-            if is_tpu:
-                self.gpu_vendor = AcceleratorVendor.GOOGLE.value
-            else:
-                self.gpu_vendor = AcceleratorVendor.NVIDIA.value
-        elif isinstance(gpu_vendor, AcceleratorVendor):
-            self.gpu_vendor = gpu_vendor.value
-
-    def _process_cpu_arch(self) -> None:
-        # This heuristic will be required indefinitely since we support historical catalogs.
-        cpu_arch = self.cpu_arch
-        if cpu_arch is None:
-            self.cpu_arch = CPUArchitecture.X86.value
-        elif isinstance(cpu_arch, CPUArchitecture):
-            self.cpu_arch = cpu_arch.value
-
-    @staticmethod
-    def from_dict(v: dict) -> "RawCatalogItem":
-        return RawCatalogItem(
-            instance_name=empty_as_none(v.get("instance_name")),
-            location=empty_as_none(v.get("location")),
-            price=empty_as_none(v.get("price"), loader=float),
-            cpu_arch=empty_as_none(v.get("cpu_arch")),
-            cpu=empty_as_none(v.get("cpu"), loader=int),
-            memory=empty_as_none(v.get("memory"), loader=float),
-            gpu_vendor=empty_as_none(v.get("gpu_vendor")),
-            gpu_count=empty_as_none(v.get("gpu_count"), loader=int),
-            gpu_name=empty_as_none(v.get("gpu_name")),
-            gpu_memory=empty_as_none(v.get("gpu_memory"), loader=float),
-            spot=empty_as_none(v.get("spot"), loader=bool_loader),
-            disk_size=empty_as_none(v.get("disk_size"), loader=float),
-            flags=v.get("flags", "").split(),
-            provider_data=json.loads(v.get("provider_data", "{}")),
-        )
-
-    def dict(self) -> dict[str, str | int | float | bool | None]:
-        return {
-            **asdict(self),
-            "flags": " ".join(self.flags),
-            "provider_data": json.dumps(self.provider_data),
-        }
-
-
-@dataclass
 class CatalogItem:
     """
     An item returned by `Catalog.query`.
@@ -172,6 +83,7 @@ class CatalogItem:
             Prefer defining a TypedDict within provider implementation.
     """
 
+    provider: str
     instance_name: str
     location: str
     price: float
@@ -182,41 +94,14 @@ class CatalogItem:
     gpu_memory: float | None
     spot: bool
     disk_size: float | None
-    provider: str
     gpu_vendor: AcceleratorVendor | None = None
     flags: list[str] = field(default_factory=list)
-    cpu_arch: CPUArchitecture | None = None
+    cpu_arch: CPUArchitecture = CPUArchitecture.X86
     provider_data: JSONObject = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        self._process_gpu_vendor()
-        self._process_cpu_arch()
-
-    def _process_gpu_vendor(self) -> None:
-        # This heuristic is only required until we update all providers to always set the vendor.
-        gpu_vendor = self.gpu_vendor
-        if gpu_vendor is None:
-            if not self.gpu_count:
-                # None or 0
-                return
-            # GCPProvider already sets gpu_vendor, and all other providers only support Nvidia
-            self.gpu_vendor = AcceleratorVendor.NVIDIA
-        else:
-            # This cast to the enum is always required since RawCatalogItem.gpu_vendor
-            # is a string field (for (de)serialization purposes).
-            self.gpu_vendor = AcceleratorVendor.cast(gpu_vendor)
-
-    def _process_cpu_arch(self) -> None:
-        # This heuristic is only required until we update all providers to always set the arch.
-        cpu_arch = self.cpu_arch
-        if cpu_arch is None:
-            self.cpu_arch = CPUArchitecture.X86
-        else:
-            self.cpu_arch = CPUArchitecture.cast(cpu_arch)
-
-    @staticmethod
-    def from_dict(v: dict, *, provider: str | None = None) -> "CatalogItem":
-        return CatalogItem(provider=provider, **asdict(RawCatalogItem.from_dict(v)))
+        if self.gpu_count and self.gpu_vendor is None:
+            raise ValueError(f"gpu_vendor is required when gpu_count is non-zero: {self}")
 
 
 @dataclass

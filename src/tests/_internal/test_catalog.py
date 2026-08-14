@@ -1,7 +1,7 @@
 from unittest.mock import Mock
 
 import gpuhunt._internal.catalog as internal_catalog
-from gpuhunt import Catalog, CatalogItem, RawCatalogItem
+from gpuhunt import AcceleratorVendor, Catalog, CatalogItem
 from gpuhunt.providers.vastai import VastAIProvider
 from gpuhunt.providers.vultr import VultrProvider
 
@@ -15,7 +15,12 @@ class TestQuery:
         catalog.add_provider(vultr)
 
         vastai = VastAIProvider()
-        vastai.get = Mock(return_value=[catalog_item(price=2), catalog_item(price=1)])
+        vastai.get = Mock(
+            return_value=[
+                catalog_item(provider="vastai", price=2),
+                catalog_item(provider="vastai", price=1),
+            ]
+        )
         catalog.add_provider(vastai)
 
         assert catalog.query(provider=["vultr", "vastai"]) == [
@@ -43,7 +48,10 @@ class TestQuery:
         catalog.add_provider(vastai := VastAIProvider())
 
         vultr_offers = [catalog_item(price=1)]
-        vastai_offers = [catalog_item(price=2), catalog_item(price=3)]
+        vastai_offers = [
+            catalog_item(provider="vastai", price=2),
+            catalog_item(provider="vastai", price=3),
+        ]
 
         vultr.get = Mock(return_value=vultr_offers)
         vastai.get = Mock(return_value=vastai_offers)
@@ -74,21 +82,20 @@ class TestQuery:
         assert len(catalog.query(gpu_name=["a10", "A100"])) == 3
 
 
-def catalog_item(**kwargs) -> CatalogItem | RawCatalogItem:
-    values = dict(
+def catalog_item(
+    provider: str = "vultr", price: float = 1, gpu_name: str | None = "gpu"
+) -> CatalogItem:
+    return CatalogItem(
+        provider=provider,
         instance_name="instance",
         cpu=1,
         memory=1,
-        gpu_vendor="nvidia",
+        gpu_vendor=AcceleratorVendor.NVIDIA,
         gpu_count=1,
-        gpu_name="gpu",
+        gpu_name=gpu_name,
         gpu_memory=1,
         location="location",
-        price=1,
+        price=price,
         spot=False,
         disk_size=None,
     )
-    values.update(kwargs)
-    if "provider" in values:
-        return CatalogItem(**values)
-    return RawCatalogItem(**values)

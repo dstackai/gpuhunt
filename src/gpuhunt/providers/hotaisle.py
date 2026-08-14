@@ -1,45 +1,46 @@
 import logging
-import os
 from typing import TypedDict, cast
 
 import requests
 from requests import Response
 
 from gpuhunt._internal.constraints import find_accelerators
-from gpuhunt._internal.models import AcceleratorVendor, JSONObject, QueryFilter, RawCatalogItem
-from gpuhunt.providers import AbstractProvider
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, JSONObject, QueryFilter
+from gpuhunt.providers.base import OnlineProvider, get_creds_env
 
 logger = logging.getLogger(__name__)
 
 API_URL = "https://admin.hotaisle.app/api"
 
 
-class HotAisleProvider(AbstractProvider):
+class HotAisleProvider(OnlineProvider):
     NAME = "hotaisle"
 
-    def __init__(self, api_key: str | None = None, team_handle: str | None = None):
+    def __init__(self, api_key: str, team_handle: str):
         """Hotaisle requries an API key and team handle to access the API."""
-        self.api_key = api_key or os.getenv("HOTAISLE_API_KEY")
-        self.team_handle = team_handle or os.getenv("HOTAISLE_TEAM_HANDLE")
+        self.api_key = api_key
+        self.team_handle = team_handle
 
-        if not self.api_key:
-            raise ValueError("Set the HOTAISLE_API_KEY environment variable.")
-        if not self.team_handle:
-            raise ValueError("Set the HOTAISLE_TEAM_HANDLE environment variable.")
+    @classmethod
+    def from_env(cls) -> "HotAisleProvider":
+        return cls(
+            api_key=get_creds_env("HOTAISLE_API_KEY"),
+            team_handle=get_creds_env("HOTAISLE_TEAM_HANDLE"),
+        )
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         offers = self.fetch_offers()
         return sorted(offers, key=lambda i: i.price)
 
-    def fetch_offers(self) -> list[RawCatalogItem]:
+    def fetch_offers(self) -> list[CatalogItem]:
         """Fetch available virtual machines from HotAisle API.
         See API documentation(https://admin.hotaisle.app/api/docs)
         for details."""
         url = f"/teams/{self.team_handle}/virtual_machines/available/"
         response = self._make_request("GET", url)
-        return convert_response_to_raw_catalog_items(response)
+        return _make_offers(response)
 
     def _make_request(self, method: str, url: str) -> Response:
         full_url = f"{API_URL}{url}"
@@ -64,9 +65,9 @@ def get_gpu_memory(gpu_name: str) -> float | None:
     return None
 
 
-def convert_response_to_raw_catalog_items(response: Response) -> list[RawCatalogItem]:
+def _make_offers(response: Response) -> list[CatalogItem]:
     data = response.json()
-    offers = []
+    offers: list[CatalogItem] = []
     for item in data:
         price_in_cents = item["OnDemandPrice"]
         price = float(price_in_cents) / 100
@@ -82,13 +83,14 @@ def convert_response_to_raw_catalog_items(response: Response) -> list[RawCatalog
         gpu = gpus[0]
         gpu_count = gpu["count"]
         gpu_name = gpu["model"]
-        gpu_vendor = AcceleratorVendor.AMD.value  # All GPUs are AMD with HotAisle.
+        gpu_vendor = AcceleratorVendor.AMD  # All GPUs are AMD with HotAisle.
         gpu_memory = get_gpu_memory(gpu_name)
 
         # Create instance name: cpu_model-cores-ram-gpucount-gpu
         instance_name = f"{gpu_count}x {gpu_name} {cpu_cores}x {cpu_model}"
 
-        offer = RawCatalogItem(
+        offer = CatalogItem(
+            provider=HotAisleProvider.NAME,
             instance_name=instance_name,
             location="us-michigan-1",  # Hardcoded for now, as HotAisle only has one location.
             price=price,
@@ -103,7 +105,7 @@ def convert_response_to_raw_catalog_items(response: Response) -> list[RawCatalog
             provider_data=cast(
                 JSONObject,
                 HotAisleCatalogItemProviderData(
-                    # The specs object may duplicate some RawCatalogItem fields, but we store it in
+                    # The specs object may duplicate some CatalogItem fields, but we store it in
                     # full because we need to pass it back to the API when creating VMs.
                     vm_specs=specs,
                 ),

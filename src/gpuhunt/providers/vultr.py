@@ -4,31 +4,35 @@ from typing import Any, cast
 import requests
 from requests import Response
 
-from gpuhunt import QueryFilter, RawCatalogItem
+from gpuhunt import CatalogItem, QueryFilter
 from gpuhunt._internal.constraints import (
     find_accelerators,
     get_gpu_vendor,
     is_nvidia_superchip,
 )
 from gpuhunt._internal.models import AcceleratorVendor, CPUArchitecture
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OnlineProvider
 
 logger = logging.getLogger(__name__)
 
 API_URL = "https://api.vultr.com/v2"
 
 
-class VultrProvider(AbstractProvider):
+class VultrProvider(OnlineProvider):
     NAME = "vultr"
+
+    @classmethod
+    def from_env(cls) -> "VultrProvider":
+        return cls()
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         offers = fetch_offers()
         return sorted(offers, key=lambda i: i.price)
 
 
-def fetch_offers() -> list[RawCatalogItem]:
+def fetch_offers() -> list[CatalogItem]:
     """Fetch plans with types:
     1. Cloud GPU (vcg),
     2. Bare Metal (vbm),
@@ -39,13 +43,13 @@ def fetch_offers() -> list[RawCatalogItem]:
         All optimized Cloud Types (voc)"""
     bare_metal_plans_response = _make_request("GET", "/plans-metal?per_page=500")
     other_plans_response = _make_request("GET", "/plans?type=all&per_page=500")
-    return convert_response_to_raw_catalog_items(bare_metal_plans_response, other_plans_response)
+    return _make_offers(bare_metal_plans_response, other_plans_response)
 
 
-def convert_response_to_raw_catalog_items(
+def _make_offers(
     bare_metal_plans_response: Response, other_plans_response: Response
-) -> list[RawCatalogItem]:
-    catalog_items = []
+) -> list[CatalogItem]:
+    offers: list[CatalogItem] = []
 
     bare_metal_plans = bare_metal_plans_response.json()["plans_metal"]
     other_plans = other_plans_response.json()["plans"]
@@ -54,18 +58,18 @@ def convert_response_to_raw_catalog_items(
         for location in plan["locations"]:
             catalog_item = get_bare_metal_plans(plan, location)
             if catalog_item:
-                catalog_items.append(catalog_item)
+                offers.append(catalog_item)
 
     for plan in other_plans:
         for location in plan["locations"]:
             catalog_item = get_instance_plans(plan, location)
             if catalog_item:
-                catalog_items.append(catalog_item)
+                offers.append(catalog_item)
 
-    return catalog_items
+    return offers
 
 
-def get_bare_metal_plans(plan: dict, location: str) -> RawCatalogItem | None:
+def get_bare_metal_plans(plan: dict, location: str) -> CatalogItem | None:
     cpu_arch = CPUArchitecture.X86
     gpu_count, gpu_name, gpu_memory, gpu_vendor = 0, None, None, None
     if "gpu" in plan["id"]:
@@ -79,11 +83,12 @@ def get_bare_metal_plans(plan: dict, location: str) -> RawCatalogItem | None:
         if gpu_vendor is None:
             logger.warning("Unknown GPU vendor for plan %s, skipping", plan["id"])
             return None
-    return RawCatalogItem(
+    return CatalogItem(
+        provider=VultrProvider.NAME,
         instance_name=plan["id"],
         location=location,
         price=plan["hourly_cost"],
-        cpu_arch=cpu_arch.value,
+        cpu_arch=cpu_arch,
         cpu=plan["cpu_threads"],
         memory=plan["ram"] / 1024,
         gpu_count=gpu_count,
@@ -95,15 +100,16 @@ def get_bare_metal_plans(plan: dict, location: str) -> RawCatalogItem | None:
     )
 
 
-def get_instance_plans(plan: dict, location: str) -> RawCatalogItem | None:
+def get_instance_plans(plan: dict, location: str) -> CatalogItem | None:
     cpu_arch = CPUArchitecture.X86
     plan_type = plan["type"]
     if plan_type in ["vc2", "vhf", "vhp", "voc"]:
-        return RawCatalogItem(
+        return CatalogItem(
+            provider=VultrProvider.NAME,
             instance_name=plan["id"],
             location=location,
             price=plan["hourly_cost"],
-            cpu_arch=cpu_arch.value,
+            cpu_arch=cpu_arch,
             cpu=plan["vcpu_count"],
             memory=plan["ram"] / 1024,
             gpu_count=0,
@@ -141,11 +147,12 @@ def get_instance_plans(plan: dict, location: str) -> RawCatalogItem | None:
         gpu_count = max(1, gpu_memory_total // gpu_memory)
         if is_nvidia_superchip(gpu_name):
             cpu_arch = CPUArchitecture.ARM
-        return RawCatalogItem(
+        return CatalogItem(
+            provider=VultrProvider.NAME,
             instance_name=plan["id"],
             location=location,
             price=plan["hourly_cost"],
-            cpu_arch=cpu_arch.value,
+            cpu_arch=cpu_arch,
             cpu=plan["vcpu_count"],
             memory=plan["ram"] / 1024,
             gpu_count=gpu_count,

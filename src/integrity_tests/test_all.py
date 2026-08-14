@@ -1,11 +1,10 @@
 import csv
 import os
-from dataclasses import fields
 from pathlib import Path
 
 import pytest
 
-from gpuhunt._internal.models import RawCatalogItem
+from gpuhunt._internal.storage import CATALOG_V2_FIELDS
 
 # Fields that are allowed to be empty, including empty strings or empty lists
 OPTIONAL_CATALOG_ITEM_FIELDS = ["gpu_name", "gpu_memory", "gpu_vendor", "disk_size", "flags"]
@@ -24,7 +23,7 @@ class TestAllCatalogs:
 
     @pytest.mark.parametrize(
         "field",
-        [f.name for f in fields(RawCatalogItem) if f.name not in OPTIONAL_CATALOG_ITEM_FIELDS],
+        [f for f in CATALOG_V2_FIELDS if f not in OPTIONAL_CATALOG_ITEM_FIELDS],
     )
     def test_field_present(self, catalog: csv.DictReader, field: str) -> None:
         for row in catalog:

@@ -4,8 +4,8 @@ import os
 import requests
 
 from gpuhunt._internal.constraints import get_gpu_vendor
-from gpuhunt._internal.models import QueryFilter, RawCatalogItem
-from gpuhunt.providers import AbstractProvider
+from gpuhunt._internal.models import CatalogItem, QueryFilter
+from gpuhunt.providers.base import OnlineProvider, get_creds_env
 
 logger = logging.getLogger(__name__)
 
@@ -13,26 +13,30 @@ logger = logging.getLogger(__name__)
 STANDARD_CLOUD_API_URL = "https://api.digitalocean.com"
 
 
-class DigitalOceanProvider(AbstractProvider):
+class DigitalOceanProvider(OnlineProvider):
     NAME = "digitalocean"
 
-    def __init__(self, api_key: str | None = None, api_url: str | None = None):
-        self.api_key = api_key or os.getenv("DIGITAL_OCEAN_API_KEY")
-        if not self.api_key:
-            raise ValueError("Set the DIGITAL_OCEAN_API_KEY environment variable.")
+    def __init__(self, api_key: str, api_url: str = STANDARD_CLOUD_API_URL):
+        self.api_key = api_key
+        self.api_url = api_url
 
-        self.api_url = api_url or os.getenv("DIGITAL_OCEAN_API_URL", STANDARD_CLOUD_API_URL)
+    @classmethod
+    def from_env(cls) -> "DigitalOceanProvider":
+        return cls(
+            api_key=get_creds_env("DIGITAL_OCEAN_API_KEY"),
+            api_url=os.getenv("DIGITAL_OCEAN_API_URL", STANDARD_CLOUD_API_URL),
+        )
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         offers = self.fetch_offers()
         return sorted(offers, key=lambda i: i.price)
 
-    def fetch_offers(self) -> list[RawCatalogItem]:
+    def fetch_offers(self) -> list[CatalogItem]:
         url = "/v2/sizes"
         response = self._make_request("GET", url)
-        return convert_response_to_raw_catalog_items(response)
+        return _make_offers(response)
 
     def _make_request(self, method: str, url: str):
         full_url = f"{self.api_url}{url}"
@@ -48,9 +52,9 @@ class DigitalOceanProvider(AbstractProvider):
         return response
 
 
-def convert_response_to_raw_catalog_items(response) -> list[RawCatalogItem]:
+def _make_offers(response) -> list[CatalogItem]:
     data = response.json()
-    offers = []
+    offers: list[CatalogItem] = []
 
     for size in data["sizes"]:
         gpu_info = size.get("gpu_info")
@@ -83,7 +87,8 @@ def convert_response_to_raw_catalog_items(response) -> list[RawCatalogItem]:
         # Creates an offer for each available region.
         # If regions list is empty, instance type is not available.
         for region in size["regions"]:
-            offer = RawCatalogItem(
+            offer = CatalogItem(
+                provider=DigitalOceanProvider.NAME,
                 instance_name=size["slug"],
                 location=region,
                 price=size["price_hourly"],

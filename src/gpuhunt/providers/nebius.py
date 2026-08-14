@@ -34,11 +34,12 @@ from gpuhunt._internal.constraints import find_accelerators
 from gpuhunt._internal.models import (
     AcceleratorInfo,
     AcceleratorVendor,
+    CatalogItem,
     JSONObject,
     QueryFilter,
-    RawCatalogItem,
 )
-from gpuhunt.providers import AbstractProvider
+from gpuhunt._internal.utils import get_or_error
+from gpuhunt.providers.base import OfflineProvider
 from gpuhunt.version import __version__
 
 logger = logging.getLogger(__name__)
@@ -73,7 +74,7 @@ INFINIBAND_FABRICS = [
 ]
 
 
-class NebiusProvider(AbstractProvider):
+class NebiusProvider(OfflineProvider):
     NAME = "nebius"
 
     def __init__(self, credentials: Credentials) -> None:
@@ -81,8 +82,8 @@ class NebiusProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
-        items: list[RawCatalogItem] = []
+    ) -> list[CatalogItem]:
+        offers: list[CatalogItem] = []
         sdk = SDK(
             credentials=self.credentials,
             user_agent_prefix=f"gpuhunt/{__version__}",
@@ -102,15 +103,14 @@ class NebiusProvider(AbstractProvider):
                             price = get_price(
                                 calculator, project_id, platform.metadata.name, preset.name, spot
                             )
-                            item = make_item(
+                            offer = _make_offer(
                                 platform.metadata.name, preset, gpu, region, spot, price
                             )
-                            if item is not None:
-                                items.append(item)
+                            if offer is not None:
+                                offers.append(offer)
         finally:
             sdk.sync_close(timeout=TIMEOUT)
-        items.sort(key=lambda i: i.price)
-        return items
+        return sorted(offers, key=lambda i: i.price)
 
 
 class NebiusCatalogItemProviderData(TypedDict):
@@ -151,7 +151,7 @@ def get_price(
     estimate = calculator.estimate(
         request=EstimateRequest(resource_spec=ResourceSpec(compute_instance_spec=spec))
     ).wait()
-    return float(estimate.hourly_cost.general.total.cost)
+    return float(get_or_error(estimate.hourly_cost.general, "general hourly cost").total.cost)
 
 
 def list_platforms(sdk: SDK, project_id: str) -> ListPlatformsResponse:
@@ -177,21 +177,22 @@ def get_gpu_info(platform: Platform) -> AcceleratorInfo | None:
     return accelerator_info[0]
 
 
-def make_item(
+def _make_offer(
     platform: str,
     preset: Preset,
     gpu: AcceleratorInfo | None,
     region: str,
     spot: bool,
     price: float,
-) -> RawCatalogItem | None:
+) -> CatalogItem | None:
     fabrics = []
     if preset.allow_gpu_clustering:
         fabrics = [
             f.name for f in INFINIBAND_FABRICS if f.platform == platform and f.region == region
         ]
 
-    item = RawCatalogItem(
+    item = CatalogItem(
+        provider=NebiusProvider.NAME,
         instance_name=f"{platform} {preset.name}",
         location=region,
         price=price,

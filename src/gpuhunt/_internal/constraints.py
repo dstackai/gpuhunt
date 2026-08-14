@@ -15,30 +15,6 @@ from gpuhunt._internal.models import (
     TPUInfo,
 )
 
-# v5litepod = v5e
-_TPU_VERSIONS = ["v2", "v3", "v4", "v5p", "v5litepod", "v6e"]
-
-
-Comparable = TypeVar("Comparable", bound=int | float | tuple[int, int])
-
-
-def is_between(value: Comparable, left: Comparable | None, right: Comparable | None) -> bool:
-    if is_below(value, left) or is_above(value, right):
-        return False
-    return True
-
-
-def is_below(value: Comparable, limit: Comparable | None) -> bool:
-    if limit is not None and value < limit:
-        return True
-    return False
-
-
-def is_above(value: Comparable, limit: Comparable | None) -> bool:
-    if limit is not None and value > limit:
-        return True
-    return False
-
 
 def matches(i: CatalogItem, q: QueryFilter) -> bool:
     """
@@ -53,21 +29,21 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
     """
     if q.provider is not None and i.provider.lower() not in map(str.lower, q.provider):
         return False
-    if not is_between(i.price, q.min_price, q.max_price):
+    if not _is_between(i.price, q.min_price, q.max_price):
         return False
     if q.spot is not None and i.spot != q.spot:
         return False
     if q.cpu_arch and q.cpu_arch != i.cpu_arch:
         return False
-    if not is_between(i.cpu, q.min_cpu, q.max_cpu):
+    if not _is_between(i.cpu, q.min_cpu, q.max_cpu):
         return False
-    if not is_between(i.memory, q.min_memory, q.max_memory):
+    if not _is_between(i.memory, q.min_memory, q.max_memory):
         return False
     if not (q.min_gpu_count == 0 and i.gpu_count == 0):
         # GPU filters should not be applied to non-gpu offers if `q.min_gpu_count == 0`.
         if q.gpu_vendor and q.gpu_vendor != i.gpu_vendor:
             return False
-        if not is_between(i.gpu_count, q.min_gpu_count, q.max_gpu_count):
+        if not _is_between(i.gpu_count, q.min_gpu_count, q.max_gpu_count):
             return False
         if q.gpu_name is not None:
             if i.gpu_name is None:
@@ -80,20 +56,22 @@ def matches(i: CatalogItem, q: QueryFilter) -> bool:
             if not i.gpu_name:
                 return False
             cc = get_compute_capability(i.gpu_name)
-            if not cc or not is_between(cc, q.min_compute_capability, q.max_compute_capability):
+            if not cc or not _is_between(cc, q.min_compute_capability, q.max_compute_capability):
                 return False
-        if not is_between(
-            i.gpu_memory if i.gpu_count > 0 else 0, q.min_gpu_memory, q.max_gpu_memory
+        if not _is_between(
+            i.gpu_memory if i.gpu_count > 0 and i.gpu_memory is not None else 0,
+            q.min_gpu_memory,
+            q.max_gpu_memory,
         ):
             return False
-        if not is_between(
-            (i.gpu_count * i.gpu_memory) if i.gpu_count > 0 else 0,
+        if not _is_between(
+            (i.gpu_count * i.gpu_memory) if i.gpu_count > 0 and i.gpu_memory is not None else 0,
             q.min_total_gpu_memory,
             q.max_total_gpu_memory,
         ):
             return False
     if i.disk_size is not None:
-        if not is_between(i.disk_size, q.min_disk_size, q.max_disk_size):
+        if not _is_between(i.disk_size, q.min_disk_size, q.max_disk_size):
             return False
     if q.allowed_flags is not None:
         if any(flag not in q.allowed_flags for flag in i.flags):
@@ -116,7 +94,7 @@ def find_accelerators(
 
 
 def get_compute_capability(gpu_name: str) -> tuple[int, int] | None:
-    if accelerators := find_accelerators(names=[gpu_name], vendors=AcceleratorVendor.NVIDIA):
+    if accelerators := find_accelerators(names=[gpu_name], vendors=[AcceleratorVendor.NVIDIA]):
         assert isinstance(accelerators[0], NvidiaGPUInfo)
         return accelerators[0].compute_capability
     return None
@@ -298,6 +276,10 @@ KNOWN_AMD_GPUS: list[AMDGPUInfo] = [
     ),
 ]
 
+
+# v5litepod = v5e
+_TPU_VERSIONS = ["v2", "v3", "v4", "v5p", "v5litepod", "v6e"]
+
 KNOWN_TPUS: list[TPUInfo] = [TPUInfo(name=version, memory=0) for version in _TPU_VERSIONS]
 
 KNOWN_INTEL_ACCELERATORS: list[IntelAcceleratorInfo] = [
@@ -326,3 +308,24 @@ KNOWN_ACCELERATORS: list[
     + KNOWN_INTEL_ACCELERATORS
     + KNOWN_TENSTORRENT_ACCELERATORS
 )
+
+
+Comparable = TypeVar("Comparable", int, float, tuple[int, int])
+
+
+def _is_between(value: Comparable, left: Comparable | None, right: Comparable | None) -> bool:
+    if _is_below(value, left) or _is_above(value, right):
+        return False
+    return True
+
+
+def _is_below(value: Comparable, limit: Comparable | None) -> bool:
+    if limit is not None and value < limit:
+        return True
+    return False
+
+
+def _is_above(value: Comparable, limit: Comparable | None) -> bool:
+    if limit is not None and value > limit:
+        return True
+    return False

@@ -7,8 +7,8 @@ from collections.abc import Iterable
 from verda import VerdaClient
 from verda.instance_types import InstanceType
 
-from gpuhunt import QueryFilter, RawCatalogItem
-from gpuhunt.providers import AbstractProvider
+from gpuhunt import AcceleratorVendor, CatalogItem, QueryFilter
+from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ ALL_AMD_GPUS = [
 ]
 
 
-class VerdaProvider(AbstractProvider):
+class VerdaProvider(OfflineProvider):
     NAME = "verda"
 
     def __init__(self, client_id: str, client_secret: str) -> None:
@@ -26,15 +26,13 @@ class VerdaProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         instance_types = self._get_instance_types()
         locations = self._get_locations()
-
         spots = (True, False)
         location_codes = [loc["code"] for loc in locations]
-        instances = generate_instances(spots, location_codes, instance_types)
-
-        return sorted(instances, key=lambda x: x.price)
+        offers = _make_offers(spots, location_codes, instance_types)
+        return sorted(offers, key=lambda x: x.price)
 
     def _get_instance_types(self) -> list[InstanceType]:
         return self.verda_client.instance_types.get()
@@ -43,30 +41,32 @@ class VerdaProvider(AbstractProvider):
         return self.verda_client.locations.get()
 
     @classmethod
-    def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
+    def filter(cls, offers: list[CatalogItem]) -> list[CatalogItem]:
         return [o for o in offers if o.gpu_name not in ALL_AMD_GPUS]  # skip AMD GPU
 
 
-def generate_instances(
+def _make_offers(
     spots: Iterable[bool], location_codes: Iterable[str], instance_types: Iterable[InstanceType]
-) -> list[RawCatalogItem]:
-    instances = []
+) -> list[CatalogItem]:
+    offers: list[CatalogItem] = []
     for spot, location, instance in itertools.product(spots, location_codes, instance_types):
-        item = transform_instance(copy.copy(instance), spot, location)
-        if item is None:
+        offer = _make_offer(copy.copy(instance), spot, location)
+        if offer is None:
             continue
-        instances.append(RawCatalogItem.from_dict(item))
-    return instances
+        offers.append(offer)
+    return offers
 
 
-def transform_instance(instance: InstanceType, spot: bool, location: str) -> dict | None:
+def _make_offer(instance: InstanceType, spot: bool, location: str) -> CatalogItem | None:
     gpu_memory = None
     gpu_count = instance.gpu["number_of_gpus"]
     gpu_name = None
+    gpu_vendor = None
 
     if instance.gpu["number_of_gpus"]:
         gpu_memory = instance.gpu_memory["size_in_gigabytes"] / instance.gpu["number_of_gpus"]
         gpu_name = get_gpu_name(instance.gpu["description"])
+        gpu_vendor = AcceleratorVendor.NVIDIA
 
     if gpu_count and gpu_name is None:
         logger.warning(
@@ -74,18 +74,21 @@ def transform_instance(instance: InstanceType, spot: bool, location: str) -> dic
         )
         return None
 
-    raw = dict(
+    return CatalogItem(
+        provider=VerdaProvider.NAME,
         instance_name=instance.instance_type,
         location=location,
         spot=spot,
-        price=instance.spot_price_per_hour if spot else instance.price_per_hour,
-        cpu=instance.cpu["number_of_cores"],
-        memory=instance.memory["size_in_gigabytes"],
-        gpu_count=gpu_count,
+        # The API reports prices as strings.
+        price=float(instance.spot_price_per_hour if spot else instance.price_per_hour),
+        cpu=int(instance.cpu["number_of_cores"]),
+        memory=float(instance.memory["size_in_gigabytes"]),
+        gpu_count=int(gpu_count),
         gpu_name=gpu_name,
         gpu_memory=gpu_memory,
+        gpu_vendor=gpu_vendor,
+        disk_size=None,
     )
-    return raw
 
 
 GPU_MAP = {

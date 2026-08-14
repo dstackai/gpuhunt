@@ -1,12 +1,11 @@
 import logging
-import os
 import re
 
 import requests
 
 from gpuhunt._internal.constraints import find_accelerators
-from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
-from gpuhunt.providers import AbstractProvider
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
+from gpuhunt.providers.base import OnlineProvider, get_creds_env
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ SEEWEB_GPU_MAP: dict[str, tuple[str, float]] = {
 _NON_NVIDIA_MARKERS = ("MI300", "TENSTORRENT", "GRAYSKULL", "WORMHOLE")
 
 
-class SeewebProvider(AbstractProvider):
+class SeewebProvider(OnlineProvider):
     """Online provider for Seeweb Cloud Server GPU.
 
     Seeweb's plan/pricing endpoints require authentication, so this is an online provider queried
@@ -44,15 +43,16 @@ class SeewebProvider(AbstractProvider):
 
     NAME = "seeweb"
 
-    def __init__(self, token: str | None = None):
-        token = token or os.getenv("SEEWEB_API_TOKEN")
-        if not token:
-            raise ValueError("Set the SEEWEB_API_TOKEN environment variable.")
+    def __init__(self, token: str):
         self.token = token
+
+    @classmethod
+    def from_env(cls) -> "SeewebProvider":
+        return cls(token=get_creds_env("SEEWEB_API_TOKEN"))
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         response = requests.get(
             f"{API_URL}/plans",
             headers={"X-APITOKEN": self.token},
@@ -63,16 +63,16 @@ class SeewebProvider(AbstractProvider):
         if not isinstance(data, dict) or not isinstance(data.get("plans"), list):
             raise ValueError("Unexpected response from Seeweb /plans endpoint")
 
-        offers: list[RawCatalogItem] = []
+        offers: list[CatalogItem] = []
         for plan in data["plans"]:
             if not isinstance(plan, dict):
                 logger.warning("Skipping malformed Seeweb plan: %r", plan)
                 continue
-            offers.extend(_convert_plan(plan))
+            offers.extend(_make_offers(plan))
         return sorted(offers, key=lambda item: item.price if item.price is not None else 0.0)
 
 
-def _convert_plan(plan: dict) -> list[RawCatalogItem]:
+def _make_offers(plan: dict) -> list[CatalogItem]:
     plan_name = plan.get("name")
     gpu_label = plan.get("gpu_label")
     # In the /plans response, "available" means that the plan is active. It does not indicate
@@ -113,7 +113,7 @@ def _convert_plan(plan: dict) -> list[RawCatalogItem]:
         )
         return []
 
-    offers = []
+    offers: list[CatalogItem] = []
     seen_regions = set()
     # These are regions where the plan is active/compatible, not a real-time capacity signal.
     # Consumers that need current capacity should query /plans/availables separately.
@@ -130,7 +130,8 @@ def _convert_plan(plan: dict) -> list[RawCatalogItem]:
             continue
         seen_regions.add(location)
         offers.append(
-            RawCatalogItem(
+            CatalogItem(
+                provider=SeewebProvider.NAME,
                 instance_name=plan_name,
                 location=location,
                 price=price,
@@ -140,7 +141,7 @@ def _convert_plan(plan: dict) -> list[RawCatalogItem]:
                 gpu_count=gpu_count,
                 gpu_name=gpu_name,
                 gpu_memory=gpu_memory,
-                gpu_vendor=AcceleratorVendor.NVIDIA.value,
+                gpu_vendor=AcceleratorVendor.NVIDIA,
                 spot=False,
                 disk_size=disk_size,
             )

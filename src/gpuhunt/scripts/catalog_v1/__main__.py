@@ -21,9 +21,9 @@ def main(args: Sequence[str] | None = None):
     )
     parser.add_argument("--input", type=Path, required=True, help="The v2 catalog file to read")
     parser.add_argument("--output", type=Path, required=True, help="The v1 catalog file to write")
-    args = parser.parse_args(args)
-    storage.convert_catalog_v2_to_v1(path_v2=args.input, path_v1=args.output)
-    logging.info("Converted %s -> %s", args.input, args.output)
+    parsed_args = parser.parse_args(args)
+    storage.convert_catalog_v2_to_v1(path_v2=parsed_args.input, path_v1=parsed_args.output)
+    logging.info("Converted %s -> %s", parsed_args.input, parsed_args.output)
 
 
 if __name__ == "__main__":

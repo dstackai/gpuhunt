@@ -1,7 +1,6 @@
 import copy
 import logging
 import re
-from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from typing import Annotated, TypeVar
 
@@ -12,9 +11,10 @@ from requests import Session
 from typing_extensions import TypedDict
 
 from gpuhunt._internal.constraints import find_accelerators
-from gpuhunt._internal.models import AcceleratorVendor, QueryFilter, RawCatalogItem
-from gpuhunt._internal.utils import to_camel_case
-from gpuhunt.providers import AbstractProvider
+from gpuhunt._internal.errors import ProviderError
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
+from gpuhunt._internal.utils import get_or_error, to_camel_case
+from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
 COST_ESTIMATOR_URL_TEMPLATE = "https://www.oracle.com/a/ocom/docs/cloudestimator2/data/{resource}"
@@ -37,7 +37,7 @@ class OCICredentials(TypedDict):
     region: str | None
 
 
-class OCIProvider(AbstractProvider):
+class OCIProvider(OfflineProvider):
     NAME = "oci"
 
     def __init__(self, credentials: OCICredentials):
@@ -48,12 +48,15 @@ class OCIProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         shapes = self.cost_estimator.get_shapes()
         products = self.cost_estimator.get_products()
-        regions: list[Region] = self.api_client.list_regions().data
+        regions: list[Region] = get_or_error(
+            self.api_client.list_regions(), "list_regions response"
+        ).data
+        region_names = [get_or_error(region.name, "region name") for region in regions]
 
-        result = []
+        offers: list[CatalogItem] = []
 
         for shape in shapes.items:
             if (
@@ -72,30 +75,30 @@ class OCIProvider(AbstractProvider):
                     "Skipping shape %s due to unexpected Cost Estimator data: %s", shape.name, e
                 )
                 continue
+            for region_name in region_names:
+                on_demand_item = CatalogItem(
+                    provider=OCIProvider.NAME,
+                    instance_name=shape.name,
+                    location=region_name,
+                    price=resources.total_price(),
+                    cpu=resources.cpu.vcpus,
+                    memory=resources.memory.gbs,
+                    gpu_vendor=(AcceleratorVendor.NVIDIA if resources.gpu.units_count else None),
+                    gpu_count=resources.gpu.units_count,
+                    gpu_name=resources.gpu.name,
+                    gpu_memory=resources.gpu.unit_memory_gb,
+                    spot=False,
+                    disk_size=None,
+                )
+                item_variations = [on_demand_item]
+                if shape.allow_preemptible:
+                    item_variations.append(self._make_spot_offer(on_demand_item))
+                offers.extend(item_variations)
 
-            on_demand_item = RawCatalogItem(
-                instance_name=shape.name,
-                location=None,
-                price=resources.total_price(),
-                cpu=resources.cpu.vcpus,
-                memory=resources.memory.gbs,
-                gpu_vendor=None,
-                gpu_count=resources.gpu.units_count,
-                gpu_name=resources.gpu.name,
-                gpu_memory=resources.gpu.unit_memory_gb,
-                spot=False,
-                disk_size=None,
-            )
-            item_variations = [on_demand_item]
-            if shape.allow_preemptible:
-                item_variations.append(self._make_spot_item(on_demand_item))
-            for item in item_variations:
-                result.extend(self._duplicate_item_in_regions(item, regions))
-
-        return sorted(result, key=lambda i: i.price)
+        return sorted(offers, key=lambda i: i.price)
 
     @staticmethod
-    def _make_spot_item(item: RawCatalogItem) -> RawCatalogItem:
+    def _make_spot_offer(item: CatalogItem) -> CatalogItem:
         item = copy.deepcopy(item)
         item.spot = True
         # > Preemptible capacity costs 50% less than on-demand capacity
@@ -103,17 +106,6 @@ class OCIProvider(AbstractProvider):
         item.price *= 0.5
         item.flags.append("oci-spot")
         return item
-
-    @staticmethod
-    def _duplicate_item_in_regions(
-        item: RawCatalogItem, regions: Iterable[Region]
-    ) -> list[RawCatalogItem]:
-        result = []
-        for region in regions:
-            regional_item = copy.deepcopy(item)
-            regional_item.location = region.name
-            result.append(regional_item)
-        return result
 
 
 class CostEstimatorTypeField(BaseModel):
@@ -215,7 +207,7 @@ class CostEstimator:
         return ResponseModel.model_validate_json(resp.content)
 
 
-class CostEstimatorDataError(Exception):
+class CostEstimatorDataError(ProviderError):
     pass
 
 

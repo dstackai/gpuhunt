@@ -1,15 +1,13 @@
-import dataclasses
-
 import pytest
 
 import gpuhunt._internal.catalog as internal_catalog
-from gpuhunt import AcceleratorVendor, Catalog, CatalogItem, RawCatalogItem
+from gpuhunt import AcceleratorVendor, Catalog, CatalogItem
 from gpuhunt.providers.verda import (
     InstanceType,
     VerdaProvider,
-    generate_instances,
+    _make_offer,
+    _make_offers,
     get_gpu_name,
-    transform_instance,
 )
 
 
@@ -185,7 +183,7 @@ def list_available_instances(raw_instance_types, locations):
     spots = (True, False)
     locations = [loc["loc"] for loc in locations]
     instances = [instance_types(raw_instance_types[0])]
-    list_instances = generate_instances(spots, locations, instances)
+    list_instances = _make_offers(spots, locations, instances)
 
     assert len(list_instances) == 4
     assert [i.price for i in list_instances if i.spot] == [1, 70] * 2
@@ -195,14 +193,6 @@ def list_available_instances(raw_instance_types, locations):
 def test_gpu_name(caplog):
     assert get_gpu_name("1x H100 SXM5 80GB") == "H100"
     assert get_gpu_name("") is None
-
-
-def transform(raw_catalog_items: list[RawCatalogItem]) -> list[CatalogItem]:
-    items = []
-    for raw in raw_catalog_items:
-        item = CatalogItem(provider="verda", **dataclasses.asdict(raw))
-        items.append(item)
-    return items
 
 
 def test_available_query(mocker, raw_instance_types):
@@ -312,15 +302,16 @@ def test_available_query_with_instance(mocker, raw_instance_types):
 def test_transform_instance(raw_instance_types):
     location = "ICE-01"
     is_spot = True
-    item = transform_instance(instance_types(raw_instance_types[1]), is_spot, location)
+    item = _make_offer(instance_types(raw_instance_types[1]), is_spot, location)
 
-    expected = RawCatalogItem(
+    expected = CatalogItem(
+        provider="verda",
         instance_name="2A6000.20V",
         location="ICE-01",
         price=0.7,
         cpu=20,
         memory=120,
-        gpu_vendor=AcceleratorVendor.NVIDIA.value,
+        gpu_vendor=AcceleratorVendor.NVIDIA,
         gpu_count=2,
         gpu_name="A6000",
         gpu_memory=96 / 2,
@@ -328,15 +319,16 @@ def test_transform_instance(raw_instance_types):
         disk_size=None,
     )
 
-    assert RawCatalogItem.from_dict(item) == expected
+    assert item == expected
 
 
 def test_cpu_instance(raw_instance_types):
     location = "ICE-01"
     is_spot = False
-    item = transform_instance(instance_types(raw_instance_types[2]), is_spot, location)
+    item = _make_offer(instance_types(raw_instance_types[2]), is_spot, location)
 
-    expected = RawCatalogItem(
+    expected = CatalogItem(
+        provider="verda",
         instance_name="CPU.120V.480G",
         location="ICE-01",
         price=3,
@@ -350,7 +342,7 @@ def test_cpu_instance(raw_instance_types):
         disk_size=None,
     )
 
-    assert RawCatalogItem.from_dict(item) == expected
+    assert item == expected
 
 
 def test_order(mocker, raw_instance_types):

@@ -3,9 +3,9 @@ import os
 
 import requests
 
-from gpuhunt import QueryFilter, RawCatalogItem
+from gpuhunt import CatalogItem, QueryFilter
 from gpuhunt._internal.models import AcceleratorVendor
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
 
@@ -13,25 +13,25 @@ CLOUDRIFT_SERVER_ADDRESS = "https://api.cloudrift.ai"
 CLOUDRIFT_API_VERSION = "2025-03-21"
 
 
-class CloudRiftProvider(AbstractProvider):
+class CloudRiftProvider(OfflineProvider):
     NAME = "cloudrift"
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         instance_types = self._get_instance_types()
-        instance_types = [
-            inst for instance in instance_types for inst in generate_instances(instance)
-        ]
-        return sorted(instance_types, key=lambda x: x.price)
+        offers = [offer for instance in instance_types for offer in _make_offers(instance)]
+        return sorted(offers, key=lambda i: i.price)
 
-    def _get_instance_types(self):
+    def _get_instance_types(self) -> list[dict]:
         request_data = {"selector": {"ByServiceAndLocation": {"services": ["vm"]}}}
         response_data = _make_request("instance-types/list", request_data)
+        if not isinstance(response_data, dict):
+            raise ValueError(f"Unexpected instance-types/list response: {response_data!r}")
         return response_data["instance_types"]
 
 
-def generate_instances(instance) -> list[RawCatalogItem]:
+def _make_offers(instance: dict) -> list[CatalogItem]:
     instance_gpu_brand = instance["brand_short"]
     gpu_info = next(
         (gpu_record for gpu_record in GPU_MAP if gpu_record[0] in instance_gpu_brand), None
@@ -44,7 +44,8 @@ def generate_instances(instance) -> list[RawCatalogItem]:
     instance_types = []
     for variant in instance["variants"]:
         for location, _count in variant["nodes_per_dc"].items():
-            raw = RawCatalogItem(
+            raw = CatalogItem(
+                provider=CloudRiftProvider.NAME,
                 instance_name=variant["name"],
                 location=location,
                 spot=False,
@@ -70,7 +71,7 @@ GPU_MAP = [
 ]
 
 
-def _make_request(endpoint: str, request_data: dict) -> dict | str | None:
+def _make_request(endpoint: str, request_data: dict) -> dict | str:
     server = os.environ.get("CLOUDRIFT_SERVER_ADDRESS", CLOUDRIFT_SERVER_ADDRESS)
     response = requests.request(
         "POST",
@@ -80,10 +81,7 @@ def _make_request(endpoint: str, request_data: dict) -> dict | str | None:
     )
     if not response.ok:
         response.raise_for_status()
-    try:
-        response_json = response.json()
-        if isinstance(response_json, str):
-            return response_json
-        return response_json["data"]
-    except requests.exceptions.JSONDecodeError:
-        return None
+    response_json = response.json()
+    if isinstance(response_json, str):
+        return response_json
+    return response_json["data"]

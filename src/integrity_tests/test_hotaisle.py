@@ -7,9 +7,10 @@ from gpuhunt.providers.hotaisle import HotAisleProvider
 
 @pytest.fixture
 def provider():
-    api_key = os.environ.get("HOTAISLE_API_KEY")
-    team_handle = os.environ.get("HOTAISLE_TEAM_HANDLE")
-    return HotAisleProvider(api_key=api_key, team_handle=team_handle)
+    return HotAisleProvider(
+        api_key=os.environ["HOTAISLE_API_KEY"],
+        team_handle=os.environ["HOTAISLE_TEAM_HANDLE"],
+    )
 
 
 @pytest.fixture

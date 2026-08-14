@@ -13,8 +13,8 @@ import boto3
 import requests
 from botocore.exceptions import ClientError, ConnectTimeoutError, EndpointConnectionError
 
-from gpuhunt._internal.models import QueryFilter, RawCatalogItem
-from gpuhunt.providers import AbstractProvider
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
+from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
 ec2_pricing_url = (
@@ -91,7 +91,7 @@ GPU_NAME_MAPPING = {
 }
 
 
-class AWSProvider(AbstractProvider):
+class AWSProvider(OfflineProvider):
     """
     AWSProvider parses Bulk API index file for AmazonEC2 in all regions and fills missing GPU details
 
@@ -115,28 +115,29 @@ class AWSProvider(AbstractProvider):
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True
-    ) -> list[RawCatalogItem]:
+    ) -> list[CatalogItem]:
         if not os.path.exists(self.cache_path):
             self._download_pricing_file()
 
-        offers = []
+        offers: list[CatalogItem] = []
         with open(self.cache_path, newline="") as f:
             for _ in range(disclaimer_rows_skip):
                 f.readline()
             reader: Iterable[dict[str, str]] = csv.DictReader(f)
             for row in reader:
-                if self.skip(row):
+                if self._skip(row):
                     continue
                 gpu_count = _parse_gpu_count(row["GPU"])
                 if gpu_count is None:
                     continue
-                offer = RawCatalogItem(
+                offer = CatalogItem(
+                    provider=AWSProvider.NAME,
                     instance_name=row["Instance Type"],
                     location=row["Region Code"],
                     price=float(row["PricePerUnit"]),
                     cpu=int(row["vCPU"]),
                     memory=_parse_memory(row["Memory"]),
-                    gpu_vendor=None,
+                    gpu_vendor=AcceleratorVendor.NVIDIA if gpu_count else None,
                     gpu_count=gpu_count,
                     spot=False,
                     gpu_name=None,
@@ -144,11 +145,11 @@ class AWSProvider(AbstractProvider):
                     disk_size=None,
                 )
                 offers.append(offer)
-        self.fill_gpu_details(offers)
-        offers = self.add_spots(offers)
+        self._fill_gpu_details(offers)
+        offers = self._with_spot_offers(offers)
         return sorted(offers, key=lambda i: i.price)
 
-    def skip(self, row: dict[str, str]) -> bool:
+    def _skip(self, row: dict[str, str]) -> bool:
         if any(row["Instance Type"].startswith(family) for family in previous_generation_families):
             return True
         for key, values in pricing_filters.items():
@@ -156,7 +157,7 @@ class AWSProvider(AbstractProvider):
                 return True
         return False
 
-    def fill_gpu_details(self, offers: list[RawCatalogItem]):
+    def _fill_gpu_details(self, offers: list[CatalogItem]) -> None:
         regions = defaultdict(list)
         non_ec2_api_regions = set()
         for offer in offers:
@@ -189,7 +190,7 @@ class AWSProvider(AbstractProvider):
                             if "GpuInfo" in i:
                                 gpu = i["GpuInfo"]["Gpus"][0]
                                 gpus[i["InstanceType"]] = (
-                                    GPU_NAME_MAPPING.get(gpu["Name"], gpu["Name"]),
+                                    GPU_NAME_MAPPING.get(gpu["Name"]) or gpu["Name"],
                                     _get_gpu_memory_gib(
                                         gpu["Name"], gpu["MemoryInfo"]["SizeInMiB"]
                                     ),
@@ -258,7 +259,7 @@ class AWSProvider(AbstractProvider):
                     }
                 ],
                 InstanceTypes=list(instance_types),
-                StartTime=datetime.datetime.utcnow(),
+                StartTime=datetime.datetime.now(tz=datetime.timezone.utc),
             )
 
             instance_prices = defaultdict(list)
@@ -331,7 +332,7 @@ class AWSProvider(AbstractProvider):
                     e,
                 )
 
-    def add_spots(self, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
+    def _with_spot_offers(self, offers: list[CatalogItem]) -> list[CatalogItem]:
         region_instances = defaultdict(set)
         non_ec2_api_regions = set()
         for offer in offers:
@@ -354,7 +355,7 @@ class AWSProvider(AbstractProvider):
             for future in as_completed(future_to_region):
                 spot_prices.update(future.result())
 
-        spot_offers = []
+        spot_offers: list[CatalogItem] = []
         for offer in offers:
             if (price := spot_prices.get((offer.instance_name, offer.location))) is None:
                 continue
@@ -365,7 +366,7 @@ class AWSProvider(AbstractProvider):
         return offers + spot_offers
 
     @classmethod
-    def filter(cls, offers: list[RawCatalogItem]) -> list[RawCatalogItem]:
+    def filter(cls, offers: list[CatalogItem]) -> list[CatalogItem]:
         return [
             i
             for i in offers
@@ -416,6 +417,8 @@ def _get_gpu_memory_gib(gpu_name: str, reported_memory_mib: int) -> float:
 
 def _parse_memory(s: str) -> float:
     r = re.match(r"^([0-9.]+) GiB$", s)
+    if r is None:
+        raise ValueError(f"Cannot parse memory: {s!r}")
     return float(r.group(1))
 
 
@@ -430,7 +433,7 @@ def _parse_gpu_count(s: str) -> int | None:
 
 
 def _get_ec2_api_regions() -> set[str]:
-    session = boto3.session.Session()
+    session = boto3.session.Session()  # pyright: ignore[reportAttributeAccessIssue]
     return {
         region
         for partition in session.get_available_partitions()
