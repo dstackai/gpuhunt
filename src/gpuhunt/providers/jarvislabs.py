@@ -7,7 +7,7 @@ from requests import Response
 from typing_extensions import NotRequired, TypedDict
 
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, JSONObject, QueryFilter
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OnlineProvider, get_creds_env
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +41,19 @@ class JarvisLabsCatalogItemProviderData(TypedDict):
     gpu_type: NotRequired[str]
 
 
-class JarvisLabsProvider(AbstractProvider):
+class JarvisLabsProvider(OnlineProvider):
     NAME = "jarvislabs"
 
-    def __init__(self, api_key: str, api_url: str | None = None):
+    def __init__(self, api_key: str, api_url: str = API_URL):
         self.api_key = api_key
-        self.api_url = (api_url or os.getenv("JARVISLABS_API_URL", API_URL)).rstrip("/")
+        self.api_url = api_url.rstrip("/")
+
+    @classmethod
+    def from_env(cls) -> "JarvisLabsProvider":
+        return cls(
+            api_key=get_creds_env("JL_API_KEY"),
+            api_url=os.getenv("JARVISLABS_API_URL", API_URL),
+        )
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True

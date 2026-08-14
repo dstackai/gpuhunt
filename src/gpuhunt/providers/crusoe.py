@@ -13,7 +13,7 @@ from gpuhunt._internal.models import (
     CPUArchitecture,
     QueryFilter,
 )
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OnlineProvider, get_creds_env
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,7 @@ CPU_PRICING: dict[str, float] = {
 }
 
 
-class CrusoeProvider(AbstractProvider):
+class CrusoeProvider(OnlineProvider):
     NAME = "crusoe"
 
     def __init__(
@@ -73,6 +73,14 @@ class CrusoeProvider(AbstractProvider):
         self.access_key = access_key
         self.secret_key = secret_key
         self.project_id = project_id
+
+    @classmethod
+    def from_env(cls) -> "CrusoeProvider":
+        return cls(
+            access_key=get_creds_env("CRUSOE_ACCESS_KEY"),
+            secret_key=get_creds_env("CRUSOE_SECRET_KEY"),
+            project_id=get_creds_env("CRUSOE_PROJECT_ID"),
+        )
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True

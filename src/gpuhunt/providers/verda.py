@@ -8,7 +8,7 @@ from verda import VerdaClient
 from verda.instance_types import InstanceType
 
 from gpuhunt import AcceleratorVendor, CatalogItem, QueryFilter
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ ALL_AMD_GPUS = [
 ]
 
 
-class VerdaProvider(AbstractProvider):
+class VerdaProvider(OfflineProvider):
     NAME = "verda"
 
     def __init__(self, client_id: str, client_secret: str) -> None:

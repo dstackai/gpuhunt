@@ -5,7 +5,7 @@ import requests
 
 from gpuhunt._internal.constraints import find_accelerators
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OnlineProvider, get_creds_env
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ SEEWEB_GPU_MAP: dict[str, tuple[str, float]] = {
 _NON_NVIDIA_MARKERS = ("MI300", "TENSTORRENT", "GRAYSKULL", "WORMHOLE")
 
 
-class SeewebProvider(AbstractProvider):
+class SeewebProvider(OnlineProvider):
     """Online provider for Seeweb Cloud Server GPU.
 
     Seeweb's plan/pricing endpoints require authentication, so this is an online provider queried
@@ -45,6 +45,10 @@ class SeewebProvider(AbstractProvider):
 
     def __init__(self, token: str):
         self.token = token
+
+    @classmethod
+    def from_env(cls) -> "SeewebProvider":
+        return cls(token=get_creds_env("SEEWEB_API_TOKEN"))
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True

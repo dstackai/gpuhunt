@@ -5,7 +5,7 @@ import requests
 
 from gpuhunt._internal.constraints import get_gpu_vendor
 from gpuhunt._internal.models import CatalogItem, QueryFilter
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OnlineProvider, get_creds_env
 
 logger = logging.getLogger(__name__)
 
@@ -13,12 +13,19 @@ logger = logging.getLogger(__name__)
 STANDARD_CLOUD_API_URL = "https://api.digitalocean.com"
 
 
-class DigitalOceanProvider(AbstractProvider):
+class DigitalOceanProvider(OnlineProvider):
     NAME = "digitalocean"
 
-    def __init__(self, api_key: str, api_url: str | None = None):
+    def __init__(self, api_key: str, api_url: str = STANDARD_CLOUD_API_URL):
         self.api_key = api_key
-        self.api_url = api_url or os.getenv("DIGITAL_OCEAN_API_URL", STANDARD_CLOUD_API_URL)
+        self.api_url = api_url
+
+    @classmethod
+    def from_env(cls) -> "DigitalOceanProvider":
+        return cls(
+            api_key=get_creds_env("DIGITAL_OCEAN_API_KEY"),
+            api_url=os.getenv("DIGITAL_OCEAN_API_URL", STANDARD_CLOUD_API_URL),
+        )
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True

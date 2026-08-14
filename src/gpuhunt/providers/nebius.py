@@ -39,7 +39,7 @@ from gpuhunt._internal.models import (
     QueryFilter,
 )
 from gpuhunt._internal.utils import get_or_error
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OfflineProvider
 from gpuhunt.version import __version__
 
 logger = logging.getLogger(__name__)
@@ -74,7 +74,7 @@ INFINIBAND_FABRICS = [
 ]
 
 
-class NebiusProvider(AbstractProvider):
+class NebiusProvider(OfflineProvider):
     NAME = "nebius"
 
     def __init__(self, credentials: Credentials) -> None:

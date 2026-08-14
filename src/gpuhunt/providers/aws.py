@@ -14,7 +14,7 @@ import requests
 from botocore.exceptions import ClientError, ConnectTimeoutError, EndpointConnectionError
 
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
 ec2_pricing_url = (
@@ -91,7 +91,7 @@ GPU_NAME_MAPPING = {
 }
 
 
-class AWSProvider(AbstractProvider):
+class AWSProvider(OfflineProvider):
     """
     AWSProvider parses Bulk API index file for AmazonEC2 in all regions and fills missing GPU details
 

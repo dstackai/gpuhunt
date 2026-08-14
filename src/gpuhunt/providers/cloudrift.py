@@ -5,7 +5,7 @@ import requests
 
 from gpuhunt import CatalogItem, QueryFilter
 from gpuhunt._internal.models import AcceleratorVendor
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ CLOUDRIFT_SERVER_ADDRESS = "https://api.cloudrift.ai"
 CLOUDRIFT_API_VERSION = "2025-03-21"
 
 
-class CloudRiftProvider(AbstractProvider):
+class CloudRiftProvider(OfflineProvider):
     NAME = "cloudrift"
 
     def get(

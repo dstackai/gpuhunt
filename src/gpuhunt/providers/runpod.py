@@ -8,7 +8,7 @@ from typing_extensions import NotRequired, TypedDict
 
 from gpuhunt._internal.constraints import find_accelerators
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
 API_URL = "https://api.runpod.io/graphql"
@@ -20,7 +20,7 @@ class RunpodCatalogItemProviderData(TypedDict):
     pod_counts: NotRequired[list[int]]
 
 
-class RunpodProvider(AbstractProvider):
+class RunpodProvider(OfflineProvider):
     NAME = "runpod"
     # Minimum CUDA version on the host. Used to filter available offers
     # and should also be used when provisioning pods.

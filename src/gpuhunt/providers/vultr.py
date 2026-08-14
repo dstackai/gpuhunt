@@ -11,15 +11,19 @@ from gpuhunt._internal.constraints import (
     is_nvidia_superchip,
 )
 from gpuhunt._internal.models import AcceleratorVendor, CPUArchitecture
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OnlineProvider
 
 logger = logging.getLogger(__name__)
 
 API_URL = "https://api.vultr.com/v2"
 
 
-class VultrProvider(AbstractProvider):
+class VultrProvider(OnlineProvider):
     NAME = "vultr"
+
+    @classmethod
+    def from_env(cls) -> "VultrProvider":
+        return cls()
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True

@@ -11,9 +11,10 @@ from requests import Session
 from typing_extensions import TypedDict
 
 from gpuhunt._internal.constraints import find_accelerators
+from gpuhunt._internal.errors import ProviderError
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt._internal.utils import get_or_error, to_camel_case
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
 COST_ESTIMATOR_URL_TEMPLATE = "https://www.oracle.com/a/ocom/docs/cloudestimator2/data/{resource}"
@@ -36,7 +37,7 @@ class OCICredentials(TypedDict):
     region: str | None
 
 
-class OCIProvider(AbstractProvider):
+class OCIProvider(OfflineProvider):
     NAME = "oci"
 
     def __init__(self, credentials: OCICredentials):
@@ -206,7 +207,7 @@ class CostEstimator:
         return ResponseModel.model_validate_json(resp.content)
 
 
-class CostEstimatorDataError(Exception):
+class CostEstimatorDataError(ProviderError):
     pass
 
 

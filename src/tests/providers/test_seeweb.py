@@ -1,6 +1,7 @@
 import pytest
 import requests
 
+from gpuhunt import MissingCredsError
 from gpuhunt.providers import seeweb as seeweb_module
 from gpuhunt.providers.seeweb import SeewebProvider, _normalize_gpu
 
@@ -126,6 +127,17 @@ def test_get_sends_token_and_timeout(monkeypatch, plans_payload):
     assert request["args"] == ("https://api.seeweb.it/ecs/v2/plans",)
     assert request["kwargs"]["headers"] == {"X-APITOKEN": "dummy"}
     assert request["kwargs"]["timeout"] == 30
+
+
+def test_from_env_reads_token(monkeypatch):
+    monkeypatch.setenv("SEEWEB_API_TOKEN", "from-env")
+    assert SeewebProvider.from_env().token == "from-env"
+
+
+def test_from_env_without_token_is_rejected(monkeypatch):
+    monkeypatch.delenv("SEEWEB_API_TOKEN", raising=False)
+    with pytest.raises(MissingCredsError, match="SEEWEB_API_TOKEN"):
+        SeewebProvider.from_env()
 
 
 def test_http_error_is_propagated(monkeypatch):

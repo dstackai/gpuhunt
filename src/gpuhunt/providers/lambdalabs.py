@@ -10,7 +10,7 @@ from gpuhunt._internal.models import (
     CPUArchitecture,
     QueryFilter,
 )
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
 INSTANCE_TYPES_URL = "https://cloud.lambdalabs.com/api/v1/instance-types"
@@ -20,7 +20,7 @@ TIMEOUT = 10
 FLAG_ARM = "lambda-arm"
 
 
-class LambdaLabsProvider(AbstractProvider):
+class LambdaLabsProvider(OfflineProvider):
     NAME = "lambdalabs"
 
     def __init__(self, token: str):

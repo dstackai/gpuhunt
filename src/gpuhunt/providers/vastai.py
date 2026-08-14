@@ -10,7 +10,7 @@ from typing_extensions import NotRequired, TypedDict
 
 from gpuhunt._internal.constraints import correct_gpu_memory_gib
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OnlineProvider
 
 logger = logging.getLogger(__name__)
 bundles_url = "https://console.vast.ai/api/v0/bundles/"
@@ -20,8 +20,12 @@ Operators = Literal["lt", "lte", "eq", "gte", "gt"]
 FilterValue = int | float | str | bool
 
 
-class VastAIProvider(AbstractProvider):
+class VastAIProvider(OnlineProvider):
     NAME = "vastai"
+
+    @classmethod
+    def from_env(cls) -> "VastAIProvider":
+        return cls()
 
     def __init__(
         self,

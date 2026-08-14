@@ -6,20 +6,27 @@ from requests import Response
 
 from gpuhunt._internal.constraints import find_accelerators
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, JSONObject, QueryFilter
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OnlineProvider, get_creds_env
 
 logger = logging.getLogger(__name__)
 
 API_URL = "https://admin.hotaisle.app/api"
 
 
-class HotAisleProvider(AbstractProvider):
+class HotAisleProvider(OnlineProvider):
     NAME = "hotaisle"
 
     def __init__(self, api_key: str, team_handle: str):
         """Hotaisle requries an API key and team handle to access the API."""
         self.api_key = api_key
         self.team_handle = team_handle
+
+    @classmethod
+    def from_env(cls) -> "HotAisleProvider":
+        return cls(
+            api_key=get_creds_env("HOTAISLE_API_KEY"),
+            team_handle=get_creds_env("HOTAISLE_TEAM_HANDLE"),
+        )
 
     def get(
         self, query_filter: QueryFilter | None = None, balance_resources: bool = True

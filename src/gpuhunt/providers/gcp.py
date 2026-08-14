@@ -20,7 +20,7 @@ from google.cloud.location import locations_pb2
 from typing_extensions import NotRequired, TypedDict
 
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
 compute_service = "services/6F81-5844-456A"
@@ -159,7 +159,7 @@ class _MachineType:
     gpu_memory: float | None
 
 
-class GCPProvider(AbstractProvider):
+class GCPProvider(OfflineProvider):
     NAME = "gcp"
 
     def __init__(self, project: str):

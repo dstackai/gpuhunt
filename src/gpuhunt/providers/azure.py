@@ -19,7 +19,7 @@ from azure.mgmt.compute import ComputeManagementClient
 from gpuhunt import AcceleratorVendor
 from gpuhunt._internal.models import CatalogItem, QueryFilter
 from gpuhunt._internal.utils import get_or_error
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
 prices_url = "https://prices.azure.com/api/retail/prices"
@@ -95,7 +95,7 @@ class _InstanceSpec:
         )
 
 
-class AzureProvider(AbstractProvider):
+class AzureProvider(OfflineProvider):
     NAME = "azure"
 
     def __init__(

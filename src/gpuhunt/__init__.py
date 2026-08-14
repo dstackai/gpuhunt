@@ -15,6 +15,11 @@ from gpuhunt._internal.default import (
     default_catalog as default_catalog,
     query as query,
 )
+from gpuhunt._internal.errors import (
+    GPUHuntError as GPUHuntError,
+    MissingCredsError as MissingCredsError,
+    ProviderError as ProviderError,
+)
 from gpuhunt._internal.models import (
     AcceleratorInfo as AcceleratorInfo,
     AcceleratorVendor as AcceleratorVendor,

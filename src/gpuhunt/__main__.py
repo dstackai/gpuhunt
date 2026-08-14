@@ -4,6 +4,7 @@ import os
 
 import gpuhunt._internal.storage as storage
 from gpuhunt._internal.utils import configure_logging
+from gpuhunt.providers.base import OfflineProvider
 
 
 def main():
@@ -45,11 +46,7 @@ def main():
     elif args.provider == "crusoe":
         from gpuhunt.providers.crusoe import CrusoeProvider
 
-        provider = CrusoeProvider(
-            access_key=os.environ["CRUSOE_ACCESS_KEY"],
-            secret_key=os.environ["CRUSOE_SECRET_KEY"],
-            project_id=os.environ["CRUSOE_PROJECT_ID"],
-        )
+        provider = CrusoeProvider.from_env()
     elif args.provider == "cloudrift":
         from gpuhunt.providers.cloudrift import CloudRiftProvider
 
@@ -64,10 +61,7 @@ def main():
     elif args.provider == "digitalocean":
         from gpuhunt.providers.digitalocean import DigitalOceanProvider
 
-        provider = DigitalOceanProvider(
-            api_key=os.environ["DIGITAL_OCEAN_API_KEY"],
-            api_url=os.getenv("DIGITAL_OCEAN_API_URL"),
-        )
+        provider = DigitalOceanProvider.from_env()
     elif args.provider == "gcp":
         from gpuhunt.providers.gcp import GCPProvider
 
@@ -75,17 +69,11 @@ def main():
     elif args.provider == "hotaisle":
         from gpuhunt.providers.hotaisle import HotAisleProvider
 
-        provider = HotAisleProvider(
-            api_key=os.environ["HOTAISLE_API_KEY"],
-            team_handle=os.environ["HOTAISLE_TEAM_HANDLE"],
-        )
+        provider = HotAisleProvider.from_env()
     elif args.provider == "jarvislabs":
         from gpuhunt.providers.jarvislabs import JarvisLabsProvider
 
-        provider = JarvisLabsProvider(
-            api_key=os.environ["JL_API_KEY"],
-            api_url=os.getenv("JARVISLABS_API_URL"),
-        )
+        provider = JarvisLabsProvider.from_env()
     elif args.provider == "lambdalabs":
         from gpuhunt.providers.lambdalabs import LambdaLabsProvider
 
@@ -126,21 +114,21 @@ def main():
     elif args.provider == "seeweb":
         from gpuhunt.providers.seeweb import SeewebProvider
 
-        provider = SeewebProvider(os.environ["SEEWEB_API_TOKEN"])
+        provider = SeewebProvider.from_env()
     elif args.provider == "vastai":
         from gpuhunt.providers.vastai import VastAIProvider
 
-        provider = VastAIProvider()
+        provider = VastAIProvider.from_env()
     elif args.provider == "vultr":
         from gpuhunt.providers.vultr import VultrProvider
 
-        provider = VultrProvider()
+        provider = VultrProvider.from_env()
     else:
         exit(f"Unknown provider {args.provider}")
 
     logging.info("Fetching offers for %s", args.provider)
     offers = provider.get()
-    if not args.no_filter:
+    if not args.no_filter and isinstance(provider, OfflineProvider):
         offers = provider.filter(offers)
     storage.dump(offers, args.output)
 

@@ -14,7 +14,7 @@ import gpuhunt._internal.constraints as constraints
 import gpuhunt._internal.storage as storage
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, CPUArchitecture, QueryFilter
 from gpuhunt._internal.utils import parse_compute_capability
-from gpuhunt.providers import AbstractProvider
+from gpuhunt.providers.base import AbstractProvider
 
 logger = logging.getLogger(__name__)
 
