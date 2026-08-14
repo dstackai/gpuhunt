@@ -37,7 +37,6 @@ class LambdaLabsProvider(AbstractProvider):
         data = resp.json()["data"]
         for instance in data.values():
             instance = instance["instance_type"]
-            logger.info(instance["name"])
             description = instance["description"]
             result = _parse_description(description)
             if result is None:
