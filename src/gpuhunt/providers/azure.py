@@ -226,7 +226,7 @@ class AzureProvider(AbstractProvider):
                 instance_name=resource.name,
                 cpu=int(cpu),
                 memory=float(memory),
-                gpu_vendor=AcceleratorVendor.NVIDIA,
+                gpu_vendor=AcceleratorVendor.NVIDIA if gpu_count else None,
                 gpu_count=gpu_count,
                 gpu_name=gpu_name,
                 gpu_memory=gpu_memory,
