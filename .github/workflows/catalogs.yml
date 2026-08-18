@@ -15,6 +15,7 @@ env:
   PIP_DEFAULT_TIMEOUT: 10
   PIP_PROGRESS_BAR: off
   PYTHON_VERSION: 3.13
+  BUCKET: s3://dstack-gpu-pricing${{ github.event_name == 'workflow_dispatch' && inputs.staging && '/stgn' || '' }}
 
 jobs:
   catalog-aws:
@@ -29,12 +30,22 @@ jobs:
         run: |
           pip install pip -U
           pip install -e '.[aws]'
+          pip install pytest awscli
       - name: Collect catalog
         working-directory: src
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: python -m gpuhunt aws --output ../aws.csv
+      - name: Test catalog integrity
+        env:
+          CATALOG_DIR: .
+        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_aws.py
+      - name: Publish catalog
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: .github/scripts/publish_catalog.sh aws
       - uses: actions/upload-artifact@v4
         with:
           name: catalogs-aws
@@ -59,11 +70,21 @@ jobs:
         run: |
           pip install pip -U
           pip install -e '.[azure]'
+          pip install pytest awscli
       - name: Collect catalog
         working-directory: src
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: python -m gpuhunt azure --output ../azure.csv
+      - name: Test catalog integrity
+        env:
+          CATALOG_DIR: .
+        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_azure.py
+      - name: Publish catalog
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: .github/scripts/publish_catalog.sh azure
       - uses: actions/upload-artifact@v4
         with:
           name: catalogs-azure
@@ -82,21 +103,26 @@ jobs:
         run: |
           pip install pip -U
           pip install -e '.[verda]'
+          pip install pytest awscli
       - name: Collect catalog
         working-directory: src
         env:
           VERDA_CLIENT_ID: ${{ secrets.VERDA_CLIENT_ID }}
           VERDA_CLIENT_SECRET: ${{ secrets.VERDA_CLIENT_SECRET }}
-        run: |
-          python -m gpuhunt verda --output ../verda.csv
-          # Copy for backward compatibility
-          cp ../verda.csv ../datacrunch.csv
+        run: python -m gpuhunt verda --output ../verda.csv
+      - name: Test catalog integrity
+        env:
+          CATALOG_DIR: .
+        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_verda.py
+      - name: Publish catalog
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: .github/scripts/publish_catalog.sh verda
       - uses: actions/upload-artifact@v4
         with:
           name: catalogs-verda
-          path: |
-            verda.csv
-            datacrunch.csv
+          path: verda.csv
           retention-days: 1
 
   catalog-gcp:
@@ -119,11 +145,21 @@ jobs:
         run: |
           pip install pip -U
           pip install -e '.[gcp]'
+          pip install pytest awscli
       - name: Collect catalog
         working-directory: src
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         run: python -m gpuhunt gcp --output ../gcp.csv
+      - name: Test catalog integrity
+        env:
+          CATALOG_DIR: .
+        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_gcp.py
+      - name: Publish catalog
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: .github/scripts/publish_catalog.sh gcp
       - uses: actions/upload-artifact@v4
         with:
           name: catalogs-gcp
@@ -145,11 +181,21 @@ jobs:
         run: |
           pip install pip -U
           pip install -e '.'
+          pip install pytest awscli
       - name: Collect catalog
         working-directory: src
         env:
           LAMBDALABS_TOKEN: ${{ secrets.LAMBDALABS_TOKEN }}
         run: python -m gpuhunt lambdalabs --output ../lambdalabs.csv
+      - name: Test catalog integrity
+        env:
+          CATALOG_DIR: .
+        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_lambdalabs.py
+      - name: Publish catalog
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: .github/scripts/publish_catalog.sh lambdalabs
       - uses: actions/upload-artifact@v4
         with:
           name: catalogs-lambdalabs
@@ -168,6 +214,7 @@ jobs:
         run: |
           pip install pip -U
           pip install -e '.[nebius]'
+          pip install pytest awscli
       - name: Collect catalog
         working-directory: src
         run: |
@@ -177,6 +224,15 @@ jobs:
           NEBIUS_SERVICE_ACCOUNT_ID: ${{ secrets.NEBIUS_SERVICE_ACCOUNT_ID }}
           NEBIUS_PUBLIC_KEY_ID: ${{ secrets.NEBIUS_PUBLIC_KEY_ID }}
           NEBIUS_PRIVATE_KEY_FILE: /tmp/nebius.key
+      - name: Test catalog integrity
+        env:
+          CATALOG_DIR: .
+        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_nebius.py
+      - name: Publish catalog
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: .github/scripts/publish_catalog.sh nebius
       - uses: actions/upload-artifact@v4
         with:
           name: catalogs-nebius
@@ -195,6 +251,7 @@ jobs:
         run: |
           pip install pip -U
           pip install -e '.[oci]'
+          pip install pytest awscli
       - name: Collect catalog
         working-directory: src
         run: python -m gpuhunt oci --output ../oci.csv
@@ -204,6 +261,15 @@ jobs:
           OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
           OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
           OCI_CLI_REGION: ${{ secrets.OCI_CLI_REGION }}
+      - name: Test catalog integrity
+        env:
+          CATALOG_DIR: .
+        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_oci.py
+      - name: Publish catalog
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: .github/scripts/publish_catalog.sh oci
       - uses: actions/upload-artifact@v4
         with:
           name: catalogs-oci
@@ -222,9 +288,19 @@ jobs:
         run: |
           pip install pip -U
           pip install -e '.'
+          pip install pytest awscli
       - name: Collect catalog
         working-directory: src
         run: python -m gpuhunt runpod --output ../runpod.csv
+      - name: Test catalog integrity
+        env:
+          CATALOG_DIR: .
+        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_runpod.py
+      - name: Publish catalog
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: .github/scripts/publish_catalog.sh runpod
       - uses: actions/upload-artifact@v4
         with:
           name: catalogs-runpod
@@ -243,17 +319,66 @@ jobs:
         run: |
           pip install pip -U
           pip install -e '.'
+          pip install pytest awscli
       - name: Collect catalog
         working-directory: src
         run: python -m gpuhunt cloudrift --output ../cloudrift.csv
+      - name: Test catalog integrity
+        env:
+          CATALOG_DIR: .
+        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_cloudrift.py
+      - name: Publish catalog
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: .github/scripts/publish_catalog.sh cloudrift
       - uses: actions/upload-artifact@v4
         with:
           name: catalogs-cloudrift
           path: cloudrift.csv
           retention-days: 1
 
-  test-catalog:
-    name: Test catalogs integrity
+  # Online providers have no catalog to publish, only offers fetched at query time
+  test-hotaisle:
+    name: Test Hot Aisle integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: |
+          pip install pip -U
+          pip install -e '.'
+          pip install pytest
+      - name: Run integrity tests
+        env:
+          HOTAISLE_API_KEY: ${{ secrets.HOTAISLE_API_KEY }}
+          HOTAISLE_TEAM_HANDLE: ${{ secrets.HOTAISLE_TEAM_HANDLE }}
+        run: pytest src/integrity_tests/test_hotaisle.py
+
+  test-vastai:
+    name: Test Vast.ai integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: |
+          pip install pip -U
+          pip install -e '.'
+          pip install pytest
+      - name: Run integrity tests
+        run: pytest src/integrity_tests/test_vastai.py
+
+  # The v2 catalog bundles all providers into a single file. It is published for dstack
+  # installations that predate per-provider v3 catalogs and, unlike the v3 catalogs, is
+  # only updated when every provider has been collected successfully.
+  publish-catalog-v2:
+    name: Publish v2 catalog
     needs:
       - catalog-aws
       - catalog-azure
@@ -266,32 +391,6 @@ jobs:
       - catalog-cloudrift
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
-        run: |
-          pip install pip -U
-          pip install '.[all]'
-          pip install pytest
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: catalogs-*
-          merge-multiple: true
-      - name: Run integrity tests
-        env:
-          HOTAISLE_API_KEY: ${{ secrets.HOTAISLE_API_KEY }}
-          HOTAISLE_TEAM_HANDLE: ${{ secrets.HOTAISLE_TEAM_HANDLE }}
-          CATALOG_DIR: .
-        run: pytest src/integrity_tests
-
-  publish-catalog:
-    name: Publish catalogs
-    needs: [ test-catalog ]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -302,6 +401,8 @@ jobs:
           pattern: catalogs-*
           merge-multiple: true
           path: v2/
+      - name: Copy Verda catalog for backward compatibility
+        run: cp v2/verda.csv v2/datacrunch.csv
       - name: Write version
         run: echo "$(date +%Y%m%d)-${{ github.run_number }}" > v2/version
       - name: Package catalogs
@@ -310,9 +411,37 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          BUCKET: s3://dstack-gpu-pricing${{ github.event_name == 'workflow_dispatch' && inputs.staging && '/stgn' || '' }}
         run: |
           VERSION=$(cat v2/version)
           aws s3 cp v2/catalog.zip "$BUCKET/v2/$VERSION/catalog.zip" --acl public-read
           echo $VERSION | aws s3 cp - "$BUCKET/v2/version" --acl public-read
           aws s3 cp "$BUCKET/v2/$VERSION/catalog.zip" "$BUCKET/v2/latest/catalog.zip" --acl public-read
+
+  report:
+    name: Report catalog status
+    if: always()
+    needs:
+      - catalog-aws
+      - catalog-azure
+      - catalog-verda
+      - catalog-gcp
+      - catalog-lambdalabs
+      - catalog-nebius
+      - catalog-oci
+      - catalog-runpod
+      - catalog-cloudrift
+      - test-hotaisle
+      - test-vastai
+      - publish-catalog-v2
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write job statuses to the run summary
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          {
+            echo '| Job | Result |'
+            echo '| --- | --- |'
+            echo "$RESULTS" | jq -r 'to_entries[]
+              | "| \(.key) | \(if .value.result == "success" then "✅" else "❌" end) \(.value.result) |"'
+          } >> "$GITHUB_STEP_SUMMARY"
