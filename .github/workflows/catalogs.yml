@@ -11,9 +11,6 @@ on:
     - cron: '5 * * * *' # Run every hour at HH:05
 
 env:
-  PIP_DISABLE_PIP_VERSION_CHECK: on
-  PIP_DEFAULT_TIMEOUT: 10
-  PIP_PROGRESS_BAR: off
   PYTHON_VERSION: 3.13
   BUCKET: s3://dstack-gpu-pricing${{ github.event_name == 'workflow_dispatch' && inputs.staging && '/stgn' || '' }}
 
@@ -23,24 +20,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
-          pip install pip -U
-          pip install -e '.[aws]'
-          pip install pytest awscli
+          uv sync --extra dev --extra aws
+          uv tool install awscli
       - name: Collect catalog
         working-directory: src
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: python -m gpuhunt aws --output ../aws.csv
+        run: uv run python -m gpuhunt aws --output ../aws.csv
       - name: Test catalog integrity
         env:
           CATALOG_DIR: .
-        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_aws.py
+        run: uv run pytest src/integrity_tests/test_all.py src/integrity_tests/test_aws.py
       - name: Publish catalog
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -63,23 +60,23 @@ jobs:
       - uses: azure/login@v2
         with:
           creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
-      - uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
-          pip install pip -U
-          pip install -e '.[azure]'
-          pip install pytest awscli
+          uv sync --extra dev --extra azure
+          uv tool install awscli
       - name: Collect catalog
         working-directory: src
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-        run: python -m gpuhunt azure --output ../azure.csv
+        run: uv run python -m gpuhunt azure --output ../azure.csv
       - name: Test catalog integrity
         env:
           CATALOG_DIR: .
-        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_azure.py
+        run: uv run pytest src/integrity_tests/test_all.py src/integrity_tests/test_azure.py
       - name: Publish catalog
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -96,24 +93,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
-          pip install pip -U
-          pip install -e '.[verda]'
-          pip install pytest awscli
+          uv sync --extra dev --extra verda
+          uv tool install awscli
       - name: Collect catalog
         working-directory: src
         env:
           VERDA_CLIENT_ID: ${{ secrets.VERDA_CLIENT_ID }}
           VERDA_CLIENT_SECRET: ${{ secrets.VERDA_CLIENT_SECRET }}
-        run: python -m gpuhunt verda --output ../verda.csv
+        run: uv run python -m gpuhunt verda --output ../verda.csv
       - name: Test catalog integrity
         env:
           CATALOG_DIR: .
-        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_verda.py
+        run: uv run pytest src/integrity_tests/test_all.py src/integrity_tests/test_verda.py
       - name: Publish catalog
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -138,23 +135,23 @@ jobs:
           workload_identity_provider: 'projects/531508670106/locations/global/workloadIdentityPools/github-identity-pool/providers/github-id-provider'
           service_account: 'dstack-gpu-pricing-ci@dstack.iam.gserviceaccount.com'
           create_credentials_file: true
-      - uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
-          pip install pip -U
-          pip install -e '.[gcp]'
-          pip install pytest awscli
+          uv sync --extra dev --extra gcp
+          uv tool install awscli
       - name: Collect catalog
         working-directory: src
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-        run: python -m gpuhunt gcp --output ../gcp.csv
+        run: uv run python -m gpuhunt gcp --output ../gcp.csv
       - name: Test catalog integrity
         env:
           CATALOG_DIR: .
-        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_gcp.py
+        run: uv run pytest src/integrity_tests/test_all.py src/integrity_tests/test_gcp.py
       - name: Publish catalog
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -174,23 +171,23 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
-          pip install pip -U
-          pip install -e '.'
-          pip install pytest awscli
+          uv sync --extra dev
+          uv tool install awscli
       - name: Collect catalog
         working-directory: src
         env:
           LAMBDALABS_TOKEN: ${{ secrets.LAMBDALABS_TOKEN }}
-        run: python -m gpuhunt lambdalabs --output ../lambdalabs.csv
+        run: uv run python -m gpuhunt lambdalabs --output ../lambdalabs.csv
       - name: Test catalog integrity
         env:
           CATALOG_DIR: .
-        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_lambdalabs.py
+        run: uv run pytest src/integrity_tests/test_all.py src/integrity_tests/test_lambdalabs.py
       - name: Publish catalog
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -207,19 +204,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
-          pip install pip -U
-          pip install -e '.[nebius]'
-          pip install pytest awscli
+          uv sync --extra dev --extra nebius
+          uv tool install awscli
       - name: Collect catalog
         working-directory: src
         run: |
           echo "${{ secrets.NEBIUS_PRIVATE_KEY }}" > "${NEBIUS_PRIVATE_KEY_FILE}"
-          python -m gpuhunt nebius --output ../nebius.csv
+          uv run python -m gpuhunt nebius --output ../nebius.csv
         env:
           NEBIUS_SERVICE_ACCOUNT_ID: ${{ secrets.NEBIUS_SERVICE_ACCOUNT_ID }}
           NEBIUS_PUBLIC_KEY_ID: ${{ secrets.NEBIUS_PUBLIC_KEY_ID }}
@@ -227,7 +224,7 @@ jobs:
       - name: Test catalog integrity
         env:
           CATALOG_DIR: .
-        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_nebius.py
+        run: uv run pytest src/integrity_tests/test_all.py src/integrity_tests/test_nebius.py
       - name: Publish catalog
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -244,17 +241,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
-          pip install pip -U
-          pip install -e '.[oci]'
-          pip install pytest awscli
+          uv sync --extra dev --extra oci
+          uv tool install awscli
       - name: Collect catalog
         working-directory: src
-        run: python -m gpuhunt oci --output ../oci.csv
+        run: uv run python -m gpuhunt oci --output ../oci.csv
         env:
           OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
           OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_CLI_KEY_CONTENT }}
@@ -264,7 +261,7 @@ jobs:
       - name: Test catalog integrity
         env:
           CATALOG_DIR: .
-        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_oci.py
+        run: uv run pytest src/integrity_tests/test_all.py src/integrity_tests/test_oci.py
       - name: Publish catalog
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -281,21 +278,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
-          pip install pip -U
-          pip install -e '.'
-          pip install pytest awscli
+          uv sync --extra dev
+          uv tool install awscli
       - name: Collect catalog
         working-directory: src
-        run: python -m gpuhunt runpod --output ../runpod.csv
+        run: uv run python -m gpuhunt runpod --output ../runpod.csv
       - name: Test catalog integrity
         env:
           CATALOG_DIR: .
-        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_runpod.py
+        run: uv run pytest src/integrity_tests/test_all.py src/integrity_tests/test_runpod.py
       - name: Publish catalog
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -312,21 +309,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
         run: |
-          pip install pip -U
-          pip install -e '.'
-          pip install pytest awscli
+          uv sync --extra dev
+          uv tool install awscli
       - name: Collect catalog
         working-directory: src
-        run: python -m gpuhunt cloudrift --output ../cloudrift.csv
+        run: uv run python -m gpuhunt cloudrift --output ../cloudrift.csv
       - name: Test catalog integrity
         env:
           CATALOG_DIR: .
-        run: pytest src/integrity_tests/test_all.py src/integrity_tests/test_cloudrift.py
+        run: uv run pytest src/integrity_tests/test_all.py src/integrity_tests/test_cloudrift.py
       - name: Publish catalog
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -344,35 +341,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
-        run: |
-          pip install pip -U
-          pip install -e '.'
-          pip install pytest
+        run: uv sync --extra dev
       - name: Run integrity tests
         env:
           HOTAISLE_API_KEY: ${{ secrets.HOTAISLE_API_KEY }}
           HOTAISLE_TEAM_HANDLE: ${{ secrets.HOTAISLE_TEAM_HANDLE }}
-        run: pytest src/integrity_tests/test_hotaisle.py
+        run: uv run pytest src/integrity_tests/test_hotaisle.py
 
   test-vastai:
     name: Test Vast.ai integrity
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
-        run: |
-          pip install pip -U
-          pip install -e '.'
-          pip install pytest
+        run: uv sync --extra dev
       - name: Run integrity tests
-        run: pytest src/integrity_tests/test_vastai.py
+        run: uv run pytest src/integrity_tests/test_vastai.py
 
   # The v2 catalog bundles all providers into a single file. It is published for dstack
   # installations that predate per-provider v3 catalogs and, unlike the v3 catalogs, is
@@ -391,11 +384,15 @@ jobs:
       - catalog-cloudrift
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          # settings to prevent warnings when running uv without a repo checkout
+          enable-cache: false
+          ignore-empty-workdir: true
       - name: Install AWS CLI
-        run: pip install awscli
+        run: uv tool install awscli
       - uses: actions/download-artifact@v4
         with:
           pattern: catalogs-*
