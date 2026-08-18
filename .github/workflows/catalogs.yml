@@ -442,3 +442,18 @@ jobs:
             echo "$RESULTS" | jq -r 'to_entries[]
               | "| \(.key) | \(if .value.result == "success" then "✅" else "❌" end) \(.value.result) |"'
           } >> "$GITHUB_STEP_SUMMARY"
+      # Staging runs are triggered manually, so their failures need no notification
+      - name: Notify Slack
+        if: |
+          (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
+          && !(github.event_name == 'workflow_dispatch' && inputs.staging)
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          FAILED=$(echo "$RESULTS" | jq -r 'to_entries
+            | map(select(.value.result != "success") | "\(.key) (\(.value.result))")
+            | join(", ")')
+          jq -n --arg text "Catalog collection failed: ${FAILED}. <${RUN_URL}|View run>" '{text: $text}' \
+            | curl -sS --fail -X POST -H 'Content-type: application/json' --data @- "$SLACK_WEBHOOK_URL"
