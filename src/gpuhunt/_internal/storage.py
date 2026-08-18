@@ -10,19 +10,6 @@ R = TypeVar("R")
 
 logger = logging.getLogger(__name__)
 
-CATALOG_V1_FIELDS = [
-    "instance_name",
-    "location",
-    "price",
-    "cpu",
-    "memory",
-    "gpu_count",
-    "gpu_name",
-    "gpu_memory",
-    "spot",
-    "disk_size",
-    "gpu_vendor",
-]
 # The columns of a v2 catalog file, in order. `provider` is not stored: the file name
 # carries it. Listed explicitly rather than derived from `CatalogItem` so that adding a
 # field to the model cannot change the published format.
@@ -116,16 +103,6 @@ def load(f: IO[str], *, provider: str) -> Iterator[CatalogItem]:
             logger.warning(
                 "Skipping malformed row in %s catalog at line %s: %s", provider, reader.line_num, e
             )
-
-
-def convert_catalog_v2_to_v1(path_v2: str, path_v1: str) -> None:
-    with open(path_v2) as f_v2, open(path_v1, "w") as f_v1:
-        reader = csv.DictReader(f_v2)
-        writer = csv.DictWriter(f_v1, fieldnames=CATALOG_V1_FIELDS, extrasaction="ignore")
-        writer.writeheader()
-        for row in reader:
-            if not row.get("flags"):
-                writer.writerow(row)
 
 
 def _dump_optional(value: str | float | None) -> str:

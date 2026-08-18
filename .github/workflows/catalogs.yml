@@ -295,8 +295,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install gpuhunt
-        run: pip install .
       - name: Install AWS CLI
         run: pip install awscli
       - uses: actions/download-artifact@v4
@@ -304,19 +302,10 @@ jobs:
           pattern: catalogs-*
           merge-multiple: true
           path: v2/
-      - name: Build legacy v1 catalogs
-        run: |
-          mkdir v1
-          for catalog_path in $(find v2/*.csv); do
-            file=$(basename "$catalog_path")
-            python -m gpuhunt.scripts.catalog_v1 --input "v2/$file" --output "v1/$file"
-          done
       - name: Write version
-        run: echo "$(date +%Y%m%d)-${{ github.run_number }}" | tee v2/version | tee v1/version
+        run: echo "$(date +%Y%m%d)-${{ github.run_number }}" > v2/version
       - name: Package catalogs
-        run: |
-          zip -j v2/catalog.zip v2/*.csv v2/version
-          zip -j v1/catalog.zip v1/*.csv v1/version
+        run: zip -j v2/catalog.zip v2/*.csv v2/version
       - name: Upload to S3
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -325,8 +314,5 @@ jobs:
         run: |
           VERSION=$(cat v2/version)
           aws s3 cp v2/catalog.zip "$BUCKET/v2/$VERSION/catalog.zip" --acl public-read
-          aws s3 cp v1/catalog.zip "$BUCKET/v1/$VERSION/catalog.zip" --acl public-read
           echo $VERSION | aws s3 cp - "$BUCKET/v2/version" --acl public-read
-          echo $VERSION | aws s3 cp - "$BUCKET/v1/version" --acl public-read
           aws s3 cp "$BUCKET/v2/$VERSION/catalog.zip" "$BUCKET/v2/latest/catalog.zip" --acl public-read
-          aws s3 cp "$BUCKET/v1/$VERSION/catalog.zip" "$BUCKET/v1/latest/catalog.zip" --acl public-read
