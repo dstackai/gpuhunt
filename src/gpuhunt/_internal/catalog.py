@@ -8,18 +8,21 @@ import urllib.request
 import zipfile
 from collections.abc import Container
 from concurrent.futures import ThreadPoolExecutor, wait
+from dataclasses import dataclass
 from pathlib import Path
 
 import gpuhunt._internal.constraints as constraints
 import gpuhunt._internal.storage as storage
+from gpuhunt._internal.errors import GPUHuntError
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, CPUArchitecture, QueryFilter
 from gpuhunt._internal.utils import parse_compute_capability
 from gpuhunt.providers.base import AbstractProvider
 
 logger = logging.getLogger(__name__)
 
-VERSION_URL = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v2/version"
-CATALOG_URL = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v2/{version}/catalog.zip"
+# Every provider is published independently under `{CATALOG_URL}/{provider}`, so a provider
+# that fails to be collected does not hold back the others.
+CATALOG_URL = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v3"
 OFFLINE_PROVIDERS = [
     "aws",
     "azure",
@@ -43,6 +46,12 @@ ONLINE_PROVIDERS = [
 RELOAD_INTERVAL = 15 * 60  # 15 minutes
 
 
+@dataclass
+class ProviderCatalog:
+    version: str
+    items: list[CatalogItem]
+
+
 class Catalog:
     def __init__(self, balance_resources: bool = True, auto_reload: bool = True):
         """
@@ -50,7 +59,7 @@ class Catalog:
             balance_resources: increase min resources to better match the chosen GPU
             auto_reload: if `True`, the catalog will be automatically loaded from the S3 bucket every 4 hours
         """
-        self.catalog = None
+        self.catalog: dict[str, ProviderCatalog] = {}
         self.loaded_at = None
         self.providers: list[AbstractProvider] = []
         self.balance_resources = balance_resources
@@ -189,51 +198,71 @@ class Catalog:
 
     def load(self, version: str | None = None):
         """
-        Fetch the catalog from the S3 bucket. Thread-safe.
+        Fetch the catalogs of all offline providers from the S3 bucket. Thread-safe.
 
         Args:
-            version: specific version of the catalog to download. If not specified, the latest version will be used
+            version: specific version of the catalogs to download. Applies to all providers.
+                If not specified, the latest version of each provider will be used
+
+        Raises:
+            GPUHuntError: if no provider could be loaded, or if any provider could not be
+                loaded at the requested `version`
         """
         with self._load_lock:
             self._load(version)
 
     def _load(self, version: str | None = None):
-        catalog_url = os.getenv("GPUHUNT_CATALOG_URL")
-        if catalog_url is None:
-            if version is None:
-                version = self.get_latest_version()
-            catalog_url = CATALOG_URL.format(version=version)
-        logger.debug("Downloading catalog %s...", version)
-        with urllib.request.urlopen(catalog_url) as f:
-            file = f.read()
-        catalog: dict[str, list[CatalogItem]] = {}
-        with zipfile.ZipFile(io.BytesIO(file)) as zip_file:
-            for provider in OFFLINE_PROVIDERS:
-                try:
-                    with zip_file.open(f"{provider}.csv", "r") as csv_file:
-                        items = storage.load(
-                            io.TextIOWrapper(csv_file, "utf-8"), provider=provider
-                        )
-                        for item in items:
-                            catalog.setdefault(provider, []).append(item)
-                except KeyError:
-                    logger.error(
-                        f"Failed to find catalog for provider {provider} in the zip. Skipping provider."
-                    )
-                except Exception:
-                    logger.exception(
-                        f"Got exception when parsing {provider} catalog. Skipping provider."
-                    )
-        self.catalog = catalog
+        base_url = _get_base_url()
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = {
+                provider: executor.submit(self._load_provider, base_url, provider, version)
+                for provider in OFFLINE_PROVIDERS
+            }
+        loaded: dict[str, ProviderCatalog] = {}
+        loaded_providers = 0
+        error: Exception | None = None
+        for provider, future in futures.items():
+            try:
+                provider_catalog = future.result()
+            except Exception as e:
+                # A pinned version is requested as a whole. Falling back to the previously
+                # loaded catalog would leave the caller with a mix of versions
+                if version is not None:
+                    raise GPUHuntError(f"Failed to load {provider} catalog {version}") from e
+                logger.exception(
+                    "Failed to load %s catalog. Keeping the previously loaded catalog, if any.",
+                    provider,
+                )
+                error = e
+                continue
+            loaded_providers += 1
+            if provider_catalog is not None:
+                loaded[provider] = provider_catalog
+        if error is not None and not loaded_providers:
+            raise GPUHuntError("Failed to load catalogs of all providers") from error
+        self.catalog.update(loaded)
         self.loaded_at = time.monotonic()
 
-    @staticmethod
-    def get_latest_version() -> str:
+    def _load_provider(
+        self, base_url: str, provider: str, version: str | None
+    ) -> ProviderCatalog | None:
         """
-        Get the latest version of the catalog from the S3 bucket
+        Returns:
+            the downloaded catalog or `None` if the loaded catalog is already up-to-date
         """
-        with urllib.request.urlopen(VERSION_URL) as f:
-            return f.read().decode("utf-8").strip()
+        if version is None:
+            version = _get_latest_version(base_url, provider)
+        loaded_catalog = self.catalog.get(provider)
+        if loaded_catalog is not None and loaded_catalog.version == version:
+            logger.debug("The %s catalog %s is up-to-date", provider, version)
+            return None
+        logger.debug("Downloading the %s catalog %s...", provider, version)
+        with urllib.request.urlopen(f"{base_url}/{provider}/{version}/catalog.zip") as f:
+            data = f.read()
+        with zipfile.ZipFile(io.BytesIO(data)) as zip_file:
+            with zip_file.open(f"{provider}.csv", "r") as csv_file:
+                items = list(storage.load(io.TextIOWrapper(csv_file, "utf-8"), provider=provider))
+        return ProviderCatalog(version=version, items=items)
 
     def add_provider(self, provider: AbstractProvider):
         """
@@ -260,14 +289,14 @@ class Catalog:
                         items.append(item)
             return items
 
-        if self.catalog is None:
+        if self.loaded_at is None:
             logger.error("Catalog not loaded. Returning zero items.")
             return []
         provider_catalog = self.catalog.get(provider_name)
         if provider_catalog is None:
             logger.error(f"No catalog for offline provider {provider_name}. Returning zero items.")
             return []
-        for item in provider_catalog:
+        for item in provider_catalog.items:
             if constraints.matches(item, query_filter):
                 items.append(item)
         return items
@@ -290,3 +319,13 @@ class Catalog:
         if not found:
             raise ValueError(f"Provider is not loaded: {provider_name}")
         return items
+
+
+def _get_base_url() -> str:
+    # Set this env var to use catalogs published somewhere other than the S3 bucket
+    return os.getenv("GPUHUNT_CATALOG_URL", CATALOG_URL).rstrip("/")
+
+
+def _get_latest_version(base_url: str, provider: str) -> str:
+    with urllib.request.urlopen(f"{base_url}/{provider}/version") as f:
+        return f.read().decode("utf-8").strip()
