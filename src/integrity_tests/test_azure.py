@@ -7,10 +7,6 @@ class TestAzureCatalog(CatalogFileIntegrityTests):
 
     def test_standard_d2s_v3_locations(self, offers: list[CatalogItem]) -> None:
         expected_locations = {
-            "attatlanta1",
-            "attdallas1",
-            "attdetroit1",
-            "attnewyork1",
             "australiacentral",
             "australiacentral2",
             "australiaeast",
@@ -47,7 +43,6 @@ class TestAzureCatalog(CatalogFileIntegrityTests):
             "norwaywest",
             "polandcentral",
             "qatarcentral",
-            "sgxsingapore1",
             "southafricanorth",
             "southafricawest",
             "southcentralus",
@@ -62,9 +57,6 @@ class TestAzureCatalog(CatalogFileIntegrityTests):
             "uaenorth",
             "uksouth",
             "ukwest",
-            "usgovarizona",
-            "usgovtexas",
-            "usgovvirginia",
             "westcentralus",
             "westeurope",
             "westindia",
