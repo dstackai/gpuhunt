@@ -1,47 +1,29 @@
-import csv
 from collections import Counter
-from pathlib import Path
 
-import pytest
-
+from gpuhunt import CatalogItem
 from gpuhunt.providers.verda import ALL_AMD_GPUS, GPU_MAP
+from integrity_tests.base import CatalogFileIntegrityTests
 
 
-@pytest.fixture
-def data_rows(catalog_dir: Path) -> list[dict]:
-    file = catalog_dir / "verda.csv"
-    reader = csv.DictReader(file.open())
-    return list(reader)
+class TestVerdaCatalog(CatalogFileIntegrityTests):
+    CATALOG_NAME = "verda"
 
+    def test_locations(self, offers: list[CatalogItem]) -> None:
+        expected_locations = {
+            "FIN-01",
+            "FIN-02",
+        }
+        locations = Counter(o.location for o in offers)
+        assert not expected_locations - set(locations)
+        for location in expected_locations:
+            assert locations[location] > 1
 
-def select_row(rows, name: str) -> list[str]:
-    return [r[name] for r in rows if r[name]]
+    def test_spot_and_on_demand_present(self, offers: list[CatalogItem]) -> None:
+        spots = Counter(o.spot for o in offers)
+        assert spots[True] > 1
+        assert spots[False] > 1
 
-
-def test_locations(data_rows):
-    expected = {
-        "FIN-01",
-        "FIN-02",
-        "FIN-02",
-    }
-    locations = select_row(data_rows, "location")
-    missing = expected - set(locations)
-    assert not missing
-
-    count = Counter(locations)
-    for loc in expected:
-        assert count[loc] > 1
-
-
-def test_spot(data_rows):
-    spots = select_row(data_rows, "spot")
-
-    count = Counter(spots)
-    for spot_key in ("True", "False"):
-        assert count[spot_key] > 1
-
-
-def test_gpu_present(data_rows):
-    refs = [name for name in GPU_MAP.values() if name not in ALL_AMD_GPUS]
-    gpus = select_row(data_rows, "gpu_name")
-    assert set(gpus) == set(refs)
+    def test_gpus(self, offers: list[CatalogItem]) -> None:
+        expected_gpus = {name for name in GPU_MAP.values() if name not in ALL_AMD_GPUS}
+        gpus = {o.gpu_name for o in offers if o.gpu_name}
+        assert gpus == expected_gpus

@@ -1,8 +1,17 @@
 import warnings
 
+import pytest
 import requests
 
-from gpuhunt.providers.vastai import get_dstack_gpu_name, get_vastai_gpu_names
+from gpuhunt import CatalogItem
+from gpuhunt.providers.vastai import VastAIProvider, get_dstack_gpu_name, get_vastai_gpu_names
+from integrity_tests.base import OffersIntegrityTests
+
+
+class TestVastAIOffers(OffersIntegrityTests):
+    @pytest.fixture(scope="class")
+    def offers(self) -> list[CatalogItem]:
+        return VastAIProvider.from_env().get()
 
 
 def test_real_world_vastai_offers():

@@ -52,13 +52,12 @@ class VastAIProvider(OnlineProvider):
         offers: list[CatalogItem] = []
         for offer in data["offers"]:
             cpu_cores = offer["cpu_cores"]
-            # although this is not stated in the docs, the value can be None
-            if cpu_cores:
-                memory = float(
-                    int(offer["cpu_ram"] * offer["cpu_cores_effective"] / cpu_cores / kilo)
-                )
-            else:
-                memory = 0.0
+            # although this is not stated in the docs, the value can be None,
+            # leaving no way to compute the memory available to the instance
+            if not cpu_cores:
+                logger.warning("Offer %s has no CPU cores, skipping", offer["id"])
+                continue
+            memory = float(int(offer["cpu_ram"] * offer["cpu_cores_effective"] / cpu_cores / kilo))
             disk_size = query_filter and query_filter.min_disk_size or offer["disk_space"]
             if not self.satisfies_filters(offer, filters):
                 logger.warning("Offer %s does not satisfy filters", offer["id"])

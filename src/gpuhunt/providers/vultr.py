@@ -66,7 +66,9 @@ def _make_offers(
             if catalog_item:
                 offers.append(catalog_item)
 
-    return offers
+    # Vultr's free tier plan is priced at 0, which would rank it above every paid plan.
+    # Offers are expected to carry a real price, so zero-priced plans are not published.
+    return [offer for offer in offers if offer.price > 0]
 
 
 def get_bare_metal_plans(plan: dict, location: str) -> CatalogItem | None:

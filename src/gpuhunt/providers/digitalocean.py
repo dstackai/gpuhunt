@@ -75,8 +75,8 @@ def _make_offers(response) -> list[CatalogItem]:
         else:
             gpu_count = 0
             gpu_vendor = None
-            gpu_name = ""
-            gpu_memory = 0
+            gpu_name = None
+            gpu_memory = None
 
         total_disk_size = sum(
             float(disk["size"]["amount"]) for disk in size["disk_info"] if disk["type"] == "local"

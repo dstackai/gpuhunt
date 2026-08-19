@@ -1,69 +1,58 @@
-import csv
-import json
-from operator import itemgetter
-from pathlib import Path
+from typing import cast
 
 import pytest
 
-
-@pytest.fixture
-def data_rows(catalog_dir: Path) -> list[dict]:
-    with open(catalog_dir / "nebius.csv") as f:
-        return list(csv.DictReader(f))
+from gpuhunt import CatalogItem
+from gpuhunt.providers.nebius import NebiusCatalogItemProviderData
+from integrity_tests.base import CatalogFileIntegrityTests
 
 
-@pytest.mark.parametrize("gpu", ["RTXPRO6000", "L40S", "H100", "H200", "B200", ""])
-def test_gpu_present(gpu: str, data_rows: list[dict]):
-    assert gpu in map(itemgetter("gpu_name"), data_rows)
+def get_offer(offers: list[CatalogItem], instance_name: str, location: str) -> CatalogItem:
+    for offer in offers:
+        if offer.instance_name == instance_name and offer.location == location:
+            return offer
+    raise LookupError(f"Offer not found: {instance_name} in {location}")
 
 
-def test_on_demand_present(data_rows: list[dict]):
-    assert "False" in map(itemgetter("spot"), data_rows)
+def get_fabrics(offer: CatalogItem) -> list[str]:
+    return cast(NebiusCatalogItemProviderData, offer.provider_data)["fabrics"]
 
 
-def test_spots_presented(data_rows: list[dict]):
-    spot_rows = [row for row in data_rows if row["spot"] == "True"]
-    assert len(spot_rows) > 0
+class TestNebiusCatalog(CatalogFileIntegrityTests):
+    CATALOG_NAME = "nebius"
 
+    @pytest.mark.parametrize("gpu", ["RTXPRO6000", "L40S", "H100", "H200", "B200"])
+    def test_gpu_present(self, gpu: str, offers: list[CatalogItem]) -> None:
+        assert any(o.gpu_name == gpu for o in offers)
 
-@pytest.mark.parametrize("location", ["eu-north1", "eu-west1"])
-def test_location_present(location: str, data_rows: list[dict]):
-    assert location in map(itemgetter("location"), data_rows)
+    def test_cpu_offer_present(self, offers: list[CatalogItem]) -> None:
+        assert any(o.gpu_count == 0 for o in offers)
 
+    def test_on_demand_present(self, offers: list[CatalogItem]) -> None:
+        assert any(not o.spot for o in offers)
 
-def test_fabrics_unique(data_rows: list[dict]) -> None:
-    for row in data_rows:
-        fabrics = json.loads(row["provider_data"])["fabrics"]
-        assert len(fabrics) == len(set(fabrics)), f"Duplicate fabrics in row: {row}"
+    def test_spot_present(self, offers: list[CatalogItem]) -> None:
+        assert any(o.spot for o in offers)
 
+    @pytest.mark.parametrize("location", ["eu-north1", "eu-west1"])
+    def test_location_present(self, location: str, offers: list[CatalogItem]) -> None:
+        assert any(o.location == location for o in offers)
 
-def test_fabrics_on_sample_offer(data_rows: list[dict]) -> None:
-    for row in data_rows:
-        if (
-            row["instance_name"] == "gpu-h100-sxm 8gpu-128vcpu-1600gb"
-            and row["location"] == "eu-north1"
-        ):
-            break
-    else:
-        raise ValueError("Offer not found")
-    fabrics = set(json.loads(row["provider_data"])["fabrics"])
-    expected_fabrics = {
-        "fabric-2",
-        "fabric-3",
-        "fabric-4",
-        "fabric-6",
-    }
-    missing_fabrics = expected_fabrics - fabrics
-    assert not missing_fabrics
+    def test_fabrics_unique(self, offers: list[CatalogItem]) -> None:
+        for offer in offers:
+            fabrics = get_fabrics(offer)
+            assert len(fabrics) == len(set(fabrics)), str(offer)
 
+    def test_fabrics_on_sample_offer(self, offers: list[CatalogItem]) -> None:
+        offer = get_offer(offers, "gpu-h100-sxm 8gpu-128vcpu-1600gb", "eu-north1")
+        expected_fabrics = {
+            "fabric-2",
+            "fabric-3",
+            "fabric-4",
+            "fabric-6",
+        }
+        assert not expected_fabrics - set(get_fabrics(offer))
 
-def test_no_fabrics_on_sample_non_clustered_offer(data_rows: list[dict]) -> None:
-    for row in data_rows:
-        if (
-            row["instance_name"] == "gpu-h100-sxm 1gpu-16vcpu-200gb"
-            and row["location"] == "eu-north1"
-        ):
-            break
-    else:
-        raise ValueError("Offer not found")
-    assert json.loads(row["provider_data"])["fabrics"] == []
+    def test_no_fabrics_on_sample_non_clustered_offer(self, offers: list[CatalogItem]) -> None:
+        offer = get_offer(offers, "gpu-h100-sxm 1gpu-16vcpu-200gb", "eu-north1")
+        assert get_fabrics(offer) == []

@@ -1,6 +1,7 @@
 import importlib
 import inspect
 import pkgutil
+from pathlib import Path
 
 import pytest
 
@@ -70,3 +71,9 @@ def test_default_catalog_loads_every_online_provider(providers):
     classes_by_name = {p.__name__: p for p in providers}
     names = {classes_by_name[class_name].NAME for _, class_name in ONLINE_PROVIDER_MODULES}
     assert names == set(ONLINE_PROVIDERS)
+
+
+def test_every_provider_has_integrity_tests():
+    integrity_tests_dir = Path(__file__).parents[2] / "integrity_tests"
+    for name in OFFLINE_PROVIDERS + ONLINE_PROVIDERS:
+        assert (integrity_tests_dir / f"test_{name}.py").exists(), name

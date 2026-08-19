@@ -1,17 +1,12 @@
-from pathlib import Path
-
-import pytest
-
-
-@pytest.fixture
-def data(catalog_dir: Path) -> str:
-    return (catalog_dir / "aws.csv").read_text()
+from gpuhunt import CatalogItem
+from integrity_tests.base import CatalogFileIntegrityTests
 
 
-class TestAWSCatalog:
-    def test_m5_large_regions(self, data: str):
-        instance = "m5.large"
-        regions = [
+class TestAWSCatalog(CatalogFileIntegrityTests):
+    CATALOG_NAME = "aws"
+
+    def test_m5_large_locations(self, offers: list[CatalogItem]) -> None:
+        expected_locations = {
             "af-south-1",
             "ap-east-1",
             "ap-northeast-1",
@@ -43,14 +38,18 @@ class TestAWSCatalog:
             "us-west-1",
             "us-west-2",
             "us-west-2-lax-1",
-        ]
-        assert all(f"\n{instance},{i}," in data for i in regions)
+        }
+        locations = {o.location for o in offers if o.instance_name == "m5.large"}
+        assert not expected_locations - locations
 
-    def test_spots_presented(self, data: str):
-        assert ",True," in data
+    def test_spot_present(self, offers: list[CatalogItem]) -> None:
+        assert any(o.spot for o in offers)
 
-    def test_gpu_presented(self, data: str):
-        gpus = [
+    def test_on_demand_present(self, offers: list[CatalogItem]) -> None:
+        assert any(not o.spot for o in offers)
+
+    def test_gpu_present(self, offers: list[CatalogItem]) -> None:
+        expected_gpus = {
             # AWS pricing csv does not include H200 (p5e.) offers.
             # TODO: Add CapacityBlocks offers to support H200.
             # "H200",
@@ -62,6 +61,6 @@ class TestAWSCatalog:
             "RTXPRO4500",
             "RTXPRO6000",
             "L4",
-        ]
-        for gpu in gpus:
-            assert f",{gpu}," in data
+        }
+        gpus = {o.gpu_name for o in offers}
+        assert not expected_gpus - gpus

@@ -1,16 +1,14 @@
-from pathlib import Path
-
 import pytest
 
-
-@pytest.fixture
-def data(catalog_dir: Path) -> str:
-    return (catalog_dir / "gcp.csv").read_text()
+from gpuhunt import AcceleratorVendor, CatalogItem
+from integrity_tests.base import CatalogFileIntegrityTests
 
 
-class TestGCPCatalog:
-    def test_e2_highcpu_2_zones(self, data: str):
-        zones = [
+class TestGCPCatalog(CatalogFileIntegrityTests):
+    CATALOG_NAME = "gcp"
+
+    def test_e2_highcpu_2_zones(self, offers: list[CatalogItem]) -> None:
+        expected_zones = {
             "asia-east1-a",
             "asia-east1-b",
             "asia-east1-c",
@@ -129,17 +127,18 @@ class TestGCPCatalog:
             "us-west4-a",
             "us-west4-b",
             "us-west4-c",
-        ]
-        assert all(f"\ne2-highcpu-2,{i}," in data for i in zones)
+        }
+        zones = {o.location for o in offers if o.instance_name == "e2-highcpu-2"}
+        assert not expected_zones - zones
 
-    def test_spots_presented(self, data: str):
-        assert ",True," in data
+    def test_spot_present(self, offers: list[CatalogItem]) -> None:
+        assert any(o.spot for o in offers)
 
-    def test_ondemand_presented(self, data: str):
-        assert ",False," in data
+    def test_on_demand_present(self, offers: list[CatalogItem]) -> None:
+        assert any(not o.spot for o in offers)
 
-    def test_gpu_presented(self, data: str):
-        gpus = [
+    def test_gpu_present(self, offers: list[CatalogItem]) -> None:
+        expected_gpus = {
             "B200",
             "H100",
             "A100",
@@ -148,18 +147,16 @@ class TestGCPCatalog:
             "T4",
             "V100",
             "P100",
-        ]
-        assert all(f",{i}," in data for i in gpus)
+        }
+        gpus = {o.gpu_name for o in offers if o.gpu_vendor == AcceleratorVendor.NVIDIA}
+        assert not expected_gpus - gpus
 
-    def test_tpu_presented(self, data: str):
-        gpus = [
-            "v2",
-            "v3",
-            "v5litepod",
-            "v5p",
-        ]
-        assert all(gpu in data for gpu in gpus)
+    # TPU offers are named after the TPU version and the number of cores, e.g. `v5litepod-4`
+    @pytest.mark.parametrize("version", ["v2", "v3", "v5litepod", "v5p"])
+    def test_tpu_present(self, version: str, offers: list[CatalogItem]) -> None:
+        tpus = {o.gpu_name for o in offers if o.gpu_vendor == AcceleratorVendor.GOOGLE}
+        assert any(tpu.startswith(f"{version}-") for tpu in tpus if tpu)
 
-    def test_both_a100_presented(self, data: str):
-        assert ",A100,40.0," in data
-        assert ",A100,80.0," in data
+    def test_both_a100_present(self, offers: list[CatalogItem]) -> None:
+        gpu_memory = {o.gpu_memory for o in offers if o.gpu_name == "A100"}
+        assert gpu_memory == {40.0, 80.0}

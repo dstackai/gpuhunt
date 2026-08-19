@@ -1,17 +1,11 @@
-import csv
-from pathlib import Path
-
-import pytest
+from gpuhunt import CatalogItem
+from integrity_tests.base import CatalogFileIntegrityTests
 
 
-@pytest.fixture
-def data_rows(catalog_dir: Path) -> list[dict]:
-    with open(catalog_dir / "azure.csv") as f:
-        return list(csv.DictReader(f))
+class TestAzureCatalog(CatalogFileIntegrityTests):
+    CATALOG_NAME = "azure"
 
-
-class TestAzureCatalog:
-    def test_standard_d2s_v3_locations(self, data_rows: list[dict]):
+    def test_standard_d2s_v3_locations(self, offers: list[CatalogItem]) -> None:
         expected_locations = {
             "attatlanta1",
             "attdallas1",
@@ -78,19 +72,16 @@ class TestAzureCatalog:
             "westus2",
             "westus3",
         }
-        locations = set(
-            row["location"] for row in data_rows if row["instance_name"] == "Standard_D2s_v3"
-        )
-        missing = expected_locations - locations
-        assert not missing
+        locations = {o.location for o in offers if o.instance_name == "Standard_D2s_v3"}
+        assert not expected_locations - locations
 
-    def test_spots_presented(self, data_rows: list[dict]):
-        assert any(row["spot"] == "True" for row in data_rows)
+    def test_spot_present(self, offers: list[CatalogItem]) -> None:
+        assert any(o.spot for o in offers)
 
-    def test_ondemand_presented(self, data_rows: list[dict]):
-        assert any(row["spot"] == "False" for row in data_rows)
+    def test_on_demand_present(self, offers: list[CatalogItem]) -> None:
+        assert any(not o.spot for o in offers)
 
-    def test_gpu_presented(self, data_rows: list[dict]):
+    def test_gpu_present(self, offers: list[CatalogItem]) -> None:
         expected_gpus = {
             "A100",
             "A10",
@@ -99,10 +90,9 @@ class TestAzureCatalog:
             "T4",
             "V100",
         }
-        gpus = set(row["gpu_name"] for row in data_rows if row["gpu_name"])
-        assert expected_gpus == gpus
+        gpus = {o.gpu_name for o in offers if o.gpu_name}
+        assert gpus == expected_gpus
 
-    def test_both_a100_presented(self, data_rows: list[dict]):
-        expected_gpu_memory = {"40.0", "80.0"}
-        gpu_memory = set(row["gpu_memory"] for row in data_rows if row["gpu_name"] == "A100")
-        assert expected_gpu_memory == gpu_memory
+    def test_both_a100_present(self, offers: list[CatalogItem]) -> None:
+        gpu_memory = {o.gpu_memory for o in offers if o.gpu_name == "A100"}
+        assert gpu_memory == {40.0, 80.0}
