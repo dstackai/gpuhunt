@@ -63,14 +63,18 @@ print(*items, sep="\n")
 * AWS
 * Azure
 * CloudRift
-* Verda
+* Crusoe
+* DigitalOcean
 * GCP
+* Hot Aisle
 * JarvisLabs
 * LambdaLabs
 * Nebius
 * OCI
 * Runpod
+* Seeweb
 * Vast AI
+* Verda
 * Vultr
 
 ## See also
