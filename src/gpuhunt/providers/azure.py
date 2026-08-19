@@ -6,9 +6,8 @@ import re
 import time
 from collections import namedtuple
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from queue import Queue
-from threading import Thread
 
 import requests
 import requests.adapters
@@ -110,63 +109,54 @@ class AzureProvider(OfflineProvider):
             subscription_id=subscription_id,
         )
 
-    def get_pages(self, threads: int = 8) -> Iterable[list[dict]]:
-        q = Queue()
-        workers = [
-            Thread(target=self._get_pages_worker, args=(q, threads, i), daemon=True)
-            for i in range(threads)
-        ]
-        for worker in workers:
-            worker.start()
+    def get_pages(self, regions: Iterable[str], threads: int = 8) -> Iterable[list[dict]]:
+        """
+        Yields pricing pages, paginating one region at a time.
 
-        exited = 0
-        while exited < threads:
-            page = q.get()
-            if page is None:
-                exited += 1
-            else:
-                yield page
-            q.task_done()
+        Prices are paginated with `$skip`, which only adds up to the full list as long as the
+        underlying data does not change. A region is only a few pages long, so a price update
+        during collection cannot shift rows out of the pages that are left to read.
+        """
 
-    def _get_pages_worker(self, q: Queue, stride: int, worker_id: int):
-        page_id = worker_id
+        with ThreadPoolExecutor(max_workers=threads) as executor:
+            futures = [executor.submit(self._get_region_pages, region) for region in regions]
+            for future in as_completed(futures):
+                yield from future.result()
+
+    def _get_region_pages(self, region: str) -> list[list[dict]]:
+        pages = []
+        page_id = 0
         session = requests.Session()
         session.mount("https://", requests.adapters.HTTPAdapter(max_retries=3))
-        try:
-            while True:
-                cached_page = None
-                if self.cache_dir is not None:
-                    cached_page = os.path.join(self.cache_dir, f"{page_id:04}.json")
-                if cached_page is not None and os.path.exists(cached_page):
-                    with open(cached_page) as f:
-                        data = json.load(f)
-                else:
-                    logger.info("Worker %s fetches pricing page %s", worker_id, page_id)
-                    res = session.get(
-                        prices_url,
-                        params={
-                            "$filter": " and ".join(prices_filters),
-                            "$skip": page_id * retail_prices_page_size,
-                        },
-                    )
-                    if res.status_code == 429:
-                        logger.warning("Worker %s got 429: sleep 3 & retry", worker_id)
-                        time.sleep(3)
-                        continue
-                    res.raise_for_status()
-                    if cached_page is not None:
-                        with open(cached_page, "w") as f:
-                            f.write(res.text)
-                    data = res.json()
-                if not data["Items"]:
-                    logger.info("Worker %s exited", worker_id)
-                    return
-                q.put(data["Items"])
-                page_id += stride
-        except Exception as e:
-            logger.exception("Worker %s failed: %s", worker_id, e)
-        finally:
-            q.put(None)
+        while True:
+            cached_page = None
+            if self.cache_dir is not None:
+                cached_page = os.path.join(self.cache_dir, f"{region}-{page_id:02}.json")
+            if cached_page is not None and os.path.exists(cached_page):
+                with open(cached_page) as f:
+                    data = json.load(f)
+            else:
+                logger.info("Fetching pricing page %s for %s", page_id, region)
+                res = session.get(
+                    prices_url,
+                    params={
+                        "$filter": " and ".join([*prices_filters, f"armRegionName eq '{region}'"]),
+                        "$skip": page_id * retail_prices_page_size,
+                    },
+                )
+                if res.status_code == 429:
+                    logger.warning("Got 429 for %s: sleep 3 & retry", region)
+                    time.sleep(3)
+                    continue
+                res.raise_for_status()
+                if cached_page is not None:
+                    with open(cached_page, "w") as f:
+                        f.write(res.text)
+                data = res.json()
+            if not data["Items"]:
+                return pages
+            pages.append(data["Items"])
+            page_id += 1
 
     def get(
         self,
@@ -175,8 +165,8 @@ class AzureProvider(OfflineProvider):
         apply_filter: bool = False,
     ) -> list[CatalogItem]:
         offers: list[CatalogItem] = []
-        instance_name_to_spec_map = self.get_instance_specs()
-        for page in self.get_pages():
+        instance_name_to_spec_map, regions = self.get_specs_and_regions()
+        for page in self.get_pages(regions):
             for sku_item in page:
                 if is_retired(sku_item["armSkuName"]):
                     continue
@@ -196,14 +186,21 @@ class AzureProvider(OfflineProvider):
                 offers.append(offer)
         return sorted(offers, key=lambda i: i.price)
 
-    def get_instance_specs(self) -> dict[str, _InstanceSpec]:
+    def get_specs_and_regions(self) -> tuple[dict[str, _InstanceSpec], set[str]]:
+        """
+        Returns the VM specs available to the subscription, keyed by instance name, along with
+        the regions those VMs are offered in.
+        """
+
         logger.info("Fetching instance details")
         instance_name_to_spec_map = {}
+        regions: set[str] = set()
         resources = self.client.resource_skus.list()
         for resource in resources:
             assert resource.name is not None
             if resource.resource_type != "virtualMachines":
                 continue
+            regions.update(location.lower() for location in resource.locations or [])
             if is_retired(resource.name):
                 continue
             capabilities = {
@@ -234,7 +231,10 @@ class AzureProvider(OfflineProvider):
                 gpu_name=gpu_name,
                 gpu_memory=gpu_memory,
             )
-        return instance_name_to_spec_map
+        logger.info(
+            "Found %s instance types in %s regions", len(instance_name_to_spec_map), len(regions)
+        )
+        return instance_name_to_spec_map, regions
 
     @classmethod
     def filter(cls, offers: list[CatalogItem]) -> list[CatalogItem]:
