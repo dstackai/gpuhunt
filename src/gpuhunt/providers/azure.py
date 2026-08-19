@@ -114,8 +114,9 @@ class AzureProvider(OfflineProvider):
         Yields pricing pages, paginating one region at a time.
 
         Prices are paginated with `$skip`, which only adds up to the full list as long as the
-        underlying data does not change. A region is only a few pages long, so a price update
-        during collection cannot shift rows out of the pages that are left to read.
+        underlying data does not change. Paginating per region does not make that safe, but it
+        shrinks the exposure from a single ~150 page walk spanning minutes to a couple of pages
+        per region, and keeps a price update mid-walk from affecting more than its own region.
         """
 
         with ThreadPoolExecutor(max_workers=threads) as executor:
