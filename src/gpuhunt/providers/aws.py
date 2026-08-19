@@ -5,25 +5,28 @@ import logging
 import os
 import re
 import tempfile
+import time
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from itertools import islice
 
 import boto3
 import requests
+from botocore.config import Config
 from botocore.exceptions import ClientError, ConnectTimeoutError, EndpointConnectionError
 
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
-ec2_pricing_url = (
+EC2_PRICING_URL = (
     "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/index.csv"
 )
-disclaimer_rows_skip = 5
+DISCLAIMER_ROWS_SKIP = 5
 # Retired (https://aws.amazon.com/ec2/previous-generation/)
 # or unlisted instance types (https://docs.aws.amazon.com/ec2/latest/instancetypes/ec2-instance-regions.html)
-previous_generation_families = [
+PREVIOUS_GENERATION_FAMILIES = [
     "a1.",
     "c1.",
     "c3.",
@@ -43,7 +46,7 @@ previous_generation_families = [
     "cr1.",
     "hs1.",
 ]
-pricing_filters = {
+PRICING_FILTERS = {
     "TermType": ["OnDemand"],
     "Tenancy": ["Shared"],
     "Operating System": ["Linux"],
@@ -53,9 +56,18 @@ pricing_filters = {
     "Pre Installed S/W": ["", "NA"],
     "MarketOption": ["OnDemand"],
 }
-describe_instances_limit = 100
-pricing_download_retries = 3
-pricing_download_chunk_size = 1024 * 1024
+# Values that a row must contain to have a chance of passing `PRICING_FILTERS`.
+# The pricing file quotes every non-empty field, so the quoted value can be looked up
+# in the raw row. Filters allowing more than one value are left to `_skip`.
+PRICING_FILTERS_SUBSTRINGS = tuple(
+    dict.fromkeys(f'"{values[0]}"' for values in PRICING_FILTERS.values() if len(values) == 1)
+)
+DESCRIBE_INSTANCES_LIMIT = 100
+PRICING_DOWNLOAD_RETRIES = 3
+PRICING_DOWNLOAD_CHUNK_SIZE = 1024 * 1024
+# Spot prices are fetched per region. Keep enough workers to cover all regions
+# at once, otherwise the slowest regions are fetched in several sequential waves.
+SPOT_PRICE_WORKERS = 32
 # AWS disruption workaround: if a request to one of these regions times out,
 # skip that region and continue collecting the catalog.
 TEMPORARILY_UNAVAILABLE_REGIONS = {
@@ -85,6 +97,10 @@ ACCOUNT_NOT_ENABLED_REGIONS = {
     "ca-west-1",
     "me-south-1",
 }
+# An unreachable region endpoint would otherwise stall the collection for minutes: botocore
+# defaults to a 60 second connect timeout and 5 attempts. Connecting to a healthy endpoint takes
+# well under a second, so a dead one now costs about 20 seconds instead of five minutes.
+EC2_CLIENT_CONFIG = Config(connect_timeout=5, retries={"mode": "standard", "max_attempts": 2})
 GPU_NAME_MAPPING = {
     "RTX PRO 4500": "RTXPRO4500",
     "RTX PRO Server 6000": "RTXPRO6000",
@@ -114,16 +130,19 @@ class AWSProvider(OfflineProvider):
         }
 
     def get(
-        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
+        self,
+        query_filter: QueryFilter | None = None,
+        balance_resources: bool = True,
+        apply_filter: bool = False,
     ) -> list[CatalogItem]:
         if not os.path.exists(self.cache_path):
             self._download_pricing_file()
 
         offers: list[CatalogItem] = []
         with open(self.cache_path, newline="") as f:
-            for _ in range(disclaimer_rows_skip):
+            for _ in range(DISCLAIMER_ROWS_SKIP):
                 f.readline()
-            reader: Iterable[dict[str, str]] = csv.DictReader(f)
+            reader: Iterable[dict[str, str]] = csv.DictReader(_prefilter_rows(f))
             for row in reader:
                 if self._skip(row):
                     continue
@@ -146,13 +165,23 @@ class AWSProvider(OfflineProvider):
                 )
                 offers.append(offer)
         self._fill_gpu_details(offers)
+        if apply_filter:
+            # Spot prices are fetched per instance type, so dropping the offers that are not
+            # stored in the catalog before fetching them saves most of the requests.
+            filtered_offers = self.filter(offers)
+            logger.info(
+                "Filtered out %s of %s offers before fetching spot prices",
+                len(offers) - len(filtered_offers),
+                len(offers),
+            )
+            offers = filtered_offers
         offers = self._with_spot_offers(offers)
         return sorted(offers, key=lambda i: i.price)
 
     def _skip(self, row: dict[str, str]) -> bool:
-        if any(row["Instance Type"].startswith(family) for family in previous_generation_families):
+        if any(row["Instance Type"].startswith(family) for family in PREVIOUS_GENERATION_FAMILIES):
             return True
-        for key, values in pricing_filters.items():
+        for key, values in PRICING_FILTERS.items():
             if row[key] not in values:
                 return True
         return False
@@ -178,12 +207,12 @@ class AWSProvider(OfflineProvider):
             instance_types = regions.pop(region)
 
             try:
-                client = boto3.client("ec2", region_name=region)
+                client = boto3.client("ec2", region_name=region, config=EC2_CLIENT_CONFIG)
                 paginator = client.get_paginator("describe_instance_types")
-                for offset in range(0, len(instance_types), describe_instances_limit):
+                for offset in range(0, len(instance_types), DESCRIBE_INSTANCES_LIMIT):
                     logger.info("Fetching GPU details for %s (offset=%s)", region, offset)
                     pages = paginator.paginate(
-                        InstanceTypes=instance_types[offset : offset + describe_instances_limit]
+                        InstanceTypes=instance_types[offset : offset + DESCRIBE_INSTANCES_LIMIT]
                     )
                     for page in pages:
                         for i in page["InstanceTypes"]:
@@ -248,9 +277,12 @@ class AWSProvider(OfflineProvider):
         self, region: str, instance_types: set[str]
     ) -> dict[tuple[str, str], float]:
         spot_prices = dict()
-        logger.info("Fetching spot prices for %s", region)
+        logger.info("Fetching spot prices for %s (%s instance types)", region, len(instance_types))
+        started_at = time.monotonic()
         try:
-            client = boto3.client("ec2", region_name=region)  # todo creds
+            client = boto3.client(  # todo creds
+                "ec2", region_name=region, config=EC2_CLIENT_CONFIG
+            )
             pages = client.get_paginator("describe_spot_price_history").paginate(
                 Filters=[
                     {
@@ -302,17 +334,23 @@ class AWSProvider(OfflineProvider):
                 )
                 return {}
             raise RuntimeError(f"Failed AWS spot price fetch in region {region}: {e}") from e
+        logger.info(
+            "Fetched %s spot prices for %s in %.1fs",
+            len(spot_prices),
+            region,
+            time.monotonic() - started_at,
+        )
         return spot_prices
 
     def _download_pricing_file(self) -> None:
         logger.info("Downloading EC2 prices to %s", self.cache_path)
         temp_cache_path = f"{self.cache_path}.part"
-        for attempt in range(1, pricing_download_retries + 1):
+        for attempt in range(1, PRICING_DOWNLOAD_RETRIES + 1):
             try:
-                with requests.get(ec2_pricing_url, stream=True, timeout=20) as r:
+                with requests.get(EC2_PRICING_URL, stream=True, timeout=20) as r:
                     r.raise_for_status()
                     with open(temp_cache_path, "wb") as f:
-                        for chunk in r.iter_content(chunk_size=pricing_download_chunk_size):
+                        for chunk in r.iter_content(chunk_size=PRICING_DOWNLOAD_CHUNK_SIZE):
                             if chunk:
                                 f.write(chunk)
                 os.replace(temp_cache_path, self.cache_path)
@@ -320,15 +358,15 @@ class AWSProvider(OfflineProvider):
             except (requests.RequestException, OSError) as e:
                 if os.path.exists(temp_cache_path):
                     os.remove(temp_cache_path)
-                if attempt == pricing_download_retries:
+                if attempt == PRICING_DOWNLOAD_RETRIES:
                     raise RuntimeError(
-                        f"Failed to download AWS pricing file after {pricing_download_retries} "
+                        f"Failed to download AWS pricing file after {PRICING_DOWNLOAD_RETRIES} "
                         f"attempts: {e}"
                     ) from e
                 logger.warning(
                     "Failed to download AWS pricing file (attempt %s/%s), retrying: %s",
                     attempt,
-                    pricing_download_retries,
+                    PRICING_DOWNLOAD_RETRIES,
                     e,
                 )
 
@@ -347,7 +385,7 @@ class AWSProvider(OfflineProvider):
             )
 
         spot_prices = dict()
-        with ThreadPoolExecutor(max_workers=8) as executor:
+        with ThreadPoolExecutor(max_workers=SPOT_PRICE_WORKERS) as executor:
             future_to_region = {}
             for region, instance_types in region_instances.items():
                 future = executor.submit(self._add_spots_worker, region, instance_types)
@@ -413,6 +451,21 @@ def _get_gpu_memory_gib(gpu_name: str, reported_memory_mib: int) -> float:
             "Please check that it is now correct and remove the hardcoded size if it is."
         )
     return 24
+
+
+def _prefilter_rows(lines: Iterable[str]) -> Iterator[str]:
+    """
+    Yields the header row followed by only the rows that may pass `PRICING_FILTERS`.
+
+    Testing raw rows for the filter values is several times cheaper than parsing every
+    row of the pricing file as CSV, as only a fraction of a percent of rows pass.
+    """
+
+    lines = iter(lines)
+    yield from islice(lines, 1)
+    for line in lines:
+        if all(substring in line for substring in PRICING_FILTERS_SUBSTRINGS):
+            yield line
 
 
 def _parse_memory(s: str) -> float:

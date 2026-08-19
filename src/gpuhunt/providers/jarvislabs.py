@@ -56,7 +56,10 @@ class JarvisLabsProvider(OnlineProvider):
         )
 
     def get(
-        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
+        self,
+        query_filter: QueryFilter | None = None,
+        balance_resources: bool = True,
+        apply_filter: bool = False,
     ) -> list[CatalogItem]:
         offers = self.fetch_offers(query_filter=query_filter)
         return sorted(offers, key=lambda i: i.price)

@@ -28,7 +28,10 @@ class LambdaLabsProvider(OfflineProvider):
         self.session.headers.update({"Authorization": f"Bearer {token}"})
 
     def get(
-        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
+        self,
+        query_filter: QueryFilter | None = None,
+        balance_resources: bool = True,
+        apply_filter: bool = False,
     ) -> list[CatalogItem]:
         offers: list[CatalogItem] = []
         regions = self.list_regions()
