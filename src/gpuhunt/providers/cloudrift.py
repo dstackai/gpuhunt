@@ -17,7 +17,10 @@ class CloudRiftProvider(OfflineProvider):
     NAME = "cloudrift"
 
     def get(
-        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
+        self,
+        query_filter: QueryFilter | None = None,
+        balance_resources: bool = True,
+        apply_filter: bool = False,
     ) -> list[CatalogItem]:
         instance_types = self._get_instance_types()
         offers = [offer for instance in instance_types for offer in _make_offers(instance)]

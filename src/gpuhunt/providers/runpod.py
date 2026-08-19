@@ -30,7 +30,10 @@ class RunpodProvider(OfflineProvider):
         self._gpu_map = get_gpu_map()
 
     def get(
-        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
+        self,
+        query_filter: QueryFilter | None = None,
+        balance_resources: bool = True,
+        apply_filter: bool = False,
     ) -> list[CatalogItem]:
         offers = self._fetch_offers()
         return sorted(offers, key=lambda i: i.price or 0)

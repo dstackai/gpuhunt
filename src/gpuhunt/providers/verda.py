@@ -25,7 +25,10 @@ class VerdaProvider(OfflineProvider):
         self.verda_client = VerdaClient(client_id, client_secret)
 
     def get(
-        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
+        self,
+        query_filter: QueryFilter | None = None,
+        balance_resources: bool = True,
+        apply_filter: bool = False,
     ) -> list[CatalogItem]:
         instance_types = self._get_instance_types()
         locations = self._get_locations()

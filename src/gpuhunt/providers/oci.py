@@ -47,7 +47,10 @@ class OCIProvider(OfflineProvider):
         self.cost_estimator = CostEstimator()
 
     def get(
-        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
+        self,
+        query_filter: QueryFilter | None = None,
+        balance_resources: bool = True,
+        apply_filter: bool = False,
     ) -> list[CatalogItem]:
         shapes = self.cost_estimator.get_shapes()
         products = self.cost_estimator.get_products()

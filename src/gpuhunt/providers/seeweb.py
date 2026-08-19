@@ -51,7 +51,10 @@ class SeewebProvider(OnlineProvider):
         return cls(token=get_creds_env("SEEWEB_API_TOKEN"))
 
     def get(
-        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
+        self,
+        query_filter: QueryFilter | None = None,
+        balance_resources: bool = True,
+        apply_filter: bool = False,
     ) -> list[CatalogItem]:
         response = requests.get(
             f"{API_URL}/plans",

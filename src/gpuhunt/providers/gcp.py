@@ -171,7 +171,10 @@ class GCPProvider(OfflineProvider):
         self.cloud_catalog_client = billing_v1.CloudCatalogClient()
 
     def get(
-        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
+        self,
+        query_filter: QueryFilter | None = None,
+        balance_resources: bool = True,
+        apply_filter: bool = False,
     ) -> list[CatalogItem]:
         machine_types = self._list_machine_types()
         machine_types += self._make_gpu_machine_types(machine_types)

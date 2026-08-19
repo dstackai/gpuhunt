@@ -124,7 +124,10 @@ class AWSProvider(OfflineProvider):
         }
 
     def get(
-        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
+        self,
+        query_filter: QueryFilter | None = None,
+        balance_resources: bool = True,
+        apply_filter: bool = False,
     ) -> list[CatalogItem]:
         if not os.path.exists(self.cache_path):
             self._download_pricing_file()

@@ -83,7 +83,10 @@ class CrusoeProvider(OnlineProvider):
         )
 
     def get(
-        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
+        self,
+        query_filter: QueryFilter | None = None,
+        balance_resources: bool = True,
+        apply_filter: bool = False,
     ) -> list[CatalogItem]:
         instance_types = self._get_instance_types()
         type_specs = {t["product_name"]: t for t in instance_types}

@@ -169,7 +169,10 @@ class AzureProvider(OfflineProvider):
             q.put(None)
 
     def get(
-        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
+        self,
+        query_filter: QueryFilter | None = None,
+        balance_resources: bool = True,
+        apply_filter: bool = False,
     ) -> list[CatalogItem]:
         offers: list[CatalogItem] = []
         instance_name_to_spec_map = self.get_instance_specs()

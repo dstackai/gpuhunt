@@ -38,7 +38,10 @@ class VastAIProvider(OnlineProvider):
         self.order = list(order)
 
     def get(
-        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
+        self,
+        query_filter: QueryFilter | None = None,
+        balance_resources: bool = True,
+        apply_filter: bool = False,
     ) -> list[CatalogItem]:
         filters: dict[str, Any] = self.make_filters(query_filter or QueryFilter())
         if self.extra_filters:

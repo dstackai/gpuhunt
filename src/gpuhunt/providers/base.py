@@ -21,7 +21,10 @@ class AbstractProvider(ABC):
 
     @abstractmethod
     def get(
-        self, query_filter: QueryFilter | None = None, balance_resources: bool = True
+        self,
+        query_filter: QueryFilter | None = None,
+        balance_resources: bool = True,
+        apply_filter: bool = False,
     ) -> list[CatalogItem]:
         """
         Return a list of available instance offers. Offers should be ordered by priority. In most
@@ -35,6 +38,10 @@ class AbstractProvider(ABC):
             balance_resources: Whether the instance resources (CPU, RAM, disk) should be
                 adjusted to better match the GPU. Only used with online providers. Only relevant
                 to cloud providers that allow configuring instance CPU, RAM, and disk.
+            apply_filter: Whether `filter` should be applied to the returned offers. Only used
+                with offline providers. Safe to ignore, as `gpuhunt` also applies `filter` after
+                calling `get`. However, it can be used to skip requests for offers that would be
+                dropped from the catalog anyway.
         """
 
         pass

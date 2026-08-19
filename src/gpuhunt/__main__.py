@@ -127,7 +127,7 @@ def main():
         exit(f"Unknown provider {args.provider}")
 
     logging.info("Fetching offers for %s", args.provider)
-    offers = provider.get()
+    offers = provider.get(apply_filter=not args.no_filter)
     if not args.no_filter and isinstance(provider, OfflineProvider):
         offers = provider.filter(offers)
     storage.dump(offers, args.output)
