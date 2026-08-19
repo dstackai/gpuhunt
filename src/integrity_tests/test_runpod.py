@@ -1,61 +1,44 @@
-import csv
-from pathlib import Path
-
-import pytest
-
+from gpuhunt import CatalogItem
 from gpuhunt.providers.runpod import get_gpu_map
 from integrity_tests.base import CatalogFileIntegrityTests
 
 
-@pytest.fixture
-def data_rows(catalog_dir: Path) -> list[dict]:
-    file = catalog_dir / "runpod.csv"
-    reader = csv.DictReader(file.open())
-    return list(reader)
-
-
-def select_row(rows, name: str) -> list[str]:
-    return [r[name] for r in rows if r[name]]
-
-
-def test_locations(data_rows):
-    expected = {
-        # Secure cloud
-        "CA-MTL-1",
-        "CA-MTL-2",
-        "CA-MTL-3",
-        "EU-NL-1",
-        "EU-RO-1",
-        "EU-SE-1",
-        "EUR-IS-1",
-        "EUR-IS-2",
-        "US-TX-3",
-        # Community cloud
-        "CA",
-        "CZ",
-        "FR",
-        "US",
-    }
-    locations = set(select_row(data_rows, "location"))
-    # Assert most are present. Some may be missing due to low availability.
-    # TODO: CA-MTL-2 looks absent in recent live Runpod snapshots.
-    # Re-evaluate this expectation later and tighten back to <= 3.
-    assert len(expected - locations) <= 4
-
-
-def test_gpu_present(data_rows):
-    refs = set(name for _, name in get_gpu_map().values())
-    gpus = set(select_row(data_rows, "gpu_name"))
-    assert len(refs & gpus) > 7
-
-
-def test_cpu_offers_integrity(data_rows):
-    cpu_rows = [row for row in data_rows if row["gpu_count"] == "0"]
-    assert len(cpu_rows) > 0
-    assert all("runpod-cpu" in row["flags"].split(",") for row in cpu_rows)
-    assert all(row["spot"] == "False" for row in cpu_rows)
-    assert all("-" in row["location"] for row in cpu_rows)
-
-
-class TestRunpodOffers(CatalogFileIntegrityTests):
+class TestRunpodCatalog(CatalogFileIntegrityTests):
     CATALOG_NAME = "runpod"
+
+    def test_locations(self, offers: list[CatalogItem]) -> None:
+        expected_locations = {
+            # Secure cloud
+            "CA-MTL-1",
+            "CA-MTL-2",
+            "CA-MTL-3",
+            "EU-NL-1",
+            "EU-RO-1",
+            "EU-SE-1",
+            "EUR-IS-1",
+            "EUR-IS-2",
+            "US-TX-3",
+            # Community cloud
+            "CA",
+            "CZ",
+            "FR",
+            "US",
+        }
+        locations = {o.location for o in offers}
+        # Assert most are present. Some may be missing due to low availability.
+        # TODO: CA-MTL-2 looks absent in recent live Runpod snapshots.
+        # Re-evaluate this expectation later and tighten back to <= 3.
+        assert len(expected_locations - locations) <= 4
+
+    def test_gpu_present(self, offers: list[CatalogItem]) -> None:
+        expected_gpus = {name for _, name in get_gpu_map().values()}
+        gpus = {o.gpu_name for o in offers if o.gpu_name}
+        assert len(expected_gpus & gpus) > 7
+
+    def test_cpu_offers_integrity(self, offers: list[CatalogItem]) -> None:
+        cpu_offers = [o for o in offers if o.gpu_count == 0]
+        assert cpu_offers
+        for offer in cpu_offers:
+            assert "runpod-cpu" in offer.flags, str(offer)
+            assert not offer.spot, str(offer)
+            assert "-" in offer.location, str(offer)
