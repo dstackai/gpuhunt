@@ -56,6 +56,9 @@ pricing_filters = {
 describe_instances_limit = 100
 pricing_download_retries = 3
 pricing_download_chunk_size = 1024 * 1024
+# Spot prices are fetched per region. Keep enough workers to cover all regions
+# at once, otherwise the slowest regions are fetched in several sequential waves.
+spot_price_workers = 32
 # AWS disruption workaround: if a request to one of these regions times out,
 # skip that region and continue collecting the catalog.
 TEMPORARILY_UNAVAILABLE_REGIONS = {
@@ -347,7 +350,7 @@ class AWSProvider(OfflineProvider):
             )
 
         spot_prices = dict()
-        with ThreadPoolExecutor(max_workers=8) as executor:
+        with ThreadPoolExecutor(max_workers=spot_price_workers) as executor:
             future_to_region = {}
             for region, instance_types in region_instances.items():
                 future = executor.submit(self._add_spots_worker, region, instance_types)
