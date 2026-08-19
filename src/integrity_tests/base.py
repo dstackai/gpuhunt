@@ -19,6 +19,9 @@ class OffersIntegrityTests:
     `CatalogFileIntegrityTests`.
     """
 
+    def test_offers_present(self, offers: list[CatalogItem]) -> None:
+        assert offers
+
     def test_name_and_location_present(self, offers: list[CatalogItem]) -> None:
         for offer in offers:
             assert offer.instance_name, str(offer)
