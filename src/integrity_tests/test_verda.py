@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from gpuhunt.providers.verda import ALL_AMD_GPUS, GPU_MAP
+from integrity_tests.base import CatalogFileIntegrityTests
 
 
 @pytest.fixture
@@ -45,3 +46,7 @@ def test_gpu_present(data_rows):
     refs = [name for name in GPU_MAP.values() if name not in ALL_AMD_GPUS]
     gpus = select_row(data_rows, "gpu_name")
     assert set(gpus) == set(refs)
+
+
+class TestVerdaOffers(CatalogFileIntegrityTests):
+    CATALOG_NAME = "verda"

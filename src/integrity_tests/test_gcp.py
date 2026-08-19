@@ -2,6 +2,8 @@ from pathlib import Path
 
 import pytest
 
+from integrity_tests.base import CatalogFileIntegrityTests
+
 
 @pytest.fixture
 def data(catalog_dir: Path) -> str:
@@ -163,3 +165,7 @@ class TestGCPCatalog:
     def test_both_a100_presented(self, data: str):
         assert ",A100,40.0," in data
         assert ",A100,80.0," in data
+
+
+class TestGCPOffers(CatalogFileIntegrityTests):
+    CATALOG_NAME = "gcp"

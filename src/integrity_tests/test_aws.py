@@ -2,6 +2,8 @@ from pathlib import Path
 
 import pytest
 
+from integrity_tests.base import CatalogFileIntegrityTests
+
 
 @pytest.fixture
 def data(catalog_dir: Path) -> str:
@@ -65,3 +67,7 @@ class TestAWSCatalog:
         ]
         for gpu in gpus:
             assert f",{gpu}," in data
+
+
+class TestAWSOffers(CatalogFileIntegrityTests):
+    CATALOG_NAME = "aws"

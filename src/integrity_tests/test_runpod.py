@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from gpuhunt.providers.runpod import get_gpu_map
+from integrity_tests.base import CatalogFileIntegrityTests
 
 
 @pytest.fixture
@@ -54,3 +55,7 @@ def test_cpu_offers_integrity(data_rows):
     assert all("runpod-cpu" in row["flags"].split(",") for row in cpu_rows)
     assert all(row["spot"] == "False" for row in cpu_rows)
     assert all("-" in row["location"] for row in cpu_rows)
+
+
+class TestRunpodOffers(CatalogFileIntegrityTests):
+    CATALOG_NAME = "runpod"

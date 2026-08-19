@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from gpuhunt.providers.cloudrift import GPU_MAP
+from integrity_tests.base import CatalogFileIntegrityTests
 
 
 @pytest.fixture
@@ -30,3 +31,7 @@ def test_gpu_present(data_rows: list[dict]):
 @pytest.mark.parametrize("gpu_count", [1, 2])
 def test_gpu_count_present(gpu_count: int, data_rows: list[dict]):
     assert str(gpu_count) in map(itemgetter("gpu_count"), data_rows)
+
+
+class TestCloudRiftOffers(CatalogFileIntegrityTests):
+    CATALOG_NAME = "cloudrift"

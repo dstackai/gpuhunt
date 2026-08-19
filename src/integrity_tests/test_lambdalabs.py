@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from integrity_tests.base import CatalogFileIntegrityTests
+
 
 @pytest.fixture
 def data_rows(catalog_dir: Path) -> list[dict]:
@@ -44,3 +46,7 @@ def test_locations(data_rows: list[dict]):
     locations = set(map(itemgetter("location"), data_rows))
     missing = expected_locations - locations
     assert not missing
+
+
+class TestLambdaLabsOffers(CatalogFileIntegrityTests):
+    CATALOG_NAME = "lambdalabs"

@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+from integrity_tests.base import CatalogFileIntegrityTests
+
 
 @pytest.fixture
 def data_rows(catalog_dir: Path) -> list[dict]:
@@ -67,3 +69,7 @@ def test_no_fabrics_on_sample_non_clustered_offer(data_rows: list[dict]) -> None
     else:
         raise ValueError("Offer not found")
     assert json.loads(row["provider_data"])["fabrics"] == []
+
+
+class TestNebiusOffers(CatalogFileIntegrityTests):
+    CATALOG_NAME = "nebius"

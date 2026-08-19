@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+from integrity_tests.base import CatalogFileIntegrityTests
+
 
 @pytest.fixture
 def data_rows(catalog_dir: Path) -> list[dict]:
@@ -106,3 +108,7 @@ class TestAzureCatalog:
         expected_gpu_memory = {"40.0", "80.0"}
         gpu_memory = set(row["gpu_memory"] for row in data_rows if row["gpu_name"] == "A100")
         assert expected_gpu_memory == gpu_memory
+
+
+class TestAzureOffers(CatalogFileIntegrityTests):
+    CATALOG_NAME = "azure"

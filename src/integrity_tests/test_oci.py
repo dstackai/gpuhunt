@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from integrity_tests.base import CatalogFileIntegrityTests
+
 
 @pytest.fixture
 def data_rows(catalog_dir: Path) -> list[dict]:
@@ -42,3 +44,7 @@ def test_quantity_decreases_as_query_complexity_increases(data_rows: list[dict])
     assert len(data_rows) > len(zero_or_one_gpu)
     assert len(zero_or_one_gpu) > len(zero_gpu)
     assert len(zero_gpu) > len(one_gpu)
+
+
+class TestOCIOffers(CatalogFileIntegrityTests):
+    CATALOG_NAME = "oci"
