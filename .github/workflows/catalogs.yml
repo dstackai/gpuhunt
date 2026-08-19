@@ -336,6 +336,40 @@ jobs:
           retention-days: 1
 
   # Online providers have no catalog to publish, only offers fetched at query time
+  test-crusoe:
+    name: Test Crusoe integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: uv sync --extra dev
+      - name: Run integrity tests
+        env:
+          CRUSOE_ACCESS_KEY: ${{ secrets.CRUSOE_ACCESS_KEY }}
+          CRUSOE_SECRET_KEY: ${{ secrets.CRUSOE_SECRET_KEY }}
+          CRUSOE_PROJECT_ID: ${{ secrets.CRUSOE_PROJECT_ID }}
+        run: uv run pytest src/integrity_tests/test_crusoe.py
+
+  test-digitalocean:
+    name: Test DigitalOcean integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: uv sync --extra dev
+      - name: Run integrity tests
+        env:
+          DIGITAL_OCEAN_API_KEY: ${{ secrets.DIGITAL_OCEAN_API_KEY }}
+        run: uv run pytest src/integrity_tests/test_digitalocean.py
+
   test-hotaisle:
     name: Test Hot Aisle integrity
     runs-on: ubuntu-latest
@@ -353,6 +387,38 @@ jobs:
           HOTAISLE_TEAM_HANDLE: ${{ secrets.HOTAISLE_TEAM_HANDLE }}
         run: uv run pytest src/integrity_tests/test_hotaisle.py
 
+  test-jarvislabs:
+    name: Test JarvisLabs integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: uv sync --extra dev
+      - name: Run integrity tests
+        env:
+          JL_API_KEY: ${{ secrets.JL_API_KEY }}
+        run: uv run pytest src/integrity_tests/test_jarvislabs.py
+
+  test-seeweb:
+    name: Test Seeweb integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: uv sync --extra dev
+      - name: Run integrity tests
+        env:
+          SEEWEB_API_TOKEN: ${{ secrets.SEEWEB_API_TOKEN }}
+        run: uv run pytest src/integrity_tests/test_seeweb.py
+
   test-vastai:
     name: Test Vast.ai integrity
     runs-on: ubuntu-latest
@@ -366,6 +432,20 @@ jobs:
         run: uv sync --extra dev
       - name: Run integrity tests
         run: uv run pytest src/integrity_tests/test_vastai.py
+
+  test-vultr:
+    name: Test Vultr integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: uv sync --extra dev
+      - name: Run integrity tests
+        run: uv run pytest src/integrity_tests/test_vultr.py
 
   # The v2 catalog bundles all providers into a single file. It is published for dstack
   # installations that predate per-provider v3 catalogs and, unlike the v3 catalogs, is
@@ -427,8 +507,13 @@ jobs:
       - catalog-oci
       - catalog-runpod
       - catalog-cloudrift
+      - test-crusoe
+      - test-digitalocean
       - test-hotaisle
+      - test-jarvislabs
+      - test-seeweb
       - test-vastai
+      - test-vultr
       - publish-catalog-v2
     runs-on: ubuntu-latest
     steps:
