@@ -29,8 +29,6 @@ class OffersIntegrityTests:
 
     def test_price_positive(self, offers: list[CatalogItem]) -> None:
         for offer in offers:
-            if "gcp-g4-preview" in offer.flags:
-                continue
             assert offer.price > 0, str(offer)
 
     def test_resources_positive(self, offers: list[CatalogItem]) -> None:
