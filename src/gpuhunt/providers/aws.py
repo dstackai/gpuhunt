@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import tempfile
+import time
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -271,7 +272,8 @@ class AWSProvider(OfflineProvider):
         self, region: str, instance_types: set[str]
     ) -> dict[tuple[str, str], float]:
         spot_prices = dict()
-        logger.info("Fetching spot prices for %s", region)
+        logger.info("Fetching spot prices for %s (%s instance types)", region, len(instance_types))
+        started_at = time.monotonic()
         try:
             client = boto3.client("ec2", region_name=region)  # todo creds
             pages = client.get_paginator("describe_spot_price_history").paginate(
@@ -325,6 +327,12 @@ class AWSProvider(OfflineProvider):
                 )
                 return {}
             raise RuntimeError(f"Failed AWS spot price fetch in region {region}: {e}") from e
+        logger.info(
+            "Fetched %s spot prices for %s in %.1fs",
+            len(spot_prices),
+            region,
+            time.monotonic() - started_at,
+        )
         return spot_prices
 
     def _download_pricing_file(self) -> None:
