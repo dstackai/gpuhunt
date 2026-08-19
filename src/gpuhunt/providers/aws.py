@@ -6,8 +6,9 @@ import os
 import re
 import tempfile
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from itertools import islice
 
 import boto3
 import requests
@@ -53,6 +54,12 @@ pricing_filters = {
     "Pre Installed S/W": ["", "NA"],
     "MarketOption": ["OnDemand"],
 }
+# Values that a row must contain to have a chance of passing `pricing_filters`.
+# The pricing file quotes every non-empty field, so the quoted value can be looked up
+# in the raw row. Filters allowing more than one value are left to `_skip`.
+pricing_filters_substrings = tuple(
+    dict.fromkeys(f'"{values[0]}"' for values in pricing_filters.values() if len(values) == 1)
+)
 describe_instances_limit = 100
 pricing_download_retries = 3
 pricing_download_chunk_size = 1024 * 1024
@@ -126,7 +133,7 @@ class AWSProvider(OfflineProvider):
         with open(self.cache_path, newline="") as f:
             for _ in range(disclaimer_rows_skip):
                 f.readline()
-            reader: Iterable[dict[str, str]] = csv.DictReader(f)
+            reader: Iterable[dict[str, str]] = csv.DictReader(_prefilter_rows(f))
             for row in reader:
                 if self._skip(row):
                     continue
@@ -416,6 +423,21 @@ def _get_gpu_memory_gib(gpu_name: str, reported_memory_mib: int) -> float:
             "Please check that it is now correct and remove the hardcoded size if it is."
         )
     return 24
+
+
+def _prefilter_rows(lines: Iterable[str]) -> Iterator[str]:
+    """
+    Yields the header row followed by only the rows that may pass `pricing_filters`.
+
+    Testing raw rows for the filter values is several times cheaper than parsing every
+    row of the pricing file as CSV, as only a fraction of a percent of rows pass.
+    """
+
+    lines = iter(lines)
+    yield from islice(lines, 1)
+    for line in lines:
+        if all(substring in line for substring in pricing_filters_substrings):
+            yield line
 
 
 def _parse_memory(s: str) -> float:
