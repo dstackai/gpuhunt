@@ -109,7 +109,7 @@ class AzureProvider(OfflineProvider):
             subscription_id=subscription_id,
         )
 
-    def get_pages(self, regions: Iterable[str], threads: int = 8) -> Iterable[list[dict]]:
+    def get_pages(self, regions: Iterable[str], threads: int = 32) -> Iterable[list[dict]]:
         """
         Yields pricing pages, paginating one region at a time.
 
