@@ -159,6 +159,16 @@ class AWSProvider(OfflineProvider):
                 )
                 offers.append(offer)
         self._fill_gpu_details(offers)
+        if apply_filter:
+            # Spot prices are fetched per instance type, so dropping the offers that are not
+            # stored in the catalog before fetching them saves most of the requests.
+            filtered_offers = self.filter(offers)
+            logger.info(
+                "Filtered out %s of %s offers before fetching spot prices",
+                len(offers) - len(filtered_offers),
+                len(offers),
+            )
+            offers = filtered_offers
         offers = self._with_spot_offers(offers)
         return sorted(offers, key=lambda i: i.price)
 
