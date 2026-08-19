@@ -18,13 +18,13 @@ from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
-ec2_pricing_url = (
+EC2_PRICING_URL = (
     "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/index.csv"
 )
-disclaimer_rows_skip = 5
+DISCLAIMER_ROWS_SKIP = 5
 # Retired (https://aws.amazon.com/ec2/previous-generation/)
 # or unlisted instance types (https://docs.aws.amazon.com/ec2/latest/instancetypes/ec2-instance-regions.html)
-previous_generation_families = [
+PREVIOUS_GENERATION_FAMILIES = [
     "a1.",
     "c1.",
     "c3.",
@@ -44,7 +44,7 @@ previous_generation_families = [
     "cr1.",
     "hs1.",
 ]
-pricing_filters = {
+PRICING_FILTERS = {
     "TermType": ["OnDemand"],
     "Tenancy": ["Shared"],
     "Operating System": ["Linux"],
@@ -54,18 +54,18 @@ pricing_filters = {
     "Pre Installed S/W": ["", "NA"],
     "MarketOption": ["OnDemand"],
 }
-# Values that a row must contain to have a chance of passing `pricing_filters`.
+# Values that a row must contain to have a chance of passing `PRICING_FILTERS`.
 # The pricing file quotes every non-empty field, so the quoted value can be looked up
 # in the raw row. Filters allowing more than one value are left to `_skip`.
-pricing_filters_substrings = tuple(
-    dict.fromkeys(f'"{values[0]}"' for values in pricing_filters.values() if len(values) == 1)
+PRICING_FILTERS_SUBSTRINGS = tuple(
+    dict.fromkeys(f'"{values[0]}"' for values in PRICING_FILTERS.values() if len(values) == 1)
 )
-describe_instances_limit = 100
-pricing_download_retries = 3
-pricing_download_chunk_size = 1024 * 1024
+DESCRIBE_INSTANCES_LIMIT = 100
+PRICING_DOWNLOAD_RETRIES = 3
+PRICING_DOWNLOAD_CHUNK_SIZE = 1024 * 1024
 # Spot prices are fetched per region. Keep enough workers to cover all regions
 # at once, otherwise the slowest regions are fetched in several sequential waves.
-spot_price_workers = 32
+SPOT_PRICE_WORKERS = 32
 # AWS disruption workaround: if a request to one of these regions times out,
 # skip that region and continue collecting the catalog.
 TEMPORARILY_UNAVAILABLE_REGIONS = {
@@ -131,7 +131,7 @@ class AWSProvider(OfflineProvider):
 
         offers: list[CatalogItem] = []
         with open(self.cache_path, newline="") as f:
-            for _ in range(disclaimer_rows_skip):
+            for _ in range(DISCLAIMER_ROWS_SKIP):
                 f.readline()
             reader: Iterable[dict[str, str]] = csv.DictReader(_prefilter_rows(f))
             for row in reader:
@@ -160,9 +160,9 @@ class AWSProvider(OfflineProvider):
         return sorted(offers, key=lambda i: i.price)
 
     def _skip(self, row: dict[str, str]) -> bool:
-        if any(row["Instance Type"].startswith(family) for family in previous_generation_families):
+        if any(row["Instance Type"].startswith(family) for family in PREVIOUS_GENERATION_FAMILIES):
             return True
-        for key, values in pricing_filters.items():
+        for key, values in PRICING_FILTERS.items():
             if row[key] not in values:
                 return True
         return False
@@ -190,10 +190,10 @@ class AWSProvider(OfflineProvider):
             try:
                 client = boto3.client("ec2", region_name=region)
                 paginator = client.get_paginator("describe_instance_types")
-                for offset in range(0, len(instance_types), describe_instances_limit):
+                for offset in range(0, len(instance_types), DESCRIBE_INSTANCES_LIMIT):
                     logger.info("Fetching GPU details for %s (offset=%s)", region, offset)
                     pages = paginator.paginate(
-                        InstanceTypes=instance_types[offset : offset + describe_instances_limit]
+                        InstanceTypes=instance_types[offset : offset + DESCRIBE_INSTANCES_LIMIT]
                     )
                     for page in pages:
                         for i in page["InstanceTypes"]:
@@ -317,12 +317,12 @@ class AWSProvider(OfflineProvider):
     def _download_pricing_file(self) -> None:
         logger.info("Downloading EC2 prices to %s", self.cache_path)
         temp_cache_path = f"{self.cache_path}.part"
-        for attempt in range(1, pricing_download_retries + 1):
+        for attempt in range(1, PRICING_DOWNLOAD_RETRIES + 1):
             try:
-                with requests.get(ec2_pricing_url, stream=True, timeout=20) as r:
+                with requests.get(EC2_PRICING_URL, stream=True, timeout=20) as r:
                     r.raise_for_status()
                     with open(temp_cache_path, "wb") as f:
-                        for chunk in r.iter_content(chunk_size=pricing_download_chunk_size):
+                        for chunk in r.iter_content(chunk_size=PRICING_DOWNLOAD_CHUNK_SIZE):
                             if chunk:
                                 f.write(chunk)
                 os.replace(temp_cache_path, self.cache_path)
@@ -330,15 +330,15 @@ class AWSProvider(OfflineProvider):
             except (requests.RequestException, OSError) as e:
                 if os.path.exists(temp_cache_path):
                     os.remove(temp_cache_path)
-                if attempt == pricing_download_retries:
+                if attempt == PRICING_DOWNLOAD_RETRIES:
                     raise RuntimeError(
-                        f"Failed to download AWS pricing file after {pricing_download_retries} "
+                        f"Failed to download AWS pricing file after {PRICING_DOWNLOAD_RETRIES} "
                         f"attempts: {e}"
                     ) from e
                 logger.warning(
                     "Failed to download AWS pricing file (attempt %s/%s), retrying: %s",
                     attempt,
-                    pricing_download_retries,
+                    PRICING_DOWNLOAD_RETRIES,
                     e,
                 )
 
@@ -357,7 +357,7 @@ class AWSProvider(OfflineProvider):
             )
 
         spot_prices = dict()
-        with ThreadPoolExecutor(max_workers=spot_price_workers) as executor:
+        with ThreadPoolExecutor(max_workers=SPOT_PRICE_WORKERS) as executor:
             future_to_region = {}
             for region, instance_types in region_instances.items():
                 future = executor.submit(self._add_spots_worker, region, instance_types)
@@ -427,7 +427,7 @@ def _get_gpu_memory_gib(gpu_name: str, reported_memory_mib: int) -> float:
 
 def _prefilter_rows(lines: Iterable[str]) -> Iterator[str]:
     """
-    Yields the header row followed by only the rows that may pass `pricing_filters`.
+    Yields the header row followed by only the rows that may pass `PRICING_FILTERS`.
 
     Testing raw rows for the filter values is several times cheaper than parsing every
     row of the pricing file as CSV, as only a fraction of a percent of rows pass.
@@ -436,7 +436,7 @@ def _prefilter_rows(lines: Iterable[str]) -> Iterator[str]:
     lines = iter(lines)
     yield from islice(lines, 1)
     for line in lines:
-        if all(substring in line for substring in pricing_filters_substrings):
+        if all(substring in line for substring in PRICING_FILTERS_SUBSTRINGS):
             yield line
 
 
