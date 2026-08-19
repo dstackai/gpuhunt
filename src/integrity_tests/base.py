@@ -76,6 +76,15 @@ class CatalogFileIntegrityTests(OffersIntegrityTests):
         for row in rows:
             assert row[field], str(row)
 
+    # `item_from_row` backfills a missing vendor as Nvidia (Google for TPUs) so that catalogs
+    # published before the `gpu_vendor` column existed still load. Newly generated catalogs
+    # must not rely on that, and the column is only optional for CPU offers, so the
+    # requirement is asserted on the raw row.
+    def test_gpu_vendor_present(self, rows: list[dict[str, str]]) -> None:
+        for row in rows:
+            if int(row["gpu_count"]) > 0:
+                assert row["gpu_vendor"], str(row)
+
     def test_spot_boolean(self, rows: list[dict[str, str]]) -> None:
         for row in rows:
             assert row["spot"] in ("True", "False"), str(row)
