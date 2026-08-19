@@ -66,8 +66,8 @@ def _make_offers(
             if catalog_item:
                 offers.append(catalog_item)
 
-    # Vultr prices its free tier plan at 0. It is not generally provisionable, so it is
-    # not published as an offer.
+    # Vultr's free tier plan is priced at 0, which would rank it above every paid plan.
+    # Offers are expected to carry a real price, so zero-priced plans are not published.
     return [offer for offer in offers if offer.price > 0]
 
 
