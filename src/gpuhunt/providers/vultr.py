@@ -66,7 +66,9 @@ def _make_offers(
             if catalog_item:
                 offers.append(catalog_item)
 
-    return offers
+    # Vultr prices its free tier plan at 0. It is not generally provisionable, so it is
+    # not published as an offer.
+    return [offer for offer in offers if offer.price > 0]
 
 
 def get_bare_metal_plans(plan: dict, location: str) -> CatalogItem | None:
