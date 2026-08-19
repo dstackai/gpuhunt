@@ -13,6 +13,7 @@ from itertools import islice
 
 import boto3
 import requests
+from botocore.config import Config
 from botocore.exceptions import ClientError, ConnectTimeoutError, EndpointConnectionError
 
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
@@ -96,6 +97,10 @@ ACCOUNT_NOT_ENABLED_REGIONS = {
     "ca-west-1",
     "me-south-1",
 }
+# An unreachable region endpoint would otherwise stall the collection for minutes: botocore
+# defaults to a 60 second connect timeout and 5 attempts. Connecting to a healthy endpoint takes
+# well under a second, so a dead one now costs about 20 seconds instead of five minutes.
+EC2_CLIENT_CONFIG = Config(connect_timeout=5, retries={"mode": "standard", "max_attempts": 2})
 GPU_NAME_MAPPING = {
     "RTX PRO 4500": "RTXPRO4500",
     "RTX PRO Server 6000": "RTXPRO6000",
@@ -202,7 +207,7 @@ class AWSProvider(OfflineProvider):
             instance_types = regions.pop(region)
 
             try:
-                client = boto3.client("ec2", region_name=region)
+                client = boto3.client("ec2", region_name=region, config=EC2_CLIENT_CONFIG)
                 paginator = client.get_paginator("describe_instance_types")
                 for offset in range(0, len(instance_types), DESCRIBE_INSTANCES_LIMIT):
                     logger.info("Fetching GPU details for %s (offset=%s)", region, offset)
@@ -275,7 +280,9 @@ class AWSProvider(OfflineProvider):
         logger.info("Fetching spot prices for %s (%s instance types)", region, len(instance_types))
         started_at = time.monotonic()
         try:
-            client = boto3.client("ec2", region_name=region)  # todo creds
+            client = boto3.client(  # todo creds
+                "ec2", region_name=region, config=EC2_CLIENT_CONFIG
+            )
             pages = client.get_paginator("describe_spot_price_history").paginate(
                 Filters=[
                     {
