@@ -1,37 +1,19 @@
-import csv
-from operator import itemgetter
-from pathlib import Path
-
 import pytest
 
+from gpuhunt import CatalogItem
 from gpuhunt.providers.cloudrift import GPU_MAP
 from integrity_tests.base import CatalogFileIntegrityTests
 
 
-@pytest.fixture
-def data_rows(catalog_dir: Path) -> list[dict]:
-    with open(catalog_dir / "cloudrift.csv") as f:
-        return list(csv.DictReader(f))
-
-
-def select_row(rows, name: str) -> list[str]:
-    return [r[name] for r in rows if r[name]]
-
-
-def test_gpu_present(data_rows: list[dict]):
-    expected_gpus = [gpu for _, gpu, _vendor in GPU_MAP]
-    gpus = select_row(data_rows, "gpu_name")
-    gpus = list(dict.fromkeys(gpus))
-    assert set(gpus).issubset(
-        set(expected_gpus)
-    ), f"Found unexpected GPUs: {set(gpus) - set(expected_gpus)}"
-
-
-# TODO: Add 3, 4, 5, ... 8
-@pytest.mark.parametrize("gpu_count", [1, 2])
-def test_gpu_count_present(gpu_count: int, data_rows: list[dict]):
-    assert str(gpu_count) in map(itemgetter("gpu_count"), data_rows)
-
-
-class TestCloudRiftOffers(CatalogFileIntegrityTests):
+class TestCloudRiftCatalog(CatalogFileIntegrityTests):
     CATALOG_NAME = "cloudrift"
+
+    def test_no_unexpected_gpus(self, offers: list[CatalogItem]) -> None:
+        expected_gpus = {gpu for _, gpu, _vendor in GPU_MAP}
+        gpus = {o.gpu_name for o in offers if o.gpu_name}
+        assert not gpus - expected_gpus
+
+    # TODO: Add 3, 4, 5, ... 8
+    @pytest.mark.parametrize("gpu_count", [1, 2])
+    def test_gpu_count_present(self, gpu_count: int, offers: list[CatalogItem]) -> None:
+        assert any(o.gpu_count == gpu_count for o in offers)
