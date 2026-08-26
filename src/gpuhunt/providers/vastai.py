@@ -60,7 +60,12 @@ class VastAIProvider(OnlineProvider):
             if not cpu_cores:
                 logger.warning("Offer %s has no CPU cores, skipping", offer["id"])
                 continue
-            memory = float(int(offer["cpu_ram"] * offer["cpu_cores_effective"] / cpu_cores / kilo))
+            # the instance gets a share of the machine RAM proportional to its share of cores.
+            # the share can be a fraction of a gigabyte, so it must not be rounded to a whole one
+            memory = round(offer["cpu_ram"] * offer["cpu_cores_effective"] / cpu_cores / kilo, 2)
+            if memory <= 0:
+                logger.warning("Offer %s has no memory, skipping", offer["id"])
+                continue
             disk_size = query_filter and query_filter.min_disk_size or offer["disk_space"]
             if not self.satisfies_filters(offer, filters):
                 logger.warning("Offer %s does not satisfy filters", offer["id"])
