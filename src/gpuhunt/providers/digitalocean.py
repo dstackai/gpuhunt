@@ -81,8 +81,12 @@ def _make_offers(response) -> list[CatalogItem]:
             gpu_name = None
             gpu_memory = None
 
+        # Droplets report their persistent disk as "local" or, since the v5 generation,
+        # as "boot". GPU droplets may also have a non-persistent "scratch" disk.
         total_disk_size = sum(
-            float(disk["size"]["amount"]) for disk in size["disk_info"] if disk["type"] == "local"
+            float(disk["size"]["amount"])
+            for disk in size["disk_info"]
+            if disk["type"] in ("local", "boot")
         )
 
         memory_gb = float(size["memory"]) / 1024  # MB -> GB
