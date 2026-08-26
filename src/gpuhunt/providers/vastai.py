@@ -60,6 +60,11 @@ class VastAIProvider(OnlineProvider):
             if not cpu_cores:
                 logger.warning("Offer %s has no CPU cores, skipping", offer["id"])
                 continue
+            # the effective core count can be fractional, and we cannot offer a fraction of a core
+            cpu = int(offer["cpu_cores_effective"])
+            if cpu < 1:
+                logger.warning("Offer %s has less than one CPU core, skipping", offer["id"])
+                continue
             # the instance gets a share of the machine RAM proportional to its share of cores.
             # the share can be a fraction of a gigabyte, so it must not be rounded to a whole one
             memory = round(offer["cpu_ram"] * offer["cpu_cores_effective"] / cpu_cores / kilo, 2)
@@ -79,7 +84,7 @@ class VastAIProvider(OnlineProvider):
                 location=get_location(offer["geolocation"]),
                 # storage_cost is $/gb/month
                 price=round(offer["dph_base"] + disk_cost, 5),
-                cpu=int(offer["cpu_cores_effective"]),
+                cpu=cpu,
                 memory=memory,
                 gpu_vendor=AcceleratorVendor.NVIDIA if offer["num_gpus"] else None,
                 gpu_count=offer["num_gpus"],

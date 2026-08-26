@@ -30,6 +30,11 @@ class TestGet:
 
         assert [offer.memory for offer in offers] == [0.98]
 
+    def test_skips_offers_with_less_than_one_cpu(self, requests_mock):
+        requests_mock.post(bundles_url, json={"offers": [make_offer(cpu_cores_effective=0.5)]})
+
+        assert VastAIProvider().get() == []
+
     def test_skips_offers_without_memory(self, requests_mock):
         requests_mock.post(bundles_url, json={"offers": [make_offer(cpu_ram=0)]})
 
