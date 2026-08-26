@@ -19,6 +19,20 @@ sizes_response = {
             "disk_info": [{"type": "local", "size": {"amount": 10, "unit": "gib"}}],
         },
         {
+            "slug": "s5-1vcpu-1gb-30gb",
+            "memory": 1024,
+            "vcpus": 1,
+            "disk": 30,
+            "transfer": 0.5,
+            "price_monthly": 17.5,
+            "price_hourly": 0.02398,
+            "regions": ["atl1", "nyc2"],
+            "available": True,
+            "description": "Basic",
+            "networking_throughput": 2000,
+            "disk_info": [{"type": "boot", "size": {"amount": 30, "unit": "gib"}}],
+        },
+        {
             "slug": "gpu-h100x8-640gb",
             "memory": 1966080,
             "vcpus": 160,
@@ -73,7 +87,8 @@ def test_fetch_offers(requests_mock):
 
     provider = DigitalOceanProvider(api_key="test-token", api_url="https://api.digitalocean.com")
     offers = provider.fetch_offers()
-    assert len(offers) == 10  # 8 CPU offers (8 regions) + 1 NVIDIA + 1 AMD (1 region each)
+    assert len(offers) == 12  # 10 CPU offers (8 + 2 regions) + 1 NVIDIA + 1 AMD (1 region each)
+    assert {o.disk_size for o in offers if o.instance_name == "s5-1vcpu-1gb-30gb"} == {30.0}
     catalog = Catalog(balance_resources=False, auto_reload=False)
     digitalocean = DigitalOceanProvider(
         api_key="test-token", api_url="https://api.digitalocean.com"
@@ -84,8 +99,8 @@ def test_fetch_offers(requests_mock):
 
     # Test queries
     assert (
-        len(catalog.query(provider=["digitalocean"], max_gpu_count=0)) == 8
-    )  # CPU only (8 regions)
+        len(catalog.query(provider=["digitalocean"], max_gpu_count=0)) == 10
+    )  # CPU only (8 + 2 regions)
     assert len(catalog.query(provider=["digitalocean"], min_gpu_count=1)) == 2  # GPU instances
     assert len(catalog.query(provider=["digitalocean"], gpu_vendor="nvidia")) == 1  # NVIDIA GPU
     assert len(catalog.query(provider=["digitalocean"], gpu_name="H100")) == 1  # Specific GPU
