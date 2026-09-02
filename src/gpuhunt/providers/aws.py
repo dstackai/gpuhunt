@@ -34,6 +34,7 @@ PREVIOUS_GENERATION_FAMILIES = [
     "g2.",
     "g3.",
     "g3s.",
+    "g4ad.",
     "p3.",
     "i2.",
     "m1.",
