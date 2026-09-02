@@ -109,3 +109,15 @@ def test_fetch_offers(requests_mock):
     assert len(catalog.query(provider=["vultr"], min_gpu_memory=80, max_gpu_count=1)) == 1
     assert len(catalog.query(provider=["vultr"], gpu_vendor="amd")) == 1
     assert len(catalog.query(provider=["vultr"], gpu_name="MI300X")) == 1
+
+
+def test_fetch_offers_skips_empty_locations(requests_mock):
+    plan = {**vm_instances["plans"][0], "locations": ["ewr", "", "ord"]}
+    requests_mock.get(
+        "https://api.vultr.com/v2/plans-metal?per_page=500", json={"plans_metal": []}
+    )
+    requests_mock.get(
+        "https://api.vultr.com/v2/plans?type=all&per_page=500", json={"plans": [plan]}
+    )
+
+    assert [offer.location for offer in fetch_offers()] == ["ewr", "ord"]

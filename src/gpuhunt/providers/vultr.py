@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Iterator
 from typing import Any, cast
 
 import requests
@@ -58,13 +59,13 @@ def _make_offers(
     other_plans = other_plans_response.json()["plans"]
 
     for plan in bare_metal_plans:
-        for location in plan["locations"]:
+        for location in _iter_locations(plan):
             catalog_item = get_bare_metal_plans(plan, location)
             if catalog_item:
                 offers.append(catalog_item)
 
     for plan in other_plans:
-        for location in plan["locations"]:
+        for location in _iter_locations(plan):
             catalog_item = get_instance_plans(plan, location)
             if catalog_item:
                 offers.append(catalog_item)
@@ -72,6 +73,15 @@ def _make_offers(
     # Vultr's free tier plan is priced at 0, which would rank it above every paid plan.
     # Offers are expected to carry a real price, so zero-priced plans are not published.
     return [offer for offer in offers if offer.price > 0]
+
+
+def _iter_locations(plan: dict) -> Iterator[str]:
+    # The plans API sometimes lists an empty string among a plan's locations
+    for location in plan["locations"]:
+        if not location:
+            logger.warning("Skipping empty location of plan %s", plan["id"])
+            continue
+        yield location
 
 
 def get_bare_metal_plans(plan: dict, location: str) -> CatalogItem | None:
