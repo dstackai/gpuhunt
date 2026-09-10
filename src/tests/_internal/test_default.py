@@ -28,7 +28,7 @@ def offline_catalog(monkeypatch):
 class TestDefaultCatalog:
     def test_skips_providers_with_missing_creds(self, offline_catalog) -> None:
         catalog = default_catalog()
-        assert sorted(p.NAME for p in catalog.providers) == ["vastai", "vultr"]
+        assert sorted(p.NAME for p in catalog.providers) == ["lium", "vastai", "vultr"]
 
     def test_loads_providers_with_creds(self, offline_catalog, monkeypatch) -> None:
         monkeypatch.setenv("HOTAISLE_API_KEY", "key")
