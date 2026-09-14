@@ -1,5 +1,7 @@
+import pytest
+
 from gpuhunt._internal.models import QueryFilter
-from gpuhunt.providers.vastai import VastAIProvider, bundles_url
+from gpuhunt.providers.vastai import VastAIProvider, bundles_url, compute_cap
 
 
 def make_offer(**overrides) -> dict:
@@ -51,3 +53,14 @@ def test_make_filters_does_not_constrain_scope_when_community_cloud_enabled():
     filters = VastAIProvider(community_cloud=True).make_filters(QueryFilter())
     assert "datacenter" not in filters
     assert "external" not in filters
+
+
+@pytest.mark.parametrize(
+    ["cc", "expected"],
+    [
+        pytest.param((7, 0), "700", id="7.0"),
+        pytest.param((7, 5), "750", id="7.5"),
+    ],
+)
+def test_compute_cap(cc: tuple[int, int], expected: str):
+    assert compute_cap(cc) == expected
