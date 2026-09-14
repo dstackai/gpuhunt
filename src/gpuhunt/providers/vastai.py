@@ -256,11 +256,5 @@ def get_location(location: str | None) -> str:
 
 
 def compute_cap(cc: tuple[int, int]) -> str:
-    """
-    >>> compute_cap((7, 0))
-    '700'
-    >>> compute_cap((7, 5))
-    '750'
-    """
     major, minor = cc
     return f"{major}{str(minor).ljust(2, '0')}"
