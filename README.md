@@ -64,6 +64,7 @@ print(*items, sep="\n")
 * Azure
 * CloudRift
 * Crusoe
+* Daytona
 * DigitalOcean
 * GCP
 * Hot Aisle

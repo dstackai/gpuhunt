@@ -33,6 +33,7 @@ OFFLINE_PROVIDERS = [
     "oci",
     "runpod",
     "cloudrift",
+    "daytona",
 ]
 ONLINE_PROVIDERS = [
     "crusoe",

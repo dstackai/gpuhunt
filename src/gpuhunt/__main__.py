@@ -16,6 +16,7 @@ def main():
             "azure",
             "cloudrift",
             "crusoe",
+            "daytona",
             "verda",
             "digitalocean",
             "gcp",
@@ -51,6 +52,10 @@ def main():
         from gpuhunt.providers.cloudrift import CloudRiftProvider
 
         provider = CloudRiftProvider()
+    elif args.provider == "daytona":
+        from gpuhunt.providers.daytona import DaytonaProvider
+
+        provider = DaytonaProvider()
     elif args.provider == "verda":
         from gpuhunt.providers.verda import VerdaProvider
 
