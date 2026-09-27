@@ -69,6 +69,7 @@ print(*items, sep="\n")
 * Hot Aisle
 * JarvisLabs
 * LambdaLabs
+* Lium
 * Nebius
 * OCI
 * Runpod

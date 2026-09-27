@@ -18,6 +18,7 @@ ONLINE_PROVIDER_MODULES = [
     ("gpuhunt.providers.digitalocean", "DigitalOceanProvider"),
     ("gpuhunt.providers.hotaisle", "HotAisleProvider"),
     ("gpuhunt.providers.jarvislabs", "JarvisLabsProvider"),
+    ("gpuhunt.providers.lium", "LiumProvider"),
     ("gpuhunt.providers.seeweb", "SeewebProvider"),
     ("gpuhunt.providers.vastai", "VastAIProvider"),
     ("gpuhunt.providers.vultr", "VultrProvider"),

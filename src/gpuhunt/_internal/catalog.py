@@ -39,6 +39,7 @@ ONLINE_PROVIDERS = [
     "digitalocean",
     "hotaisle",
     "jarvislabs",
+    "lium",
     "seeweb",
     "vastai",
     "vultr",

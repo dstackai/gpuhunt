@@ -22,6 +22,7 @@ def main():
             "hotaisle",
             "jarvislabs",
             "lambdalabs",
+            "lium",
             "nebius",
             "oci",
             "runpod",
@@ -78,6 +79,10 @@ def main():
         from gpuhunt.providers.lambdalabs import LambdaLabsProvider
 
         provider = LambdaLabsProvider(token=os.environ["LAMBDALABS_TOKEN"])
+    elif args.provider == "lium":
+        from gpuhunt.providers.lium import LiumProvider
+
+        provider = LiumProvider.from_env()
     elif args.provider == "nebius":
         from nebius.base.service_account.pk_file import Reader as PKReader
 
