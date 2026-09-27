@@ -1,4 +1,5 @@
 import logging
+import math
 import re
 from typing import cast
 
@@ -22,9 +23,11 @@ class LiumProvider(OnlineProvider):
     """Online provider for Lium (https://lium.io) GPU pods.
 
     Lium publishes its whole rentable inventory as one public JSON feed with per-GPU hourly
-    prices, so no credentials are needed. A node with N GPUs can be rented in part: any GPU count
-    between ``min_rentable_gpu_count`` and ``available_gpu_count`` is a valid order and gets a
-    proportional share of the host's CPUs, RAM and disk. One offer is produced per rentable GPU
+    prices, so no credentials are needed. Any GPU count between ``min_rentable_gpu_count`` and
+    ``available_gpu_count`` is a valid order and gets a proportional share of the host's CPUs,
+    disk and RAM (after the RAM the host keeps for itself). Most nodes publish
+    ``min_rentable_gpu_count == gpu_count``, so they get a single whole-node offer. One offer is
+    produced per rentable GPU
     count so that requests for 1, 2, ... GPUs all match, as the jarvislabs provider does.
     """
 
@@ -84,7 +87,9 @@ def _make_offers(node: dict) -> list[CatalogItem]:
         logger.warning("Skipping Lium node %s: non-positive GPU count or price", node_id)
         return []
     available_gpu_count = min(available_gpu_count, gpu_count)
-    min_gpu_count = max(1, int(node.get("min_rentable_gpu_count") or 1))
+    # The feed publishes the smallest order checkout accepts, and sets it to `gpu_count` wherever
+    # the node cannot be split. If it is ever missing, only the whole node is a safe offer.
+    min_gpu_count = max(1, int(node.get("min_rentable_gpu_count") or gpu_count))
     if min_gpu_count > available_gpu_count:
         logger.debug(
             "Skipping Lium node %s: %d GPUs free, %d is the smallest order",
@@ -110,15 +115,17 @@ def _make_offers(node: dict) -> list[CatalogItem]:
     if rent_url:
         provider_data["rent_url"] = str(rent_url)
 
+    pod_ram_gb = ram_gb - get_host_ram_reserve_gb(ram_gb)
     offers: list[CatalogItem] = []
     for count in range(min_gpu_count, available_gpu_count + 1):
-        # A partial rental gets the host's CPUs, RAM and disk in proportion to its GPU share.
+        # A rental gets the host's CPUs, RAM (after the host reserve) and disk in proportion
+        # to its GPU share.
         share = count / gpu_count
         cpu = int(cpu_count * share)
-        memory = round(ram_gb * share, 2)
-        if cpu < 1 or memory <= 0:
+        memory = max(1.0, math.floor(pod_ram_gb * share * 100) / 100)
+        if cpu < 1:
             logger.warning(
-                "Skipping Lium node %s with %d GPU(s): less than one CPU or no memory",
+                "Skipping Lium node %s with %d GPU(s): less than one CPU",
                 node_id,
                 count,
             )
@@ -144,6 +151,20 @@ def _make_offers(node: dict) -> list[CatalogItem]:
             )
         )
     return offers
+
+
+def get_host_ram_reserve_gb(ram_gb: float) -> float:
+    """
+    RAM in GiB that the host keeps for its own services before splitting the rest between GPUs.
+
+    Documented at https://docs.lium.io/pod-users/create-pod as ``max(4, 1 % of host RAM)``.
+
+    >>> get_host_ram_reserve_gb(16)
+    4
+    >>> round(get_host_ram_reserve_gb(2048), 2)
+    20.48
+    """
+    return max(4, ram_gb * 0.01)
 
 
 def _required(node: dict, name: str) -> str | int | float:

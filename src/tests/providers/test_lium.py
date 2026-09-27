@@ -136,7 +136,7 @@ class TestGet:
         assert offer.location == "jp-13"
         assert offer.price == 4.0  # 8 GPUs x $0.5 per GPU-hour
         assert offer.cpu == 384
-        assert offer.memory == 251
+        assert offer.memory == 247  # 251 minus the 4 GiB host reserve
         assert offer.disk_size == 935
         assert offer.gpu_vendor == AcceleratorVendor.NVIDIA
         assert offer.gpu_count == 8
@@ -160,11 +160,12 @@ class TestGet:
         }
         assert h200[1].price == 3.99
         assert h200[1].cpu == 24  # 192 / 8
-        assert h200[1].memory == 251.88  # 2015 / 8
+        # The host keeps max(4, 1% of 2015) = 20.15 GiB; the rest is split and rounded down.
+        assert h200[1].memory == 249.35  # (2015 - 20.15) / 8
         assert h200[1].disk_size == 446.88  # 3575 / 8
         assert h200[5].price == 19.95
         assert h200[5].cpu == 120
-        assert h200[5].memory == 1259.38
+        assert h200[5].memory == 1246.78
         # The feed reports 140 GB for a 141 GB card; the known size wins.
         assert all(o.gpu_memory == 141 for o in h200.values())
 
@@ -219,7 +220,7 @@ class TestGet:
 
         assert LiumProvider().get() == []
 
-    def test_missing_min_rentable_defaults_to_one(self, requests_mock):
+    def test_missing_min_rentable_offers_whole_node_only(self, requests_mock):
         requests_mock.get(
             NODES_URL,
             json={
@@ -231,7 +232,35 @@ class TestGet:
 
         offers = LiumProvider().get()
 
-        assert [o.gpu_count for o in offers] == [1, 2]
+        assert [o.gpu_count for o in offers] == [2]
+
+    def test_missing_min_rentable_on_partly_rented_node_is_skipped(self, requests_mock):
+        requests_mock.get(
+            NODES_URL,
+            json={
+                "nodes": [
+                    make_node(gpu_count=8, available_gpu_count=3, min_rentable_gpu_count=None)
+                ]
+            },
+        )
+
+        assert LiumProvider().get() == []
+
+    def test_small_host_keeps_minimum_reserve(self, requests_mock):
+        requests_mock.get(
+            NODES_URL,
+            json={
+                "nodes": [
+                    make_node(
+                        gpu_count=2, available_gpu_count=2, min_rentable_gpu_count=1, ram_gb=16
+                    )
+                ]
+            },
+        )
+
+        offers = LiumProvider().get()
+
+        assert [o.memory for o in offers] == [6, 12]  # (16 - 4) / 2 per GPU
 
     def test_missing_disk_size(self, requests_mock):
         requests_mock.get(NODES_URL, json={"nodes": [make_node(disk_gb=None)]})
