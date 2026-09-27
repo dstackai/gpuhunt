@@ -55,7 +55,7 @@ def main():
     elif args.provider == "daytona":
         from gpuhunt.providers.daytona import DaytonaProvider
 
-        provider = DaytonaProvider()
+        provider = DaytonaProvider.from_env()
     elif args.provider == "verda":
         from gpuhunt.providers.verda import VerdaProvider
 

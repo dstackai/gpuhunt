@@ -304,8 +304,8 @@ jobs:
           path: runpod.csv
           retention-days: 1
 
-  catalog-daytona:
-    name: Collect Daytona catalog
+  test-daytona:
+    name: Test Daytona integrity
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -314,26 +314,11 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
-        run: |
-          uv sync --extra dev
-          uv tool install awscli
-      - name: Collect catalog
-        working-directory: src
-        run: uv run python -m gpuhunt daytona --output ../daytona.csv
-      - name: Test catalog integrity
+        run: uv sync --extra dev
+      - name: Run integrity tests
         env:
-          CATALOG_DIR: .
+          DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
         run: uv run pytest src/integrity_tests/test_daytona.py
-      - name: Publish catalog
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: .github/scripts/publish_catalog.sh daytona
-      - uses: actions/upload-artifact@v4
-        with:
-          name: catalogs-daytona
-          path: daytona.csv
-          retention-days: 1
 
   catalog-cloudrift:
     name: Collect CloudRift catalog
@@ -493,7 +478,6 @@ jobs:
       - catalog-oci
       - catalog-runpod
       - catalog-cloudrift
-      - catalog-daytona
     runs-on: ubuntu-latest
     steps:
       - name: Set up uv
@@ -539,8 +523,8 @@ jobs:
       - catalog-oci
       - catalog-runpod
       - catalog-cloudrift
-      - catalog-daytona
       - test-crusoe
+      - test-daytona
       - test-digitalocean
       - test-hotaisle
       - test-jarvislabs
