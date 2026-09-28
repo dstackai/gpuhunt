@@ -69,7 +69,8 @@ def get_gpu_memory(gpu_name: str) -> float | None:
 
 
 def _make_offers(response: Response) -> list[CatalogItem]:
-    data = response.json()
+    # The API returns null instead of an empty list when no VMs are available.
+    data = response.json() or []
     offers: list[CatalogItem] = []
     for item in data:
         price_in_cents = item["OnDemandPrice"]
