@@ -7,6 +7,7 @@ CREDS_ENV_VARS = [
     "CRUSOE_ACCESS_KEY",
     "CRUSOE_SECRET_KEY",
     "CRUSOE_PROJECT_ID",
+    "DAYTONA_API_KEY",
     "DIGITAL_OCEAN_API_KEY",
     "HOTAISLE_API_KEY",
     "HOTAISLE_TEAM_HANDLE",
@@ -26,9 +27,10 @@ def offline_catalog(monkeypatch):
 
 
 class TestDefaultCatalog:
-    def test_skips_providers_with_missing_creds(self, offline_catalog) -> None:
+    def test_skips_providers_with_missing_creds(self, offline_catalog, caplog) -> None:
         catalog = default_catalog()
-        assert sorted(p.NAME for p in catalog.providers) == ["vastai", "vultr"]
+        assert sorted(p.NAME for p in catalog.providers) == ["daytona", "vastai", "vultr"]
+        assert not any("daytona" in record.getMessage().lower() for record in caplog.records)
 
     def test_loads_providers_with_creds(self, offline_catalog, monkeypatch) -> None:
         monkeypatch.setenv("HOTAISLE_API_KEY", "key")

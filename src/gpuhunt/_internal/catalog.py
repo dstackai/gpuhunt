@@ -36,6 +36,7 @@ OFFLINE_PROVIDERS = [
 ]
 ONLINE_PROVIDERS = [
     "crusoe",
+    "daytona",
     "digitalocean",
     "hotaisle",
     "jarvislabs",
