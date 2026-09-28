@@ -47,7 +47,7 @@ class VastAIProvider(OnlineProvider):
         if self.extra_filters:
             for key, constraints in self.extra_filters.items():
                 for op, value in constraints.items():
-                    filters[key][op] = value
+                    filters[key][op] = stricter_constraint(op, filters[key].get(op), value)
         resp = requests.post(bundles_url, json=filters, timeout=10)
         resp.raise_for_status()
         data = resp.json()
@@ -151,9 +151,9 @@ class VastAIProvider(OnlineProvider):
             filters["dph_total"]["lte"] = q.max_price
         # TODO(egor-s): add compute capability info for all GPUs
         if q.min_compute_capability is not None:
-            filters["compute_capability"]["gte"] = compute_cap(q.min_compute_capability)
+            filters["compute_cap"]["gte"] = compute_cap(q.min_compute_capability)
         if q.max_compute_capability is not None:
-            filters["compute_capability"]["lte"] = compute_cap(q.max_compute_capability)
+            filters["compute_cap"]["lte"] = compute_cap(q.max_compute_capability)
         # Datacenter offers map to Vast's "server cloud" scope.
         # When community_cloud is enabled, keep scope unfiltered so both
         # server and community offers are returned.
@@ -255,6 +255,25 @@ def get_location(location: str | None) -> str:
     return location.lower().replace(" ", "")
 
 
-def compute_cap(cc: tuple[int, int]) -> str:
+def compute_cap(cc: tuple[int, int]) -> int:
+    """
+    Convert a compute capability to Vast's `compute_cap` value, e.g. (8, 6) -> 860.
+    """
     major, minor = cc
-    return f"{major}{str(minor).ljust(2, '0')}"
+    return major * 100 + minor * 10
+
+
+def stricter_constraint(
+    op: Operators, current: FilterValue | None, new: FilterValue
+) -> FilterValue:
+    """
+    Combine two values for the same operator so that both constraints hold.
+    For `eq`, the new value wins.
+    """
+    if current is None:
+        return new
+    if op in ("gte", "gt"):
+        return max(current, new)
+    if op in ("lte", "lt"):
+        return min(current, new)
+    return new

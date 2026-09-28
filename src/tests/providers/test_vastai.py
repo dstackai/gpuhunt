@@ -42,6 +42,40 @@ class TestGet:
 
         assert VastAIProvider().get() == []
 
+    @pytest.mark.parametrize(
+        ["min_cc", "max_cc", "expected"],
+        [
+            pytest.param((8, 0), None, {"gte": 800}, id="query-min-stricter"),
+            pytest.param((5, 0), None, {"gte": 600}, id="extra-min-stricter"),
+            pytest.param(None, (9, 0), {"gte": 600, "lte": 900}, id="query-max"),
+        ],
+    )
+    def test_merges_extra_filters_keeping_stricter_bound(
+        self,
+        requests_mock,
+        min_cc: tuple[int, int] | None,
+        max_cc: tuple[int, int] | None,
+        expected: dict,
+    ):
+        requests_mock.post(bundles_url, json={"offers": []})
+        provider = VastAIProvider(extra_filters={"compute_cap": {"gte": 600}})
+
+        provider.get(QueryFilter(min_compute_capability=min_cc, max_compute_capability=max_cc))
+
+        assert requests_mock.last_request.json()["compute_cap"] == expected
+
+    def test_filters_offers_by_compute_cap(self, requests_mock):
+        requests_mock.post(
+            bundles_url,
+            json={
+                "offers": [make_offer(id=1, compute_cap=750), make_offer(id=2, compute_cap=860)]
+            },
+        )
+
+        offers = VastAIProvider().get(QueryFilter(min_compute_capability=(8, 0)))
+
+        assert [offer.instance_name for offer in offers] == ["2"]
+
 
 def test_make_filters_defaults_to_datacenter_only():
     filters = VastAIProvider(community_cloud=False).make_filters(QueryFilter())
@@ -58,9 +92,10 @@ def test_make_filters_does_not_constrain_scope_when_community_cloud_enabled():
 @pytest.mark.parametrize(
     ["cc", "expected"],
     [
-        pytest.param((7, 0), "700", id="7.0"),
-        pytest.param((7, 5), "750", id="7.5"),
+        pytest.param((7, 0), 700, id="7.0"),
+        pytest.param((7, 5), 750, id="7.5"),
+        pytest.param((12, 0), 1200, id="12.0"),
     ],
 )
-def test_compute_cap(cc: tuple[int, int], expected: str):
+def test_compute_cap(cc: tuple[int, int], expected: int):
     assert compute_cap(cc) == expected
