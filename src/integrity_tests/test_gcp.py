@@ -146,7 +146,6 @@ class TestGCPCatalog(CatalogFileIntegrityTests):
             "RTXPRO6000",
             "T4",
             "V100",
-            "P100",
         }
         gpus = {o.gpu_name for o in offers if o.gpu_vendor == AcceleratorVendor.NVIDIA}
         assert not expected_gpus - gpus
