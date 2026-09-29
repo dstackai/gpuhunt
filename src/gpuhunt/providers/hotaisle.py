@@ -11,6 +11,7 @@ from gpuhunt.providers.base import OnlineProvider, get_creds_env
 logger = logging.getLogger(__name__)
 
 API_URL = "https://admin.hotaisle.app/api"
+FLAG_BARE_METAL = "hotaisle-bm"
 
 
 class HotAisleProvider(OnlineProvider):
@@ -38,12 +39,25 @@ class HotAisleProvider(OnlineProvider):
         return sorted(offers, key=lambda i: i.price)
 
     def fetch_offers(self) -> list[CatalogItem]:
-        """Fetch available virtual machines from HotAisle API.
+        """Fetch available virtual machines and bare metal servers from HotAisle API.
         See API documentation(https://admin.hotaisle.app/api/docs)
-        for details."""
-        url = f"/teams/{self.team_handle}/virtual_machines/available/"
-        response = self._make_request("GET", url)
-        return _make_offers(response)
+        for details.
+        If one kind of offers fails, the error is logged and the other kind is still returned."""
+        endpoints = [("virtual_machines", False), ("bare_metal", True)]
+        offers: list[CatalogItem] = []
+        errors: list[Exception] = []
+        for endpoint, bare_metal in endpoints:
+            try:
+                response = self._make_request(
+                    "GET", f"/teams/{self.team_handle}/{endpoint}/available/"
+                )
+                offers += _make_offers(response, bare_metal=bare_metal)
+            except Exception as e:
+                logger.exception("Failed to fetch Hot Aisle %s offers", endpoint)
+                errors.append(e)
+        if len(errors) == len(endpoints):
+            raise errors[0]
+        return offers
 
     def _make_request(self, method: str, url: str) -> Response:
         full_url = f"{API_URL}{url}"
@@ -61,6 +75,10 @@ class HotAisleCatalogItemProviderData(TypedDict):
     vm_specs: JSONObject
 
 
+class HotAisleBareMetalCatalogItemProviderData(TypedDict):
+    bare_metal_specs: JSONObject
+
+
 def get_gpu_memory(gpu_name: str) -> float | None:
     if accelerators := find_accelerators(names=[gpu_name], vendors=[AcceleratorVendor.AMD]):
         return float(accelerators[0].memory)
@@ -68,8 +86,8 @@ def get_gpu_memory(gpu_name: str) -> float | None:
     return None
 
 
-def _make_offers(response: Response) -> list[CatalogItem]:
-    # The API returns null instead of an empty list when no VMs are available.
+def _make_offers(response: Response, bare_metal: bool) -> list[CatalogItem]:
+    # The API returns null instead of an empty list when nothing is available.
     data = response.json() or []
     offers: list[CatalogItem] = []
     for item in data:
@@ -81,8 +99,6 @@ def _make_offers(response: Response) -> list[CatalogItem]:
         memory_gb = ram_capacity_bytes / (1024**3)
         disk_capacity_bytes = specs["disk_capacity"]
         disk_gb = disk_capacity_bytes / (1024**3)
-        cpus = specs["cpus"]
-        cpu_model = cpus["model"]
         gpus = specs["gpus"]
         gpu = gpus[0]
         gpu_count = gpu["count"]
@@ -90,8 +106,19 @@ def _make_offers(response: Response) -> list[CatalogItem]:
         gpu_vendor = AcceleratorVendor.AMD  # All GPUs are AMD with HotAisle.
         gpu_memory = get_gpu_memory(gpu_name)
 
-        # Create instance name: cpu_model-cores-ram-gpucount-gpu
-        instance_name = f"{gpu_count}x {gpu_name} {cpu_cores}x {cpu_model}"
+        kind = "vm"
+        flags = []
+        # The specs object may duplicate some CatalogItem fields, but we store it in
+        # full because we need to pass it back to the API when creating instances.
+        provider_data = cast(JSONObject, HotAisleCatalogItemProviderData(vm_specs=specs))
+        if bare_metal:
+            kind = "bm"
+            flags.append(FLAG_BARE_METAL)
+            provider_data = cast(
+                JSONObject, HotAisleBareMetalCatalogItemProviderData(bare_metal_specs=specs)
+            )
+        # Create instance name: kind-gpu-gpucount, e.g. vm-mi300x-1 or bm-mi300x-8
+        instance_name = f"{kind}-{gpu_name.lower()}-{gpu_count}"
 
         offer = CatalogItem(
             provider=HotAisleProvider.NAME,
@@ -106,14 +133,8 @@ def _make_offers(response: Response) -> list[CatalogItem]:
             gpu_vendor=gpu_vendor,
             spot=False,
             disk_size=disk_gb,
-            provider_data=cast(
-                JSONObject,
-                HotAisleCatalogItemProviderData(
-                    # The specs object may duplicate some CatalogItem fields, but we store it in
-                    # full because we need to pass it back to the API when creating VMs.
-                    vm_specs=specs,
-                ),
-            ),
+            flags=flags,
+            provider_data=provider_data,
         )
         offers.append(offer)
 
