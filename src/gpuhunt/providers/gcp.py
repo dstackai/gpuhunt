@@ -33,23 +33,12 @@ accelerator_details = {
     "nvidia-h100-mega-80gb": AcceleratorDetails("H100", 80.0),
     "nvidia-l4": AcceleratorDetails("L4", 24.0),
     "nvidia-tesla-a100": AcceleratorDetails("A100", 40.0),
-    "nvidia-tesla-k80": AcceleratorDetails("K80", 12.0),
-    "nvidia-tesla-p100": AcceleratorDetails("P100", 16.0),
-    "nvidia-tesla-p4": AcceleratorDetails("P4", 8.0),
     "nvidia-tesla-t4": AcceleratorDetails("T4", 16.0),
     "nvidia-tesla-v100": AcceleratorDetails("V100", 16.0),
     "nvidia-rtx-pro-6000": AcceleratorDetails("RTXPRO6000", 96.0),
 }
 CpuMemory = namedtuple("CpuMemory", ["cpu", "memory"])
 accelerator_limits = {
-    "nvidia-tesla-k80": [
-        CpuMemory(8, 52),
-        CpuMemory(16, 104),
-        CpuMemory(32, 208),
-        CpuMemory(64, 208),
-    ],
-    "nvidia-tesla-p100": [CpuMemory(16, 104), CpuMemory(32, 208), CpuMemory(96, 624)],
-    "nvidia-tesla-p4": [CpuMemory(24, 156), CpuMemory(48, 312), CpuMemory(96, 624)],
     "nvidia-tesla-t4": [CpuMemory(48, 312), CpuMemory(48, 312), CpuMemory(96, 624)],
     "nvidia-tesla-v100": [
         CpuMemory(12, 78),
@@ -207,7 +196,7 @@ class GCPProvider(OfflineProvider):
                         "g2-",
                     ]
                 )
-                or (i.gpu_name and i.gpu_name not in ["K80", "P4"])
+                or i.gpu_name
             )
             and not (
                 # Filter out on-demand offers that are not actually available on demand.
