@@ -7,9 +7,15 @@ from gpuhunt.providers.nebius import NebiusCatalogItemProviderData
 from integrity_tests.base import CatalogFileIntegrityTests
 
 
-def get_offer(offers: list[CatalogItem], instance_name: str, location: str) -> CatalogItem:
+def get_offer(
+    offers: list[CatalogItem], instance_name: str, location: str, spot: bool | None = None
+) -> CatalogItem:
     for offer in offers:
-        if offer.instance_name == instance_name and offer.location == location:
+        if (
+            offer.instance_name == instance_name
+            and offer.location == location
+            and (spot is None or spot == offer.spot)
+        ):
             return offer
     raise LookupError(f"Offer not found: {instance_name} in {location}")
 
@@ -56,3 +62,21 @@ class TestNebiusCatalog(CatalogFileIntegrityTests):
     def test_no_fabrics_on_sample_non_clustered_offer(self, offers: list[CatalogItem]) -> None:
         offer = get_offer(offers, "gpu-h100-sxm 1gpu-16vcpu-200gb", "eu-north1")
         assert get_fabrics(offer) == []
+
+    def test_is_preemptible_flat_rate(self, offers: list[CatalogItem]) -> None:
+        l40s_a = get_offer(offers, "gpu-l40s-a 1gpu-8vcpu-32gb", "eu-north1", spot=True)
+        l40s_d = get_offer(offers, "gpu-l40s-d 1gpu-16vcpu-96gb", "eu-north1", spot=True)
+        h200 = get_offer(offers, "gpu-h200-sxm 1gpu-16vcpu-200gb", "eu-north1", spot=True)
+        l40s_a_on_demand = get_offer(offers, "gpu-l40s-a 1gpu-8vcpu-32gb", "eu-north1", spot=False)
+        assert cast(NebiusCatalogItemProviderData, l40s_a.provider_data)[
+            "is_preemptible_flat_rate"
+        ]
+        assert cast(NebiusCatalogItemProviderData, l40s_d.provider_data)[
+            "is_preemptible_flat_rate"
+        ]
+        assert not cast(NebiusCatalogItemProviderData, h200.provider_data)[
+            "is_preemptible_flat_rate"
+        ]
+        assert not cast(NebiusCatalogItemProviderData, l40s_a_on_demand.provider_data)[
+            "is_preemptible_flat_rate"
+        ]
