@@ -2,6 +2,7 @@ import copy
 import logging
 import re
 from dataclasses import asdict, dataclass
+from functools import cached_property
 from typing import Annotated, TypeVar
 
 import oci
@@ -11,7 +12,6 @@ from requests import Session
 from typing_extensions import TypedDict
 
 from gpuhunt._internal.constraints import (
-    correct_gpu_memory_gib,
     find_accelerators,
     get_gpu_vendor,
     is_nvidia_superchip,
@@ -24,10 +24,6 @@ from gpuhunt.providers.base import OfflineProvider
 logger = logging.getLogger(__name__)
 COST_ESTIMATOR_URL_TEMPLATE = "https://www.oracle.com/a/ocom/docs/cloudestimator2/data/{resource}"
 COST_ESTIMATOR_REQUEST_TIMEOUT = 10
-# Authoritative list of Compute shapes, their API names and specs
-COMPUTE_SHAPES_DOCS_URL = (
-    "https://docs.oracle.com/en-us/iaas/Content/Compute/References/computeshapes.htm"
-)
 
 ResponseModelT = TypeVar("ResponseModelT", bound=BaseModel)
 
@@ -37,19 +33,7 @@ ResponseModelT = TypeVar("ResponseModelT", bound=BaseModel)
 # shape we do not even use would otherwise break catalog collection entirely.
 LaxInt = Annotated[int, BeforeValidator(lambda v: int(v) if isinstance(v, float) else v)]
 
-# GPU vendors present in OCI shapes. Lookups are restricted to them so that a shape name token
-# can never resolve to a same-named accelerator of another vendor (TPUs, Gaudi, Tenstorrent).
 GPU_VENDORS = (AcceleratorVendor.NVIDIA, AcceleratorVendor.AMD)
-
-# Shape name tokens that do not spell the accelerator the way gpuhunt names it.
-# See COMPUTE_SHAPES_DOCS_URL for what each shape carries.
-GPU_NAME_ALIASES = {
-    "GPU2": "P100",
-    "GPU3": "V100",
-    "GPU4": "A100",
-    # BM.GPU.RTXPRO.8: 8 x NVIDIA RTX PRO 6000 Blackwell Server Edition (96 GB each)
-    "RTXPRO": "RTXPRO6000",
-}
 
 
 @dataclass(frozen=True)
@@ -58,11 +42,11 @@ class ShapeSpecs:
     memory_gb: int
 
 
-# The Cost Estimator omits the OCPU and memory quantities of some recently added shapes, which
-# would make them unusable although their GPU price is published. Values below come from
-# COMPUTE_SHAPES_DOCS_URL and are only used when the Cost Estimator has none.
-SHAPE_SPECS_FALLBACK: dict[str, ShapeSpecs] = {
+# The Cost Estimator omits or misreports OCPU and memory of some shapes. Values below come from
+# https://docs.oracle.com/en-us/iaas/Content/Compute/References/computeshapes.htm
+SHAPE_SPECS_OVERRIDES: dict[str, ShapeSpecs] = {
     "BM.GPU.B300.8": ShapeSpecs(ocpus=128, memory_gb=4096),
+    "BM.GPU.GB200.4": ShapeSpecs(ocpus=144, memory_gb=960),
     "BM.GPU.GB300.4": ShapeSpecs(ocpus=144, memory_gb=960),
     "BM.GPU.RTXPRO.8": ShapeSpecs(ocpus=144, memory_gb=3072),
 }
@@ -120,7 +104,7 @@ class OCIProvider(OfflineProvider):
             for region_name in region_names:
                 on_demand_item = CatalogItem(
                     provider=OCIProvider.NAME,
-                    instance_name=normalize_shape_name(shape.name),
+                    instance_name=shape.name,
                     location=region_name,
                     price=resources.total_price(),
                     cpu_arch=resources.cpu.arch,
@@ -164,9 +148,9 @@ class CostEstimatorShapeProduct(BaseModel):
 
 
 class CostEstimatorShape(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel_case)
+    model_config = ConfigDict(alias_generator=to_camel_case, frozen=True)
 
-    name: str
+    name_: Annotated[str, Field(alias="name")]
     hidden: bool
     status: str
     allow_preemptible: bool
@@ -178,14 +162,19 @@ class CostEstimatorShape(BaseModel):
     sub_type: CostEstimatorTypeField
     products: list[CostEstimatorShapeProduct]
 
-    def is_arm_cpu(self):
-        is_ampere_gpu = self.sub_type.value == "gpu" and (
-            "GPU4" in self.name or "GPU.A10" in self.name
-        )
-        # the data says A10 and A100 GPU instances are ARM, but they are not
-        return self.processor_type.value == "arm" and not is_ampere_gpu
+    @cached_property
+    def name(self) -> str:
+        """Normalized name"""
+        return self.name_.removesuffix(" (NVL72)")
 
     def get_gpu_unit_memory_gb(self) -> float | None:
+        # The Cost Estimator misreports gpu_memory_qty for some shapes. Override.
+        if ".MI355X." in self.name:
+            return 288.0
+        if ".GB200." in self.name:
+            return 192.0
+        if ".GB300." in self.name:
+            return 278.0
         if self.gpu_memory_qty and self.gpu_qty:
             return self.gpu_memory_qty / self.gpu_qty
         return None
@@ -294,21 +283,21 @@ class ResourcesConfiguration:
 def shape_to_resources(
     shape: CostEstimatorShape, products: CostEstimatorProductList
 ) -> ResourcesConfiguration:
-    fallback_specs = SHAPE_SPECS_FALLBACK.get(normalize_shape_name(shape.name))
+    specs_override = SHAPE_SPECS_OVERRIDES.get(shape.name)
     gpu_name = get_gpu_name(shape.name)
     cpu_arch = get_cpu_arch(shape, gpu_name)
     cpu = None
     gpu = GPUConfiguration(units_count=0, unit_memory_gb=None, name=None, vendor=None, price=0.0)
     memory: MemoryConfiguration | None = None
-    if shape.bundle_memory_qty is not None:
+    if specs_override is not None:
+        memory = MemoryConfiguration(gbs=specs_override.memory_gb, price=0.0)
+    elif shape.bundle_memory_qty is not None:
         memory = MemoryConfiguration(gbs=shape.bundle_memory_qty, price=0.0)
-    elif fallback_specs is not None:
-        memory = MemoryConfiguration(gbs=fallback_specs.memory_gb, price=0.0)
 
     for product in shape.products:
         qty = product.qty
-        if qty is None and product.type.value == "ocpu" and fallback_specs is not None:
-            qty = fallback_specs.ocpus
+        if product.type.value == "ocpu" and specs_override is not None:
+            qty = specs_override.ocpus
         if qty is None:
             raise CostEstimatorDataError("Product quantity not found")
         product_details = products.find(product.part_number)
@@ -322,9 +311,7 @@ def shape_to_resources(
                 # For GPU shapes the "ocpu" product is priced per GPU-hour
                 gpu = GPUConfiguration(
                     units_count=shape.gpu_qty,
-                    unit_memory_gb=(
-                        get_gpu_unit_memory_gb(shape, gpu_name) if gpu_name is not None else None
-                    ),
+                    unit_memory_gb=shape.get_gpu_unit_memory_gb(),
                     name=gpu_name,
                     vendor=get_gpu_vendor(gpu_name),
                     price=product_price * shape.gpu_qty,
@@ -371,55 +358,31 @@ def get_product_price_usd_per_hour(product: CostEstimatorProduct) -> float:
     return price.value
 
 
-def normalize_shape_name(name: str) -> str:
-    """
-    The Cost Estimator decorates some shape names for display, e.g. "BM.GPU.GB200.4 (NVL72)",
-    while the Compute API knows the shape as "BM.GPU.GB200.4" (see COMPUTE_SHAPES_DOCS_URL).
-    Consumers match catalog items against API shape names, so the decoration must go.
-    """
-    return re.sub(r"\s*\([^)]*\)\s*$", "", name)
-
-
 def get_gpu_name(shape_name: str) -> str | None:
-    parts = re.split(r"[\.-]", normalize_shape_name(shape_name).upper())
+    parts = re.split(r"[\.-]", shape_name.upper())
 
-    for legacy_family in ("GPU2", "GPU3", "GPU4"):
-        if legacy_family in parts:
-            return GPU_NAME_ALIASES[legacy_family]
+    if "GPU4" in parts:
+        return "A100"
+    if "GPU3" in parts:
+        return "V100"
+    if "GPU2" in parts:
+        return "P100"
+    if "RTXPRO" in parts:
+        return "RTXPRO6000"
 
     if "GPU" in parts:
         gpu_name_index = parts.index("GPU") + 1
         if gpu_name_index < len(parts):
             gpu_name = parts[gpu_name_index]
-            gpu_name = GPU_NAME_ALIASES.get(gpu_name, gpu_name)
-
             if accelerators := find_accelerators(names=[gpu_name], vendors=GPU_VENDORS):
                 return accelerators[0].name
     return None
 
 
-def get_gpu_unit_memory_gb(shape: CostEstimatorShape, gpu_name: str) -> float | None:
-    """
-    `gpuMemoryQty` is normally the total memory of all GPUs in the shape (BM.GPU.H100.8: 640),
-    but for some shapes it is the memory of a single GPU (BM.GPU.MI355X.8: 288) or is otherwise
-    inconsistent with the vendor specs (BM.GPU.GB300.4: 278). Trust the reported value only
-    when it is close to a known memory size of the resolved accelerator, otherwise fall back
-    to the known size if it is unambiguous.
-    """
-    known_memories = {a.memory for a in find_accelerators(names=[gpu_name], vendors=GPU_VENDORS)}
-    reported = shape.get_gpu_unit_memory_gb()
-    if reported is not None:
-        corrected = correct_gpu_memory_gib(gpu_name, reported * 1024)
-        if corrected in known_memories:
-            return corrected
-    if len(known_memories) == 1:
-        return known_memories.pop()
-    return reported
-
-
 def get_cpu_arch(shape: CostEstimatorShape, gpu_name: str | None) -> CPUArchitecture:
-    # NVIDIA Grace superchips (GB200, GB300) come with Arm CPUs, but the Cost Estimator reports
-    # their processor type as "blackwell"
-    if shape.is_arm_cpu() or (gpu_name is not None and is_nvidia_superchip(gpu_name)):
+    # The Cost Estimator misreports processor_type for some shapes. Override.
+    if ".GPU4." in shape.name or ".GPU.A10." in shape.name or ".GPU.A100-v2." in shape.name:
+        return CPUArchitecture.X86
+    if gpu_name is not None and is_nvidia_superchip(gpu_name):
         return CPUArchitecture.ARM
-    return CPUArchitecture.X86
+    return CPUArchitecture.ARM if shape.processor_type.value == "arm" else CPUArchitecture.X86

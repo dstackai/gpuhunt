@@ -7,7 +7,25 @@ from integrity_tests.base import CatalogFileIntegrityTests
 class TestOCICatalog(CatalogFileIntegrityTests):
     CATALOG_NAME = "oci"
 
-    @pytest.mark.parametrize("gpu", ["P100", "V100", "A10", "A100", "H100", "MI300X"])
+    @pytest.mark.parametrize(
+        "gpu",
+        [
+            "P100",
+            "V100",
+            "A10",
+            "A100",
+            "L40S",
+            "H100",
+            "H200",
+            "MI300X",
+            "MI355X",
+            "B200",
+            "B300",
+            "GB200",
+            "GB300",
+            "RTXPRO6000",
+        ],
+    )
     def test_gpu_present(self, gpu: str, offers: list[CatalogItem]) -> None:
         assert any(o.gpu_name == gpu for o in offers)
 
