@@ -66,8 +66,18 @@ class TestGetGpuName:
             ("VM.GPU3.4", "V100"),
             ("VM.GPU2.1", "P100"),
             ("BM.GPU.H100.8", "H100"),
+            ("BM.GPU.H200.8", "H200"),
+            ("BM.GPU.L40S.4", "L40S"),
+            ("BM.GPU.B200.8", "B200"),
+            ("BM.GPU.B300.8", "B300"),
+            ("BM.GPU.GB200.4 (NVL72)", "GB200"),
+            ("BM.GPU.GB300.4 (NVL72)", "GB300"),
+            ("BM.GPU.RTXPRO.8", "RTXPRO6000"),
+            ("BM.GPU.MI300X.8", "MI300X"),
+            ("BM.GPU.MI355X.8", "MI355X"),
             ("VM.Standard2.8", None),
             ("VM.Notgpu.A10", None),
+            ("BM.GPU.UNKNOWN.8", None),
         ],
     )
     def test_get_gpu_name(self, shape_name, gpu_name):

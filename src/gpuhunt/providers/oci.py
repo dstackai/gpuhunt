@@ -2,6 +2,7 @@ import copy
 import logging
 import re
 from dataclasses import asdict, dataclass
+from functools import cached_property
 from typing import Annotated, TypeVar
 
 import oci
@@ -10,9 +11,13 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 from requests import Session
 from typing_extensions import TypedDict
 
-from gpuhunt._internal.constraints import find_accelerators
+from gpuhunt._internal.constraints import (
+    find_accelerators,
+    get_gpu_vendor,
+    is_nvidia_superchip,
+)
 from gpuhunt._internal.errors import ProviderError
-from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, CPUArchitecture, QueryFilter
 from gpuhunt._internal.utils import get_or_error, to_camel_case
 from gpuhunt.providers.base import OfflineProvider
 
@@ -27,6 +32,24 @@ ResponseModelT = TypeVar("ResponseModelT", bound=BaseModel)
 # rejects them, failing the whole document. Truncate to keep the v1 behaviour: an unparsable
 # shape we do not even use would otherwise break catalog collection entirely.
 LaxInt = Annotated[int, BeforeValidator(lambda v: int(v) if isinstance(v, float) else v)]
+
+GPU_VENDORS = (AcceleratorVendor.NVIDIA, AcceleratorVendor.AMD)
+
+
+@dataclass(frozen=True)
+class ShapeSpecs:
+    ocpus: int
+    memory_gb: int
+
+
+# The Cost Estimator omits or misreports OCPU and memory of some shapes. Values below come from
+# https://docs.oracle.com/en-us/iaas/Content/Compute/References/computeshapes.htm
+SHAPE_SPECS_OVERRIDES: dict[str, ShapeSpecs] = {
+    "BM.GPU.B300.8": ShapeSpecs(ocpus=128, memory_gb=4096),
+    "BM.GPU.GB200.4": ShapeSpecs(ocpus=144, memory_gb=960),
+    "BM.GPU.GB300.4": ShapeSpecs(ocpus=144, memory_gb=960),
+    "BM.GPU.RTXPRO.8": ShapeSpecs(ocpus=144, memory_gb=3072),
+}
 
 
 class OCICredentials(TypedDict):
@@ -84,9 +107,10 @@ class OCIProvider(OfflineProvider):
                     instance_name=shape.name,
                     location=region_name,
                     price=resources.total_price(),
+                    cpu_arch=resources.cpu.arch,
                     cpu=resources.cpu.vcpus,
                     memory=resources.memory.gbs,
-                    gpu_vendor=(AcceleratorVendor.NVIDIA if resources.gpu.units_count else None),
+                    gpu_vendor=resources.gpu.vendor,
                     gpu_count=resources.gpu.units_count,
                     gpu_name=resources.gpu.name,
                     gpu_memory=resources.gpu.unit_memory_gb,
@@ -124,9 +148,9 @@ class CostEstimatorShapeProduct(BaseModel):
 
 
 class CostEstimatorShape(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel_case)
+    model_config = ConfigDict(alias_generator=to_camel_case, frozen=True)
 
-    name: str
+    name_: Annotated[str, Field(alias="name")]
     hidden: bool
     status: str
     allow_preemptible: bool
@@ -138,14 +162,19 @@ class CostEstimatorShape(BaseModel):
     sub_type: CostEstimatorTypeField
     products: list[CostEstimatorShapeProduct]
 
-    def is_arm_cpu(self):
-        is_ampere_gpu = self.sub_type.value == "gpu" and (
-            "GPU4" in self.name or "GPU.A10" in self.name
-        )
-        # the data says A10 and A100 GPU instances are ARM, but they are not
-        return self.processor_type.value == "arm" and not is_ampere_gpu
+    @cached_property
+    def name(self) -> str:
+        """Normalized name"""
+        return self.name_.removesuffix(" (NVL72)")
 
     def get_gpu_unit_memory_gb(self) -> float | None:
+        # The Cost Estimator misreports gpu_memory_qty for some shapes. Override.
+        if ".MI355X." in self.name:
+            return 288.0
+        if ".GB200." in self.name:
+            return 192.0
+        if ".GB300." in self.name:
+            return 278.0
         if self.gpu_memory_qty and self.gpu_qty:
             return self.gpu_memory_qty / self.gpu_qty
         return None
@@ -217,6 +246,7 @@ class CostEstimatorDataError(ProviderError):
 @dataclass
 class CPUConfiguration:
     vcpus: int
+    arch: CPUArchitecture
     price: float
 
 
@@ -231,6 +261,7 @@ class GPUConfiguration:
     units_count: int
     unit_memory_gb: float | None
     name: str | None
+    vendor: AcceleratorVendor | None
     price: float
 
     def __post_init__(self):
@@ -252,14 +283,22 @@ class ResourcesConfiguration:
 def shape_to_resources(
     shape: CostEstimatorShape, products: CostEstimatorProductList
 ) -> ResourcesConfiguration:
+    specs_override = SHAPE_SPECS_OVERRIDES.get(shape.name)
+    gpu_name = get_gpu_name(shape.name)
+    cpu_arch = get_cpu_arch(shape, gpu_name)
     cpu = None
-    gpu = GPUConfiguration(units_count=0, unit_memory_gb=None, name=None, price=0.0)
+    gpu = GPUConfiguration(units_count=0, unit_memory_gb=None, name=None, vendor=None, price=0.0)
     memory: MemoryConfiguration | None = None
-    if shape.bundle_memory_qty is not None:
+    if specs_override is not None:
+        memory = MemoryConfiguration(gbs=specs_override.memory_gb, price=0.0)
+    elif shape.bundle_memory_qty is not None:
         memory = MemoryConfiguration(gbs=shape.bundle_memory_qty, price=0.0)
 
     for product in shape.products:
-        if product.qty is None:
+        qty = product.qty
+        if product.type.value == "ocpu" and specs_override is not None:
+            qty = specs_override.ocpus
+        if qty is None:
             raise CostEstimatorDataError("Product quantity not found")
         product_details = products.find(product.part_number)
         if product_details is None:
@@ -267,20 +306,22 @@ def shape_to_resources(
         product_price = get_product_price_usd_per_hour(product_details)
 
         if product.type.value == "ocpu":
-            vcpus = product.qty if shape.is_arm_cpu() else product.qty * 2
+            vcpus = qty if cpu_arch == CPUArchitecture.ARM else qty * 2
             if shape.gpu_qty:
+                # For GPU shapes the "ocpu" product is priced per GPU-hour
                 gpu = GPUConfiguration(
                     units_count=shape.gpu_qty,
                     unit_memory_gb=shape.get_gpu_unit_memory_gb(),
-                    name=get_gpu_name(shape.name),
+                    name=gpu_name,
+                    vendor=get_gpu_vendor(gpu_name),
                     price=product_price * shape.gpu_qty,
                 )
-                cpu = CPUConfiguration(vcpus=vcpus, price=0.0)
+                cpu = CPUConfiguration(vcpus=vcpus, arch=cpu_arch, price=0.0)
             else:
-                cpu = CPUConfiguration(vcpus=vcpus, price=product_price * product.qty)
+                cpu = CPUConfiguration(vcpus=vcpus, arch=cpu_arch, price=product_price * qty)
 
         elif product.type.value == "memory":
-            memory = MemoryConfiguration(gbs=product.qty, price=product_price * product.qty)
+            memory = MemoryConfiguration(gbs=qty, price=product_price * qty)
 
         else:
             raise CostEstimatorDataError(f"Unknown product type {product.type.value!r}")
@@ -326,14 +367,22 @@ def get_gpu_name(shape_name: str) -> str | None:
         return "V100"
     if "GPU2" in parts:
         return "P100"
+    if "RTXPRO" in parts:
+        return "RTXPRO6000"
 
     if "GPU" in parts:
         gpu_name_index = parts.index("GPU") + 1
         if gpu_name_index < len(parts):
             gpu_name = parts[gpu_name_index]
-
-            if accelerators := find_accelerators(
-                names=[gpu_name], vendors=[AcceleratorVendor.NVIDIA]
-            ):
+            if accelerators := find_accelerators(names=[gpu_name], vendors=GPU_VENDORS):
                 return accelerators[0].name
     return None
+
+
+def get_cpu_arch(shape: CostEstimatorShape, gpu_name: str | None) -> CPUArchitecture:
+    # The Cost Estimator misreports processor_type for some shapes. Override.
+    if ".GPU4." in shape.name or ".GPU.A10." in shape.name or ".GPU.A100-v2." in shape.name:
+        return CPUArchitecture.X86
+    if gpu_name is not None and is_nvidia_superchip(gpu_name):
+        return CPUArchitecture.ARM
+    return CPUArchitecture.ARM if shape.processor_type.value == "arm" else CPUArchitecture.X86
