@@ -1,7 +1,13 @@
 import pytest
 
 from gpuhunt._internal.models import QueryFilter
-from gpuhunt.providers.vastai import VastAIProvider, bundles_url, compute_cap
+from gpuhunt.providers.vastai import (
+    VastAIProvider,
+    bundles_url,
+    compute_cap,
+    get_dstack_gpu_name,
+    get_vastai_gpu_names,
+)
 
 
 def make_offer(**overrides) -> dict:
@@ -76,6 +82,25 @@ class TestGet:
 
         assert [offer.instance_name for offer in offers] == ["2"]
 
+    def test_lists_b300_pc_as_b300(self, requests_mock):
+        requests_mock.post(
+            bundles_url,
+            json={
+                "offers": [
+                    make_offer(id=1, gpu_name="B300", gpu_ram=275040),
+                    make_offer(id=2, gpu_name="B300 PC", gpu_ram=275040),
+                ]
+            },
+        )
+
+        offers = VastAIProvider().get(QueryFilter(gpu_name=["B300"]))
+
+        assert requests_mock.last_request.json()["gpu_name"] == {"in": ["B300", "B300 PC"]}
+        assert [(o.instance_name, o.gpu_name, o.gpu_memory) for o in offers] == [
+            ("1", "B300", 270.0),
+            ("2", "B300", 270.0),
+        ]
+
 
 def test_make_filters_defaults_to_datacenter_only():
     filters = VastAIProvider(community_cloud=False).make_filters(QueryFilter())
@@ -99,3 +124,22 @@ def test_make_filters_does_not_constrain_scope_when_community_cloud_enabled():
 )
 def test_compute_cap(cc: tuple[int, int], expected: int):
     assert compute_cap(cc) == expected
+
+
+@pytest.mark.parametrize(
+    ["vastai_name", "expected"],
+    [
+        ("RTX A5000", "A5000"),
+        ("Tesla V100", "V100"),
+        ("A100 SXM4", "A100"),
+        ("H100 NVL", "H100NVL"),
+        ("B300", "B300"),
+        ("B300 PC", "B300"),
+    ],
+)
+def test_get_dstack_gpu_name(vastai_name: str, expected: str):
+    assert get_dstack_gpu_name(vastai_name) == expected
+
+
+def test_get_vastai_gpu_names_includes_b300_pc():
+    assert get_vastai_gpu_names("B300") == ["B300", "B300 PC"]
