@@ -212,6 +212,7 @@ GPU_MAPPING = {
     "A800PCIE": ["A800 PCIE"],
     "H100": ["H100 PCIE", "H100 SXM"],
     "H100NVL": ["H100 NVL"],
+    "B300": ["B300", "B300 PC"],
 }
 
 GPU_MAPPING_RULES = {
@@ -241,6 +242,10 @@ def get_dstack_gpu_name(gpu_name: str) -> str:
         return "A100"
     if gpu_name.startswith("H100 ") and "NVL" not in gpu_name:
         return "H100"
+    # "B300 PC" is how Vast lists boards that report "NVIDIA B300 SXM6 PC" rather than
+    # "NVIDIA B300 SXM6 AC": the same B300 GPU (PCI device 0x3182) on a different board SKU
+    if gpu_name == "B300 PC":
+        return "B300"
     return gpu_name.replace(" ", "")
 
 
