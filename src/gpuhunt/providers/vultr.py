@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Iterator
-from typing import Any, cast
+from typing import Any
 
 import requests
 from requests import Response
@@ -38,7 +38,7 @@ class VultrProvider(OnlineProvider):
 
 def fetch_offers() -> list[CatalogItem]:
     """Fetch plans with types:
-    1. Cloud GPU (vcg),
+    1. GPU plans (vcg, vdm),
     2. Bare Metal (vbm),
     3. and other CPU plans, including:
         Cloud Compute (vc2),
@@ -58,17 +58,18 @@ def _make_offers(
     bare_metal_plans = bare_metal_plans_response.json()["plans_metal"]
     other_plans = other_plans_response.json()["plans"]
 
-    for plan in bare_metal_plans:
-        for location in _iter_locations(plan):
-            catalog_item = get_bare_metal_plans(plan, location)
-            if catalog_item:
-                offers.append(catalog_item)
-
-    for plan in other_plans:
-        for location in _iter_locations(plan):
-            catalog_item = get_instance_plans(plan, location)
-            if catalog_item:
-                offers.append(catalog_item)
+    for plans, make_offer in (
+        (bare_metal_plans, get_bare_metal_plans),
+        (other_plans, get_instance_plans),
+    ):
+        for plan in plans:
+            # Only publish on-demand offers. Accept responses that omit this flag.
+            if plan.get("deploy_ondemand") is False:
+                continue
+            for location in _iter_locations(plan):
+                catalog_item = make_offer(plan, location)
+                if catalog_item:
+                    offers.append(catalog_item)
 
     # Vultr's free tier plan is priced at 0, which would rank it above every paid plan.
     # Offers are expected to carry a real price, so zero-priced plans are not published.
@@ -134,32 +135,17 @@ def get_instance_plans(plan: dict, location: str) -> CatalogItem | None:
             spot=False,
             disk_size=plan["disk"],
         )
-    elif plan_type == "vcg":
-        gpu_type = cast(str | None, plan.get("gpu_type"))
-        if not gpu_type:
-            logger.warning("Missing gpu_type for plan %s, skipping", plan["id"])
+    elif plan_type in ["vcg", "vdm"]:
+        gpu_details = _get_instance_gpu_details(plan)
+        if gpu_details is None:
             return None
-        if "_" not in gpu_type:
-            logger.warning(
-                "Failed to parse gpu_type %s for plan %s, skipping", gpu_type, plan["id"]
-            )
-            return None
-        gpu_name = gpu_type.split("_")[1]
+        gpu_count, gpu_name, gpu_memory = gpu_details
         gpu_vendor = get_gpu_vendor(gpu_name)
         if not gpu_vendor:
             logger.warning(
-                "Failed to detect GPU vendor %s for plan %s, skipping", gpu_type, plan["id"]
+                "Failed to detect GPU vendor %s for plan %s, skipping", gpu_name, plan["id"]
             )
             return None
-        gpu_memory = get_gpu_memory(gpu_name)
-        if not gpu_memory:
-            logger.warning(
-                "Failed to detect GPU memory %s for plan %s, skipping", gpu_type, plan["id"]
-            )
-            return None
-        gpu_memory_total = cast(int, plan["gpu_vram_gb"])
-        # For fractional GPU, gpu_count=1
-        gpu_count = max(1, gpu_memory_total // gpu_memory)
         if is_nvidia_superchip(gpu_name):
             cpu_arch = CPUArchitecture.ARM
         return CatalogItem(
@@ -172,12 +158,40 @@ def get_instance_plans(plan: dict, location: str) -> CatalogItem | None:
             memory=plan["ram"] / 1024,
             gpu_count=gpu_count,
             gpu_name=gpu_name,
-            gpu_memory=gpu_memory_total / gpu_count,
+            gpu_memory=gpu_memory,
             gpu_vendor=gpu_vendor,
             spot=False,
             disk_size=plan["disk"],
         )
     return None
+
+
+def _get_instance_gpu_details(plan: dict) -> tuple[int, str, float] | None:
+    """Return GPU count, model name, and memory per GPU in GB."""
+    if plan["type"] == "vdm":
+        # VDM plans omit GPU metadata, so use known configurations as for bare metal.
+        gpu_details = VDM_GPU_DETAILS.get(plan["id"])
+        if gpu_details is None:
+            logger.warning("Skipping unknown VDM GPU plan %s", plan["id"])
+        return gpu_details
+
+    gpu_type = plan.get("gpu_type")
+    if not gpu_type or "_" not in gpu_type:
+        logger.warning(
+            "Missing or invalid gpu_type %s for plan %s, skipping", gpu_type, plan["id"]
+        )
+        return None
+    gpu_name = gpu_type.split("_")[1]
+    full_gpu_memory = get_gpu_memory(gpu_name)
+    if not full_gpu_memory:
+        logger.warning(
+            "Failed to detect GPU memory %s for plan %s, skipping", gpu_type, plan["id"]
+        )
+        return None
+    total_gpu_memory = plan["gpu_vram_gb"]
+    # For fractional GPU, gpu_count=1
+    gpu_count = max(1, total_gpu_memory // full_gpu_memory)
+    return gpu_count, gpu_name, total_gpu_memory / gpu_count
 
 
 def get_gpu_memory(gpu_name: str) -> int | None:
@@ -209,4 +223,23 @@ BARE_METAL_GPU_DETAILS = {
     "vbm-64c-2048gb-8-l40-gpu": (8, "L40S", 48),
     "vbm-72c-480gb-gh200-gpu": (1, "GH200", 96),
     "vbm-256c-2048gb-8-mi300x-gpu": (8, "MI300X", 192),
+    "vbm-256c-3072gb-8-mi325x-gpu": (8, "MI325X", 256),
+    "vbm-256c-3072gb-8-b200-gpu": (8, "B200", 192),
+    "vbm-256c-3072gb-8-mi355x-gpu": (8, "MI355X", 288),
+}
+
+VDM_GPU_DETAILS = {
+    "vcg-a16-6c-64g-16vram": (1, "A16", 16),
+    "vcg-a16-96c-960g-256vram": (16, "A16", 16),
+    "vcg-a16-96c-878g-256vram": (16, "A16", 16),
+    "vcg-a40-24c-120g-48vram": (1, "A40", 48),
+    "vcg-a40-96c-480g-192vram": (4, "A40", 48),
+    "vcg-a100-12c-120g-80vram": (1, "A100", 80),
+    "vcg-a100-96c-960g-640vram": (8, "A100", 80),
+    "vcg-h100-216c-1914gb-640vram": (8, "H100", 80),
+    "vcg-b200-248c-2826g-1536vram": (8, "B200", 192),
+    "vcg-mi355x-252c-2872g-2304vram": (8, "MI355X", 288),
+    # Use Vultr's documented 8 x 256 GB MI325X configuration.
+    # The VDM plan's 1536vram suffix conflicts; its allocation is not verified.
+    "vcg-mi325x-252c-2872g-1536vram": (8, "MI325X", 256),
 }

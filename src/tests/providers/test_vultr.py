@@ -1,6 +1,14 @@
+import pytest
+
 import gpuhunt._internal.catalog as internal_catalog
 from gpuhunt import Catalog
-from gpuhunt.providers.vultr import VultrProvider, fetch_offers
+from gpuhunt._internal.models import AcceleratorVendor
+from gpuhunt.providers.vultr import (
+    VultrProvider,
+    fetch_offers,
+    get_bare_metal_plans,
+    get_instance_plans,
+)
 
 bare_metal = {
     "plans_metal": [
@@ -92,6 +100,36 @@ vm_instances = {
     ]
 }
 
+vdm_gpu_plan = {
+    # Public /plans response: a GPU plan whose type differs from its ID prefix,
+    # and which has none of the gpu_type/gpu_count/gpu_vram_gb fields.
+    "id": "vcg-a40-24c-120g-48vram",
+    "vcpu_count": 24,
+    "ram": 122880,
+    "disk": 1400,
+    "disk_type": "DEDICATEDMETAL",
+    "monthly_cost": 1250,
+    "hourly_cost": 1.712,
+    "type": "vdm",
+    "locations": ["blr"],
+    "deploy_ondemand": True,
+    "deploy_preemptible": False,
+    "gpu_brand": "NVIDIA",
+}
+
+vdm_amd_plan = {
+    "id": "vcg-mi325x-252c-2872g-1536vram",
+    "vcpu_count": 252,
+    "ram": 2940928,
+    "disk": 14336,
+    "hourly_cost": 36.92,
+    "type": "vdm",
+    "locations": [],
+    "deploy_ondemand": False,
+    "deploy_preemptible": True,
+    "gpu_brand": "AMD",
+}
+
 
 def test_fetch_offers(requests_mock):
     # Mocking the responses for the API endpoints
@@ -121,3 +159,120 @@ def test_fetch_offers_skips_empty_locations(requests_mock):
     )
 
     assert [offer.location for offer in fetch_offers()] == ["ewr", "ord"]
+
+
+class TestFetchOffers:
+    def test_vdm_without_gpu_metadata(self, requests_mock):
+        _mock_plans(requests_mock, plans=[vdm_gpu_plan], plans_metal=[])
+
+        [offer] = fetch_offers()
+
+        assert offer.instance_name == "vcg-a40-24c-120g-48vram"
+        assert offer.location == "blr"
+        assert offer.cpu == 24
+        assert offer.memory == 120
+        assert offer.disk_size == 1400
+        assert offer.price == 1.712
+        assert offer.gpu_name == "A40"
+        assert offer.gpu_count == 1
+        assert offer.gpu_memory == 48
+        assert offer.gpu_vendor == AcceleratorVendor.NVIDIA
+        assert not offer.spot
+
+    def test_unknown_vdm_plan(self, requests_mock):
+        plan = {**vdm_gpu_plan, "id": "vcg-a40-48c-240g-96vram"}
+        _mock_plans(requests_mock, plans=[plan], plans_metal=[])
+
+        assert fetch_offers() == []
+
+    def test_vdm_amd_plan(self, requests_mock):
+        # Exercise metadata conversion independently of current availability.
+        plan = {
+            **vdm_amd_plan,
+            "locations": ["ord"],
+            "deploy_ondemand": True,
+        }
+        _mock_plans(requests_mock, plans=[plan], plans_metal=[])
+
+        [offer] = fetch_offers()
+
+        assert offer.gpu_vendor == AcceleratorVendor.AMD
+        assert offer.gpu_name == "MI325X"
+        assert offer.gpu_count == 8
+        assert offer.gpu_memory == 256
+
+    @pytest.mark.parametrize(
+        ("plan", "is_bare_metal"),
+        [
+            (vdm_amd_plan, False),
+            (vm_instances["plans"][0], False),
+            (bare_metal["plans_metal"][1], True),
+        ],
+    )
+    def test_on_demand_plans(self, requests_mock, plan, is_bare_metal):
+        plan = {k: v for k, v in plan.items() if k != "deploy_ondemand"}
+        plans = [
+            {**plan, "locations": ["ewr"], "deploy_ondemand": True},
+            {**plan, "locations": ["ord"], "deploy_ondemand": False, "deploy_preemptible": True},
+            {**plan, "locations": ["blr"]},
+        ]
+        _mock_plans(
+            requests_mock,
+            plans=[] if is_bare_metal else plans,
+            plans_metal=plans if is_bare_metal else [],
+        )
+
+        assert [offer.location for offer in fetch_offers()] == ["ewr", "blr"]
+
+
+class TestGetInstancePlans:
+    @pytest.mark.parametrize(
+        ("gpu_type", "total_vram", "gpu_count", "gpu_memory"),
+        [
+            ("NVIDIA_A100", 4, 1, 4),
+            ("NVIDIA_A100_SXM", 40, 1, 40),
+            ("NVIDIA_A100", 160, 2, 80),
+        ],
+    )
+    def test_vcg_gpu_memory(self, gpu_type, total_vram, gpu_count, gpu_memory):
+        plan = {
+            **vm_instances["plans"][0],
+            "gpu_type": gpu_type,
+            "gpu_vram_gb": total_vram,
+        }
+
+        offer = get_instance_plans(plan, "ewr")
+
+        assert offer is not None
+        assert (offer.gpu_count, offer.gpu_memory) == (gpu_count, gpu_memory)
+
+
+class TestGetBareMetalPlans:
+    def test_mi325x_memory(self):
+        # The Vultr plan's memory differs from the generic accelerator catalog.
+        plan = {
+            "id": "vbm-256c-3072gb-8-mi325x-gpu",
+            "cpu_threads": 256,
+            "ram": 3145728,
+            "disk": 3576,
+            "hourly_cost": 36.92,
+            "gpu_count": 8,
+            "gpu_vram_gb": 2048,
+        }
+
+        offer = get_bare_metal_plans(plan, "ord")
+
+        assert offer is not None
+        assert offer.gpu_vendor == AcceleratorVendor.AMD
+        assert offer.gpu_name == "MI325X"
+        assert offer.gpu_count == plan["gpu_count"]
+        assert offer.gpu_memory == plan["gpu_vram_gb"] / plan["gpu_count"]
+
+
+def _mock_plans(requests_mock, *, plans: list[dict], plans_metal: list[dict]) -> None:
+    requests_mock.get(
+        "https://api.vultr.com/v2/plans?type=all&per_page=500", json={"plans": plans}
+    )
+    requests_mock.get(
+        "https://api.vultr.com/v2/plans-metal?per_page=500", json={"plans_metal": plans_metal}
+    )
