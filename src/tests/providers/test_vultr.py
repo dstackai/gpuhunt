@@ -100,6 +100,16 @@ vm_instances = {
     ]
 }
 
+cpu_plan = {
+    "id": "vc2-2c-4gb",
+    "type": "vc2",
+    "vcpu_count": 2,
+    "ram": 4096,
+    "disk": 80,
+    "hourly_cost": 0.027,
+    "locations": ["fra"],
+}
+
 vdm_gpu_plan = {
     # Public /plans response: a GPU plan whose type differs from its ID prefix,
     # and which has none of the gpu_type/gpu_count/gpu_vram_gb fields.
@@ -223,6 +233,72 @@ class TestFetchOffers:
         )
 
         assert [offer.location for offer in fetch_offers()] == ["ewr", "blr"]
+
+    @pytest.mark.parametrize(
+        ("public_locations", "available_plans", "expected_locations"),
+        [
+            ([], [vdm_gpu_plan["id"]], ["blr"]),
+            (["ewr"], [], []),
+        ],
+    )
+    def test_account_availability(
+        self, requests_mock, monkeypatch, public_locations, available_plans, expected_locations
+    ):
+        _mock_plans(
+            requests_mock,
+            plans=[
+                *vm_instances["plans"],
+                cpu_plan,
+                {**vdm_gpu_plan, "locations": public_locations},
+            ],
+            plans_metal=bare_metal["plans_metal"],
+        )
+        # No-key callers retain the public catalog without querying regional availability.
+        existing_offers = [
+            offer for offer in VultrProvider().get() if offer.instance_name != vdm_gpu_plan["id"]
+        ]
+        monkeypatch.setenv("VULTR_API_KEY", "test-key")
+        requests_mock.get(
+            "https://api.vultr.com/v2/regions?per_page=500",
+            request_headers={"Authorization": "Bearer test-key"},
+            json={"regions": [{"id": "blr"}, {"id": "ord"}]},
+        )
+        for region in ("blr", "ord"):
+            requests_mock.get(
+                f"https://api.vultr.com/v2/regions/{region}/availability?type=vdm",
+                request_headers={"Authorization": "Bearer test-key"},
+                json={
+                    "available_plans": available_plans if region == "blr" else [],
+                    # VPC-only instances cannot provide the public IP expected by dstack.
+                    "available_vpc_only_plans": [vdm_gpu_plan["id"]],
+                },
+            )
+
+        offers = VultrProvider.from_env().get()
+
+        assert [
+            offer.location for offer in offers if offer.instance_name == vdm_gpu_plan["id"]
+        ] == expected_locations
+        assert [
+            offer for offer in offers if offer.instance_name != vdm_gpu_plan["id"]
+        ] == existing_offers
+
+    def test_account_availability_failure_preserves_existing_offers(self, requests_mock):
+        _mock_plans(
+            requests_mock,
+            plans=[*vm_instances["plans"], cpu_plan, vdm_gpu_plan],
+            plans_metal=bare_metal["plans_metal"],
+        )
+        existing_offers = [
+            offer for offer in VultrProvider().get() if offer.instance_name != vdm_gpu_plan["id"]
+        ]
+        requests_mock.get(
+            "https://api.vultr.com/v2/regions/blr/availability?type=vdm", status_code=503
+        )
+
+        offers = VultrProvider(api_key="test-key", regions=["blr"]).get()
+
+        assert offers == existing_offers
 
 
 class TestGetInstancePlans:

@@ -58,6 +58,9 @@ items = catalog.query()
 print(*items, sep="\n")
 ```
 
+Vultr uses `VULTR_API_KEY`, when set, to query account-specific availability for VDM GPU plans.
+Its public plan locations can omit available VDM plans.
+
 ## Supported providers
 
 * AWS

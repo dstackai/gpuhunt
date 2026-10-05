@@ -1,5 +1,7 @@
 import logging
+import os
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import requests
@@ -22,9 +24,13 @@ API_URL = "https://api.vultr.com/v2"
 class VultrProvider(OnlineProvider):
     NAME = "vultr"
 
+    def __init__(self, api_key: str | None = None, regions: list[str] | None = None):
+        self.api_key = api_key
+        self.regions = regions
+
     @classmethod
     def from_env(cls) -> "VultrProvider":
-        return cls()
+        return cls(api_key=os.getenv("VULTR_API_KEY"))
 
     def get(
         self,
@@ -32,11 +38,13 @@ class VultrProvider(OnlineProvider):
         balance_resources: bool = True,
         apply_filter: bool = False,
     ) -> list[CatalogItem]:
-        offers = fetch_offers()
+        offers = fetch_offers(api_key=self.api_key, regions=self.regions)
         return sorted(offers, key=lambda i: i.price)
 
 
-def fetch_offers() -> list[CatalogItem]:
+def fetch_offers(
+    api_key: str | None = None, regions: list[str] | None = None
+) -> list[CatalogItem]:
     """Fetch plans with types:
     1. GPU plans (vcg, vdm),
     2. Bare Metal (vbm),
@@ -47,11 +55,40 @@ def fetch_offers() -> list[CatalogItem]:
         All optimized Cloud Types (voc)"""
     bare_metal_plans_response = _make_request("GET", "/plans-metal?per_page=500")
     other_plans_response = _make_request("GET", "/plans?type=all&per_page=500")
-    return _make_offers(bare_metal_plans_response, other_plans_response)
+    vdm_locations = None
+    if api_key:
+        try:
+            vdm_locations = _get_vdm_locations(api_key, regions)
+        except requests.RequestException as e:
+            logger.warning("Failed to fetch Vultr VDM availability: %s", e)
+            # Preserve existing offers without using unverified public VDM locations.
+            vdm_locations = {}
+    return _make_offers(bare_metal_plans_response, other_plans_response, vdm_locations)
+
+
+def _get_vdm_locations(api_key: str, regions: list[str] | None) -> dict[str, list[str]]:
+    if not regions:
+        response = _make_request("GET", "/regions?per_page=500", api_key=api_key)
+        regions = [region["id"] for region in response.json()["regions"]]
+
+    locations: dict[str, list[str]] = {}
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {
+            region: executor.submit(
+                _make_request, "GET", f"/regions/{region}/availability?type=vdm", api_key=api_key
+            )
+            for region in regions
+        }
+        for region, future in futures.items():
+            for plan_id in future.result().json()["available_plans"]:
+                locations.setdefault(plan_id, []).append(region)
+    return locations
 
 
 def _make_offers(
-    bare_metal_plans_response: Response, other_plans_response: Response
+    bare_metal_plans_response: Response,
+    other_plans_response: Response,
+    vdm_locations: dict[str, list[str]] | None = None,
 ) -> list[CatalogItem]:
     offers: list[CatalogItem] = []
 
@@ -66,6 +103,9 @@ def _make_offers(
             # Only publish on-demand offers. Accept responses that omit this flag.
             if plan.get("deploy_ondemand") is False:
                 continue
+            if plan.get("type") == "vdm" and vdm_locations is not None:
+                # Public VDM locations can be empty despite availability for this account.
+                plan["locations"] = vdm_locations.get(plan["id"], [])
             for location in _iter_locations(plan):
                 catalog_item = make_offer(plan, location)
                 if catalog_item:
@@ -205,11 +245,14 @@ def get_gpu_memory(gpu_name: str) -> int | None:
     return None
 
 
-def _make_request(method: str, path: str, data: Any = None) -> Response:
+def _make_request(
+    method: str, path: str, data: Any = None, *, api_key: str | None = None
+) -> Response:
     response = requests.request(
         method=method,
         url=API_URL + path,
         json=data,
+        headers={"Authorization": f"Bearer {api_key}"} if api_key else None,
         timeout=30,
     )
     response.raise_for_status()

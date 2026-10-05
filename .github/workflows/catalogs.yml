@@ -461,6 +461,8 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
       - name: Run integrity tests
+        env:
+          VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
         run: uv run pytest src/integrity_tests/test_vultr.py
 
   # The v2 catalog bundles all providers into a single file. It is published for dstack
