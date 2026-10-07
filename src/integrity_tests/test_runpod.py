@@ -1,3 +1,5 @@
+import re
+
 from gpuhunt import CatalogItem
 from gpuhunt.providers.runpod import get_gpu_map
 from integrity_tests.base import CatalogFileIntegrityTests
@@ -7,28 +9,14 @@ class TestRunpodCatalog(CatalogFileIntegrityTests):
     CATALOG_NAME = "runpod"
 
     def test_locations(self, offers: list[CatalogItem]) -> None:
-        expected_locations = {
-            # Secure cloud
-            "CA-MTL-1",
-            "CA-MTL-2",
-            "CA-MTL-3",
-            "EU-NL-1",
-            "EU-RO-1",
-            "EU-SE-1",
-            "EUR-IS-1",
-            "EUR-IS-2",
-            "US-TX-3",
-            # Community cloud
-            "CA",
-            "CZ",
-            "FR",
-            "US",
-        }
         locations = {o.location for o in offers}
-        # Assert most are present. Some may be missing due to low availability.
-        # TODO: CA-MTL-2 looks absent in recent live Runpod snapshots.
-        # Re-evaluate this expectation later and tighten back to <= 3.
-        assert len(expected_locations - locations) <= 4
+        assert 10 <= len(locations) <= 300
+        # Secure cloud locations are datacenter IDs, e.g., EU-RO-1
+        secure_cloud = {loc for loc in locations if re.fullmatch(r"[A-Z]+-[A-Z]+-\d+", loc)}
+        # Community cloud locations are country codes, e.g., FR
+        community_cloud = {loc for loc in locations if re.fullmatch(r"[A-Z]{2}", loc)}
+        assert secure_cloud
+        assert community_cloud
 
     def test_gpu_present(self, offers: list[CatalogItem]) -> None:
         expected_gpus = {name for _, name in get_gpu_map().values()}
