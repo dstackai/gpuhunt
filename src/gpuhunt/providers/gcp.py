@@ -37,6 +37,12 @@ accelerator_details = {
     "nvidia-tesla-v100": AcceleratorDetails("V100", 16.0),
     "nvidia-rtx-pro-6000": AcceleratorDetails("RTXPRO6000", 96.0),
 }
+# GCP reports one accelerator for fractional G4 shapes, with only part of its VRAM.
+fractional_g4_gpu_memory = {
+    "g4-standard-6": 12.0,
+    "g4-standard-12": 24.0,
+    "g4-standard-24": 48.0,
+}
 CpuMemory = namedtuple("CpuMemory", ["cpu", "memory"])
 accelerator_limits = {
     "nvidia-tesla-t4": [CpuMemory(48, 312), CpuMemory(48, 312), CpuMemory(96, 624)],
@@ -244,7 +250,11 @@ class GCPProvider(OfflineProvider):
                     gpu_name=(
                         machine_type.accelerators[0].guest_accelerator_type if gpu else None
                     ),
-                    gpu_memory=gpu.memory if gpu else None,
+                    gpu_memory=(
+                        fractional_g4_gpu_memory.get(machine_type.name, gpu.memory)
+                        if gpu
+                        else None
+                    ),
                 )
                 zone_machine_types.append(machine_type)
             return zone_machine_types
