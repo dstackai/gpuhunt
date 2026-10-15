@@ -25,7 +25,7 @@ class LiumProvider(OnlineProvider):
     Lium publishes its whole rentable inventory as one public JSON feed with per-GPU hourly
     prices, so no credentials are needed. Any GPU count between ``min_rentable_gpu_count`` and
     ``available_gpu_count`` is a valid order and gets a proportional share of the host's CPUs,
-    disk and RAM (after the RAM the host keeps for itself). Most nodes publish
+    free disk and RAM (after the RAM the host keeps for itself). Most nodes publish
     ``min_rentable_gpu_count == gpu_count``, so they get a single whole-node offer. One offer is
     produced per rentable GPU
     count so that requests for 1, 2, ... GPUs all match, as the jarvislabs provider does.
@@ -82,7 +82,15 @@ def _make_offers(node: dict) -> list[CatalogItem]:
     except (TypeError, ValueError) as e:
         logger.warning("Skipping Lium node %s: %s", node_id, e)
         return []
-    disk_gb = node.get("disk_gb")
+    disk_free_gb = node.get("disk_free_gb")
+    if (
+        isinstance(disk_free_gb, bool)
+        or not isinstance(disk_free_gb, int | float)
+        or disk_free_gb <= 0
+    ):
+        # with disk_size=None an offer would pass every disk filter, so no free disk means no offer
+        logger.warning("Skipping Lium node %s: no free disk reported", node_id)
+        return []
     if gpu_count <= 0 or available_gpu_count <= 0 or price_per_gpu_hour <= 0:
         logger.warning("Skipping Lium node %s: non-positive GPU count or price", node_id)
         return []
@@ -118,8 +126,8 @@ def _make_offers(node: dict) -> list[CatalogItem]:
     pod_ram_gb = ram_gb - get_host_ram_reserve_gb(ram_gb)
     offers: list[CatalogItem] = []
     for count in range(min_gpu_count, available_gpu_count + 1):
-        # A rental gets the host's CPUs, RAM (after the host reserve) and disk in proportion
-        # to its GPU share.
+        # A rental gets the host's CPUs, RAM (after the host reserve) and free disk in
+        # proportion to its GPU share.
         share = count / gpu_count
         cpu = int(cpu_count * share)
         memory = max(1.0, math.floor(pod_ram_gb * share * 100) / 100)
@@ -130,9 +138,14 @@ def _make_offers(node: dict) -> list[CatalogItem]:
                 count,
             )
             continue
-        disk_size = None
-        if disk_gb:
-            disk_size = round(float(disk_gb) * share, 2) or None
+        disk_size = get_disk_quota_gb(disk_free_gb * share)
+        if disk_size < 1:
+            logger.debug(
+                "Skipping Lium node %s with %d GPU(s): its disk quotas round to zero",
+                node_id,
+                count,
+            )
+            continue
         offers.append(
             CatalogItem(
                 provider=LiumProvider.NAME,
@@ -146,11 +159,25 @@ def _make_offers(node: dict) -> list[CatalogItem]:
                 gpu_name=gpu_name,
                 gpu_memory=float(gpu_memory),
                 spot=node.get("tier") == "spot",
-                disk_size=disk_size,
+                disk_size=float(disk_size),
                 provider_data=cast(JSONObject, dict(provider_data)),
             )
         )
     return offers
+
+
+def get_disk_quota_gb(disk_gb: float) -> int:
+    """
+    Disk in GB a pod gets from its share of the host's free disk: the volume quota (2/3) and the
+    container storage quota (1/3), each rounded down, as documented at
+    https://docs.lium.io/pod-users/create-pod.
+
+    >>> get_disk_quota_gb(1467 / 8)
+    183
+    >>> get_disk_quota_gb(1)
+    0
+    """
+    return int(disk_gb * 2 / 3) + int(disk_gb / 3)
 
 
 def get_host_ram_reserve_gb(ram_gb: float) -> float:

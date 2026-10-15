@@ -3,11 +3,13 @@ import copy
 import pytest
 import requests
 
-from gpuhunt._internal.constraints import find_accelerators
-from gpuhunt._internal.models import AcceleratorVendor
+from gpuhunt._internal.constraints import find_accelerators, matches
+from gpuhunt._internal.models import AcceleratorVendor, QueryFilter
 from gpuhunt.providers.lium import NODES_URL, LiumProvider, get_dstack_gpu_name, get_location
 
 # Recorded from https://lium.io/api/public/v1/nodes on 2026-09-10 (trimmed to four nodes).
+# `disk_free_gb` was added on 2026-10-15: the H200's is the reading from the PR review, the
+# others are illustrative.
 RECORDED_FEED = {
     "generated_at": "2026-09-10T07:37:02.247559Z",
     "count": 4,
@@ -23,6 +25,7 @@ RECORDED_FEED = {
             "cpu_count": 384,
             "ram_gb": 251,
             "disk_gb": 935,
+            "disk_free_gb": 800,
             "tier": "secure",
             "country": "Japan",
             "country_code": "JP",
@@ -42,6 +45,7 @@ RECORDED_FEED = {
             "cpu_count": 192,
             "ram_gb": 2015,
             "disk_gb": 3575,
+            "disk_free_gb": 1467,
             "tier": "secure",
             "country": "United States",
             "country_code": "US",
@@ -61,6 +65,7 @@ RECORDED_FEED = {
             "cpu_count": 24,
             "ram_gb": 62,
             "disk_gb": 1832,
+            "disk_free_gb": 1500,
             "tier": "spot",
             "country": "United States",
             "country_code": "US",
@@ -80,6 +85,7 @@ RECORDED_FEED = {
             "cpu_count": 240,
             "ram_gb": 1772,
             "disk_gb": 19383,
+            "disk_free_gb": 15000,
             "tier": "secure",
             "country": "United States",
             "country_code": "US",
@@ -137,7 +143,8 @@ class TestGet:
         assert offer.price == 4.0  # 8 GPUs x $0.5 per GPU-hour
         assert offer.cpu == 384
         assert offer.memory == 247  # 251 minus the 4 GiB host reserve
-        assert offer.disk_size == 935
+        # int(800 * 2 / 3) + int(800 / 3) of the free disk, not the 935 GB total
+        assert offer.disk_size == 799
         assert offer.gpu_vendor == AcceleratorVendor.NVIDIA
         assert offer.gpu_count == 8
         assert offer.gpu_name == "RTX5090"
@@ -162,7 +169,8 @@ class TestGet:
         assert h200[1].cpu == 24  # 192 / 8
         # The host keeps max(4, 1% of 2015) = 20.15 GiB; the rest is split and rounded down.
         assert h200[1].memory == 249.35  # (2015 - 20.15) / 8
-        assert h200[1].disk_size == 446.88  # 3575 / 8
+        # Free disk, not total: int(1467 / 8 * 2 / 3) + int(1467 / 8 / 3) = 122 + 61.
+        assert h200[1].disk_size == 183
         assert h200[5].price == 19.95
         assert h200[5].cpu == 120
         assert h200[5].memory == 1246.78
@@ -262,12 +270,40 @@ class TestGet:
 
         assert [o.memory for o in offers] == [6, 12]  # (16 - 4) / 2 per GPU
 
-    def test_missing_disk_size(self, requests_mock):
-        requests_mock.get(NODES_URL, json={"nodes": [make_node(disk_gb=None)]})
+    @pytest.mark.parametrize("disk_free_gb", [None, 0, -5, "100", True], ids=repr)
+    def test_skips_node_without_free_disk(self, requests_mock, disk_free_gb):
+        # disk_size=None would let the offer through every disk filter
+        requests_mock.get(NODES_URL, json={"nodes": [make_node(disk_free_gb=disk_free_gb)]})
+
+        assert LiumProvider().get() == []
+
+    def test_skips_node_missing_free_disk(self, requests_mock):
+        node = make_node()
+        del node["disk_free_gb"]
+        requests_mock.get(NODES_URL, json={"nodes": [node]})
+
+        assert LiumProvider().get() == []
+
+    def test_skips_offers_whose_disk_quotas_round_to_zero(self, requests_mock):
+        node = make_node(
+            gpu_count=2, available_gpu_count=2, min_rentable_gpu_count=1, disk_free_gb=2
+        )
+        requests_mock.get(NODES_URL, json={"nodes": [node]})
 
         offers = LiumProvider().get()
 
-        assert [o.disk_size for o in offers] == [None]
+        # 1 GPU: 1 GB -> int(0.67) + int(0.33) = 0, skipped; 2 GPUs: 2 GB -> 1 + 0 = 1
+        assert [(o.gpu_count, o.disk_size) for o in offers] == [(2, 1)]
+
+    def test_disk_filter_uses_the_pod_quota(self, requests_mock, feed):
+        requests_mock.get(NODES_URL, json=feed)
+
+        offers = LiumProvider().get()
+        h200 = [o for o in offers if o.instance_name == "f092246d-5704-4c9e-b57f-7c0710a06deb"]
+
+        # The one-GPU H200 share is 446.88 GB of total disk but only 183 GB of quota.
+        assert not matches(h200[0], QueryFilter(min_disk_size=300))
+        assert matches(h200[1], QueryFilter(min_disk_size=300))  # 2 GPUs: 244 + 122 = 366
 
     def test_skips_unknown_gpu_model(self, requests_mock, caplog):
         requests_mock.get(
