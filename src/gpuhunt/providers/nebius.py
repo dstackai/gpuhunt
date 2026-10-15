@@ -49,6 +49,9 @@ TIMEOUT = 7
 GPU_NAME_OVERRIDES = {
     "rtx6000": "rtxpro6000",
 }
+# > NVIDIA L40S preemptible instances are excluded from spot pricing and billed at the current flat rate
+# https://nebius.com/prices
+PREEMPTIBLE_FLAT_RATE_GPUS = ("L40S",)
 
 
 @dataclass(frozen=True)
@@ -118,6 +121,7 @@ class NebiusProvider(OfflineProvider):
 
 class NebiusCatalogItemProviderData(TypedDict):
     fabrics: list[str]
+    is_preemptible_flat_rate: bool
 
 
 def get_sample_projects(sdk: SDK) -> dict[str, str]:
@@ -188,9 +192,12 @@ def _make_offer(
     spot: bool,
     price: float,
 ) -> CatalogItem | None:
-    fabrics = []
+    provider_data = NebiusCatalogItemProviderData(
+        fabrics=[],
+        is_preemptible_flat_rate=False,
+    )
     if preset.allow_gpu_clustering:
-        fabrics = [
+        provider_data["fabrics"] = [
             f.name for f in INFINIBAND_FABRICS if f.platform == platform and f.region == region
         ]
 
@@ -207,7 +214,6 @@ def _make_offer(
         gpu_vendor=None,
         spot=spot,
         disk_size=None,
-        provider_data=cast(JSONObject, NebiusCatalogItemProviderData(fabrics=fabrics)),
     )
 
     if preset.resources.gpu_count:
@@ -222,5 +228,9 @@ def _make_offer(
         item.gpu_name = gpu.name
         item.gpu_memory = float(gpu.memory)
         item.gpu_vendor = gpu.vendor
+        if spot and gpu.name in PREEMPTIBLE_FLAT_RATE_GPUS:
+            provider_data["is_preemptible_flat_rate"] = True
+
+    item.provider_data = cast(JSONObject, provider_data)
 
     return item

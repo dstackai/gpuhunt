@@ -44,9 +44,9 @@ List of all available filters:
 
 ## Advanced usage
 
-Every provider catalog is published and versioned independently, so a provider that fails
+Every offline provider catalog is published and versioned independently, so a provider that fails
 to be collected keeps its previous catalog while the other providers are updated. Passing
-a version to `load()` requests that version from every provider:
+a version to `load()` requests that version from every offline provider:
 
 ```python
 from gpuhunt import Catalog
@@ -58,12 +58,16 @@ items = catalog.query()
 print(*items, sep="\n")
 ```
 
+Vultr uses `VULTR_API_KEY`, when set, to query account-specific availability for VDM GPU plans.
+Its public plan locations can omit available VDM plans.
+
 ## Supported providers
 
 * AWS
 * Azure
 * CloudRift
 * Crusoe
+* Daytona
 * DigitalOcean
 * GCP
 * Hot Aisle

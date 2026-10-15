@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 # Every provider in `ONLINE_PROVIDERS` must be listed here to be queried by `default_catalog`.
 ONLINE_PROVIDER_MODULES = [
     ("gpuhunt.providers.crusoe", "CrusoeProvider"),
+    ("gpuhunt.providers.daytona", "DaytonaProvider"),
     ("gpuhunt.providers.digitalocean", "DigitalOceanProvider"),
     ("gpuhunt.providers.hotaisle", "HotAisleProvider"),
     ("gpuhunt.providers.jarvislabs", "JarvisLabsProvider"),

@@ -177,7 +177,7 @@ def _required(node: dict, name: str) -> str | int | float:
 # Tokens that describe a form factor, memory size or marketing line rather than the GPU itself.
 _GPU_NAME_NOISE = re.compile(
     r"\b(nvidia|geforce|tesla|quadro|tensor core gpu|generation|blackwell|server edition|"
-    r"workstation edition|pcie|sxm\d?|hbm\d\w*|ac|\d+\s*gb)\b",
+    r"workstation edition|pcie|sxm\d?|hbm\d\w*|ac|pc|\d+\s*gb)\b",
     flags=re.IGNORECASE,
 )
 
@@ -195,6 +195,8 @@ def get_dstack_gpu_name(gpu_model: str) -> str:
     >>> get_dstack_gpu_name("A100-SXM4-80GB")
     'A100'
     >>> get_dstack_gpu_name("B300 SXM6 AC")
+    'B300'
+    >>> get_dstack_gpu_name("B300 SXM6 PC")
     'B300'
     >>> get_dstack_gpu_name("RTX PRO 6000 Blackwell Server Edition")
     'RTXPRO6000'

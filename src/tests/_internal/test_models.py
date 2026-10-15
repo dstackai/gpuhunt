@@ -1,7 +1,7 @@
 import pytest
 
 from gpuhunt._internal.constraints import KNOWN_AMD_GPUS
-from gpuhunt._internal.models import AMDArchitecture
+from gpuhunt._internal.models import AMDArchitecture, QueryFilter
 
 
 @pytest.mark.parametrize(
@@ -25,3 +25,19 @@ def test_amd_gpu_architecture(model: str, architecture: AMDArchitecture, expecte
             return
     # If we get here, the test should fail since we could not find the GPU in our known list.
     assert False
+
+
+@pytest.mark.parametrize(
+    ["query_filter", "expected"],
+    [
+        pytest.param(QueryFilter(), "QueryFilter()", id="empty"),
+        pytest.param(QueryFilter(min_cpu=4), "QueryFilter(min_cpu=4)", id="single-field"),
+        pytest.param(
+            QueryFilter(max_price=1.2, min_cpu=4),
+            "QueryFilter(min_cpu=4, max_price=1.2)",
+            id="fields-in-declaration-order",
+        ),
+    ],
+)
+def test_query_filter_repr(query_filter: QueryFilter, expected: str):
+    assert repr(query_filter) == expected

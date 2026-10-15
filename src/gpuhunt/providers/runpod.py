@@ -79,10 +79,15 @@ class RunpodProvider(OfflineProvider):
 
         gpu_types = _make_request({"query": gpu_types_query, "variables": {}})
         data_centers = [dc["id"] for dc in gpu_types["data"]["dataCenters"] if dc["listed"]]
-        max_gpu_count = max(gpu["maxGpuCount"] for gpu in gpu_types["data"]["gpuTypes"])
+        max_secure_gpu_count = max(
+            gpu["maxGpuCountSecureCloud"] for gpu in gpu_types["data"]["gpuTypes"]
+        )
+        max_community_gpu_count = max(
+            gpu["maxGpuCountCommunityCloud"] for gpu in gpu_types["data"]["gpuTypes"]
+        )
 
         variables = []
-        for gpu_count in range(1, max_gpu_count + 1):
+        for gpu_count in range(1, max_secure_gpu_count + 1):
             # Secure cloud is queryable by datacenter ID
             for dc_id in data_centers:
                 variables.append(
@@ -101,6 +106,7 @@ class RunpodProvider(OfflineProvider):
                         },
                     }
                 )
+        for gpu_count in range(1, max_community_gpu_count + 1):
             # Community cloud is queryable by country code
             for country_code in gpu_types["data"]["countryCodes"]:
                 if country_code is None:
@@ -199,11 +205,11 @@ class RunpodProvider(OfflineProvider):
                     provider=RunpodProvider.NAME,
                     instance_name=pod_type["id"],
                     location=location["id"],
-                    price=pod_type["clusterPrice"] * pod_type["maxGpuCount"],
+                    price=pod_type["clusterPrice"] * pod_type["maxGpuCountSecureCloud"],
                     cpu=cpu,
                     memory=memory,
                     gpu_vendor=gpu_vendor,
-                    gpu_count=pod_type["maxGpuCount"],
+                    gpu_count=pod_type["maxGpuCountSecureCloud"],
                     gpu_name=gpu_name,
                     gpu_memory=pod_type["memoryInGb"],
                     spot=False,
@@ -413,8 +419,6 @@ query GpuTypes {
     __typename
   }
   gpuTypes {
-    maxGpuCount
-    maxGpuCount
     maxGpuCountCommunityCloud
     maxGpuCountSecureCloud
     minPodGpuCount
@@ -441,7 +445,8 @@ query GpuTypes($lowestPriceInput: GpuLowestPriceInput, $gpuTypesInput: GpuTypeFi
       countryCode
       __typename
     }
-    maxGpuCount
+    maxGpuCountCommunityCloud
+    maxGpuCountSecureCloud
     id
     nodeGroupDatacenters {
         id

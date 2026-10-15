@@ -47,7 +47,7 @@ class VastAIProvider(OnlineProvider):
         if self.extra_filters:
             for key, constraints in self.extra_filters.items():
                 for op, value in constraints.items():
-                    filters[key][op] = value
+                    filters[key][op] = stricter_constraint(op, filters[key].get(op), value)
         resp = requests.post(bundles_url, json=filters, timeout=10)
         resp.raise_for_status()
         data = resp.json()
@@ -151,9 +151,9 @@ class VastAIProvider(OnlineProvider):
             filters["dph_total"]["lte"] = q.max_price
         # TODO(egor-s): add compute capability info for all GPUs
         if q.min_compute_capability is not None:
-            filters["compute_capability"]["gte"] = compute_cap(q.min_compute_capability)
+            filters["compute_cap"]["gte"] = compute_cap(q.min_compute_capability)
         if q.max_compute_capability is not None:
-            filters["compute_capability"]["lte"] = compute_cap(q.max_compute_capability)
+            filters["compute_cap"]["lte"] = compute_cap(q.max_compute_capability)
         # Datacenter offers map to Vast's "server cloud" scope.
         # When community_cloud is enabled, keep scope unfiltered so both
         # server and community offers are returned.
@@ -212,6 +212,7 @@ GPU_MAPPING = {
     "A800PCIE": ["A800 PCIE"],
     "H100": ["H100 PCIE", "H100 SXM"],
     "H100NVL": ["H100 NVL"],
+    "B300": ["B300", "B300 PC"],
 }
 
 GPU_MAPPING_RULES = {
@@ -241,6 +242,10 @@ def get_dstack_gpu_name(gpu_name: str) -> str:
         return "A100"
     if gpu_name.startswith("H100 ") and "NVL" not in gpu_name:
         return "H100"
+    # "B300 PC" is how Vast lists boards that report "NVIDIA B300 SXM6 PC" rather than
+    # "NVIDIA B300 SXM6 AC": the same B300 GPU (PCI device 0x3182) on a different board SKU
+    if gpu_name == "B300 PC":
+        return "B300"
     return gpu_name.replace(" ", "")
 
 
@@ -255,12 +260,25 @@ def get_location(location: str | None) -> str:
     return location.lower().replace(" ", "")
 
 
-def compute_cap(cc: tuple[int, int]) -> str:
+def compute_cap(cc: tuple[int, int]) -> int:
     """
-    >>> compute_cap((7, 0))
-    '700'
-    >>> compute_cap((7, 5))
-    '750'
+    Convert a compute capability to Vast's `compute_cap` value, e.g. (8, 6) -> 860.
     """
     major, minor = cc
-    return f"{major}{str(minor).ljust(2, '0')}"
+    return major * 100 + minor * 10
+
+
+def stricter_constraint(
+    op: Operators, current: FilterValue | None, new: FilterValue
+) -> FilterValue:
+    """
+    Combine two values for the same operator so that both constraints hold.
+    For `eq`, the new value wins.
+    """
+    if current is None:
+        return new
+    if op in ("gte", "gt"):
+        return max(current, new)
+    if op in ("lte", "lt"):
+        return min(current, new)
+    return new

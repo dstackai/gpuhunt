@@ -156,14 +156,6 @@ class QueryFilter:
     allowed_flags: Container[str] | None = None
 
     def __repr__(self) -> str:
-        """
-        >>> QueryFilter()
-        QueryFilter()
-        >>> QueryFilter(min_cpu=4)
-        QueryFilter(min_cpu=4)
-        >>> QueryFilter(max_price=1.2, min_cpu=4)
-        QueryFilter(min_cpu=4, max_price=1.2)
-        """
         kv = ", ".join(
             f"{f.name}={value}"
             for f in fields(self)

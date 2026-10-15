@@ -326,6 +326,7 @@ def test_from_env_needs_no_credentials():
         ("H200 NVL", "H200NVL"),
         ("B200", "B200"),
         ("B300 SXM6 AC", "B300"),
+        ("B300 SXM6 PC", "B300"),
         ("A100-SXM4-80GB", "A100"),
         ("A100 80GB PCIe", "A100"),
         ("A10 Tensor Core GPU", "A10"),
