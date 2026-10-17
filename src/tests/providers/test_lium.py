@@ -142,9 +142,9 @@ class TestGet:
         assert offer.location == "jp-13"
         assert offer.price == 4.0  # 8 GPUs x $0.5 per GPU-hour
         assert offer.cpu == 384
-        assert offer.memory == 247  # 251 minus the 4 GiB host reserve
-        # int(800 * 2 / 3) + int(800 / 3) of the free disk, not the 935 GB total
-        assert offer.disk_size == 799
+        assert offer.memory == 246  # at least 250.5 GiB, minus the 4 GiB host reserve
+        # The storage quota of the free disk: int((800 - 0.5) / 3), not the 935 GB total
+        assert offer.disk_size == 266
         assert offer.gpu_vendor == AcceleratorVendor.NVIDIA
         assert offer.gpu_count == 8
         assert offer.gpu_name == "RTX5090"
@@ -167,13 +167,13 @@ class TestGet:
         }
         assert h200[1].price == 3.99
         assert h200[1].cpu == 24  # 192 / 8
-        # The host keeps max(4, 1% of 2015) = 20.15 GiB; the rest is split and rounded down.
-        assert h200[1].memory == 249.35  # (2015 - 20.15) / 8
-        # Free disk, not total: int(1467 / 8 * 2 / 3) + int(1467 / 8 / 3) = 122 + 61.
-        assert h200[1].disk_size == 183
+        # At least 2014.5 GiB; the host keeps 1% of it and the rest is split and rounded down.
+        assert h200[1].memory == 249  # (2014.5 - 20.145) / 8 = 249.29, measured memory.max 249
+        # The storage quota of the free disk: int((1467 - 0.5) / 8 / 3) = 61.
+        assert h200[1].disk_size == 61
         assert h200[5].price == 19.95
         assert h200[5].cpu == 120
-        assert h200[5].memory == 1246.78
+        assert h200[5].memory == 1246
         # The feed reports 140 GB for a 141 GB card; the known size wins.
         assert all(o.gpu_memory == 141 for o in h200.values())
 
@@ -268,7 +268,7 @@ class TestGet:
 
         offers = LiumProvider().get()
 
-        assert [o.memory for o in offers] == [6, 12]  # (16 - 4) / 2 per GPU
+        assert [o.memory for o in offers] == [5, 11]  # (15.5 - 4) / 2 per GPU, rounded down
 
     @pytest.mark.parametrize("disk_free_gb", [None, 0, -5, "100", True], ids=repr)
     def test_skips_node_without_free_disk(self, requests_mock, disk_free_gb):
@@ -286,13 +286,13 @@ class TestGet:
 
     def test_skips_offers_whose_disk_quotas_round_to_zero(self, requests_mock):
         node = make_node(
-            gpu_count=2, available_gpu_count=2, min_rentable_gpu_count=1, disk_free_gb=2
+            gpu_count=2, available_gpu_count=2, min_rentable_gpu_count=1, disk_free_gb=6
         )
         requests_mock.get(NODES_URL, json={"nodes": [node]})
 
         offers = LiumProvider().get()
 
-        # 1 GPU: 1 GB -> int(0.67) + int(0.33) = 0, skipped; 2 GPUs: 2 GB -> 1 + 0 = 1
+        # 1 GPU: int(5.5 / 2 / 3) = 0, skipped; 2 GPUs: int(5.5 / 3) = 1
         assert [(o.gpu_count, o.disk_size) for o in offers] == [(2, 1)]
 
     def test_disk_filter_uses_the_pod_quota(self, requests_mock, feed):
@@ -301,9 +301,21 @@ class TestGet:
         offers = LiumProvider().get()
         h200 = [o for o in offers if o.instance_name == "f092246d-5704-4c9e-b57f-7c0710a06deb"]
 
-        # The one-GPU H200 share is 446.88 GB of total disk but only 183 GB of quota.
-        assert not matches(h200[0], QueryFilter(min_disk_size=300))
-        assert matches(h200[1], QueryFilter(min_disk_size=300))  # 2 GPUs: 244 + 122 = 366
+        # The one-GPU H200 share is 446.88 GB of total disk but only 61 GB of storage quota.
+        assert not matches(h200[0], QueryFilter(min_disk_size=62))
+        assert not matches(h200[0], QueryFilter(min_disk_size=150))
+        assert matches(h200[0], QueryFilter(min_disk_size=61))
+        assert matches(h200[1], QueryFilter(min_disk_size=122))  # 2 GPUs: int(366.6 / 3)
+
+    def test_memory_filter_boundary(self, requests_mock, feed):
+        requests_mock.get(NODES_URL, json=feed)
+
+        offers = LiumProvider().get()
+        h200 = [o for o in offers if o.instance_name == "f092246d-5704-4c9e-b57f-7c0710a06deb"]
+
+        # The one-GPU H200 pod gets memory.max = 249 GiB, so asking for more must not match it.
+        assert matches(h200[0], QueryFilter(min_memory=249))
+        assert not matches(h200[0], QueryFilter(min_memory=249.1))
 
     def test_skips_unknown_gpu_model(self, requests_mock, caplog):
         requests_mock.get(
