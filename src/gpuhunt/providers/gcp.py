@@ -5,6 +5,7 @@ import importlib.resources
 import json
 import logging
 import re
+import time
 from collections import defaultdict, namedtuple
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -13,6 +14,7 @@ from typing import cast
 
 import google.cloud.billing_v1 as billing_v1
 import google.cloud.compute_v1 as compute_v1
+from google.auth.exceptions import RefreshError
 from google.cloud import tpu_v2
 from google.cloud.billing_v1 import CloudCatalogClient, ListSkusRequest
 from google.cloud.billing_v1.types.cloud_catalog import Sku
@@ -23,6 +25,7 @@ from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
+AUTHENTICATION_ATTEMPTS = 3
 compute_service = "services/6F81-5844-456A"
 AcceleratorDetails = namedtuple("AcceleratorDetails", ["name", "memory"])
 # Update gpu_vendor detection if adding non-nvidia GPUs.
@@ -171,6 +174,22 @@ class GCPProvider(OfflineProvider):
         balance_resources: bool = True,
         apply_filter: bool = False,
     ) -> list[CatalogItem]:
+        attempt = 1
+        while True:
+            try:
+                return self._get_offers()
+            except RefreshError as e:
+                if attempt == AUTHENTICATION_ATTEMPTS or not _is_transient_auth_error(e):
+                    raise
+                logger.warning(
+                    "Transient GCP authentication failure (attempt %s/%s); retrying collection",
+                    attempt,
+                    AUTHENTICATION_ATTEMPTS,
+                )
+                time.sleep(attempt)
+                attempt += 1
+
+    def _get_offers(self) -> list[CatalogItem]:
         machine_types = self._list_machine_types()
         machine_types += self._make_gpu_machine_types(machine_types)
         offers = self._make_offers(machine_types)
@@ -348,6 +367,19 @@ class GCPProvider(OfflineProvider):
                 )
                 offers.append(item)
         return offers
+
+
+def _is_transient_auth_error(error: RefreshError) -> bool:
+    if error.retryable:
+        return True
+    # The identity-token supplier discards the HTTP status and marks even gateway
+    # connection failures as non-retryable RefreshErrors.
+    return (
+        len(error.args) == 2
+        and error.args[0] == "Unable to retrieve Identity Pool subject token"
+        and isinstance(error.args[1], str)
+        and error.args[1].startswith("upstream connect error or disconnect/reset before headers")
+    )
 
 
 class GCPCatalogItemProviderData(TypedDict):
