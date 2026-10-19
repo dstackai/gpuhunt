@@ -5,27 +5,31 @@ import importlib.resources
 import json
 import logging
 import re
-import time
 from collections import defaultdict, namedtuple
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import cast
 
+import google.auth
 import google.cloud.billing_v1 as billing_v1
 import google.cloud.compute_v1 as compute_v1
-from google.auth.exceptions import RefreshError
+import requests
+from google.auth import identity_pool
+from google.auth.credentials import Credentials
+from google.auth.transport.requests import Request
 from google.cloud import tpu_v2
 from google.cloud.billing_v1 import CloudCatalogClient, ListSkusRequest
 from google.cloud.billing_v1.types.cloud_catalog import Sku
 from google.cloud.location import locations_pb2
+from requests.adapters import HTTPAdapter
 from typing_extensions import NotRequired, TypedDict
+from urllib3.util.retry import Retry
 
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
-AUTHENTICATION_ATTEMPTS = 3
 compute_service = "services/6F81-5844-456A"
 AcceleratorDetails = namedtuple("AcceleratorDetails", ["name", "memory"])
 # Update gpu_vendor detection if adding non-nvidia GPUs.
@@ -161,12 +165,13 @@ class GCPProvider(OfflineProvider):
     NAME = "gcp"
 
     def __init__(self, project: str):
-        # todo credentials
         self.project = project
-        self.machine_types_client = compute_v1.MachineTypesClient()
-        self.accelerator_types_client = compute_v1.AcceleratorTypesClient()
-        self.regions_client = compute_v1.RegionsClient()
-        self.cloud_catalog_client = billing_v1.CloudCatalogClient()
+        self.machine_types_client = compute_v1.MachineTypesClient(credentials=_get_credentials())
+        self.accelerator_types_client = compute_v1.AcceleratorTypesClient(
+            credentials=_get_credentials()
+        )
+        self.regions_client = compute_v1.RegionsClient(credentials=_get_credentials())
+        self.cloud_catalog_client = billing_v1.CloudCatalogClient(credentials=_get_credentials())
 
     def get(
         self,
@@ -174,22 +179,6 @@ class GCPProvider(OfflineProvider):
         balance_resources: bool = True,
         apply_filter: bool = False,
     ) -> list[CatalogItem]:
-        attempt = 1
-        while True:
-            try:
-                return self._get_offers()
-            except RefreshError as e:
-                if attempt == AUTHENTICATION_ATTEMPTS or not _is_transient_auth_error(e):
-                    raise
-                logger.warning(
-                    "Transient GCP authentication failure (attempt %s/%s); retrying collection",
-                    attempt,
-                    AUTHENTICATION_ATTEMPTS,
-                )
-                time.sleep(attempt)
-                attempt += 1
-
-    def _get_offers(self) -> list[CatalogItem]:
         machine_types = self._list_machine_types()
         machine_types += self._make_gpu_machine_types(machine_types)
         offers = self._make_offers(machine_types)
@@ -369,17 +358,32 @@ class GCPProvider(OfflineProvider):
         return offers
 
 
-def _is_transient_auth_error(error: RefreshError) -> bool:
-    if error.retryable:
-        return True
-    # The identity-token supplier discards the HTTP status and marks even gateway
-    # connection failures as non-retryable RefreshErrors.
-    return (
-        len(error.args) == 2
-        and error.args[0] == "Unable to retrieve Identity Pool subject token"
-        and isinstance(error.args[1], str)
-        and error.args[1].startswith("upstream connect error or disconnect/reset before headers")
-    )
+def _get_credentials() -> Credentials:
+    credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+    if isinstance(credentials, identity_pool.Credentials) and credentials.info.get(
+        "credential_source", {}
+    ).get("url"):
+        return _RetryingIdentityPoolCredentials.from_info(
+            credentials.info, scopes=credentials.scopes
+        )
+    return credentials
+
+
+class _RetryingIdentityPoolCredentials(identity_pool.Credentials):
+    def retrieve_subject_token(self, request):
+        # Retry the token URL before google-auth discards its HTTP status.
+        with requests.Session() as session:
+            adapter = HTTPAdapter(
+                max_retries=Retry(
+                    total=2,
+                    backoff_factor=1,
+                    status_forcelist=(429, 500, 502, 503, 504),
+                    raise_on_status=False,
+                )
+            )
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            return super().retrieve_subject_token(Request(session))
 
 
 class GCPCatalogItemProviderData(TypedDict):
@@ -692,7 +696,7 @@ def _get_priced_tpu_configs(project_id: str) -> list[dict]:
 
 
 def get_tpu_prices() -> list[dict]:
-    client = CloudCatalogClient()
+    client = CloudCatalogClient(credentials=_get_credentials())
     tpu_configs = []
     # E000-3F24-B8AA contains prices for TPU versions v2,v3,v4.
     # 6F81-5844-456A contains prices for newer TPU versions v5p, v5litepod(v5e), v6e.
@@ -804,7 +808,7 @@ def get_tpu_configs(project_id: str) -> list[dict]:
             )
         return zone_instances
 
-    client = tpu_v2.TpuClient()
+    client = tpu_v2.TpuClient(credentials=_get_credentials())
     instances: list[dict] = []
     futures = []
     with ThreadPoolExecutor(max_workers=8) as ex:
@@ -825,7 +829,7 @@ def get_no_of_chips(expression: str) -> int:
 
 
 def get_locations(project_id: str) -> list[str]:
-    client = tpu_v2.TpuClient()
+    client = tpu_v2.TpuClient(credentials=_get_credentials())
     parent = f"projects/{project_id}"
     list_locations_request = client.list_locations(locations_pb2.ListLocationsRequest(name=parent))
     locations = [loc.location_id for loc in list_locations_request.locations]

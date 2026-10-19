@@ -1,14 +1,14 @@
 from unittest.mock import Mock
 
 import pytest
-from google.auth.exceptions import RefreshError
 
 from gpuhunt import AcceleratorVendor, CatalogItem
 from gpuhunt.providers import gcp
 
 
 @pytest.fixture
-def provider(monkeypatch: pytest.MonkeyPatch) -> gcp.GCPProvider:
+def offers(monkeypatch: pytest.MonkeyPatch) -> list[CatalogItem]:
+    monkeypatch.setattr(gcp, "_get_credentials", Mock())
     # GCP reports one accelerator even for fractional G4 machines.
     machine_types = [
         gcp.compute_v1.MachineType(
@@ -59,69 +59,10 @@ def provider(monkeypatch: pytest.MonkeyPatch) -> gcp.GCPProvider:
             None if capacity_type is gcp.CapacityType.DWS_CALENDAR_MODE else 1.0
         ),
     )
-    return gcp.GCPProvider("test-project")
-
-
-@pytest.fixture
-def offers(provider: gcp.GCPProvider) -> list[CatalogItem]:
-    return provider.get()
+    return gcp.GCPProvider("test-project").get()
 
 
 class TestGet:
-    @pytest.mark.parametrize(
-        ("error", "failures", "recovers"),
-        [
-            pytest.param(
-                RefreshError(
-                    "Unable to retrieve Identity Pool subject token",
-                    "upstream connect error or disconnect/reset before headers. "
-                    "retried and the latest reset reason: connection timeout",
-                ),
-                failures,
-                failures < 3,
-                id=f"identity-token-timeout-{failures}",
-            )
-            for failures in [1, 2, 3]
-        ]
-        + [
-            pytest.param(RefreshError("Unavailable", retryable=True), 1, True, id="retryable"),
-            pytest.param(
-                RefreshError("Unable to retrieve Identity Pool subject token", "Unauthorized"),
-                1,
-                False,
-                id="github-unauthorized",
-            ),
-            pytest.param(
-                RefreshError("Unable to acquire impersonated credentials", "Permission denied"),
-                1,
-                False,
-                id="google-permission-denied",
-            ),
-            pytest.param(RefreshError("Invalid credentials"), 1, False, id="invalid-credentials"),
-        ],
-    )
-    def test_authentication_retries(self, provider, monkeypatch, error, failures, recovers):
-        provider.machine_types_client.list.return_value = [
-            gcp.compute_v1.MachineType(name="n1-standard-4", guest_cpus=4, memory_mb=15360)
-        ]
-        provider.accelerator_types_client.list.side_effect = [error] * failures + [
-            [gcp.compute_v1.AcceleratorType(name="nvidia-tesla-t4")]
-        ]
-        sleep = Mock()
-        monkeypatch.setattr(gcp.time, "sleep", sleep)
-
-        if recovers:
-            offers = provider.get()
-            assert any(offer.gpu_name == "T4" for offer in offers)
-        else:
-            with pytest.raises(RefreshError) as exc_info:
-                provider.get()
-            assert exc_info.value is error
-
-        attempts = failures + 1 if recovers else failures
-        assert provider.accelerator_types_client.list.call_count == attempts
-        assert sleep.call_count == attempts - 1
-
     @pytest.mark.parametrize(
         ("instance_name", "gpu_name", "gpu_count", "gpu_memory"),
         [
