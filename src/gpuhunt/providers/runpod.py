@@ -346,6 +346,9 @@ def _get_gpu_name(vendor: AcceleratorVendor, name: str) -> str | None:
 
 
 def _get_nvidia_gpu_name(name: str) -> str | None:
+    # Match the full GPU only; B300 MIG slices have different resources.
+    if name == "B300":
+        return "B300"
     if "B200" in name:
         return "B200"
     if "V100" in name:
