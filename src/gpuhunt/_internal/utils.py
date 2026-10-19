@@ -2,6 +2,10 @@ import logging
 import sys
 from typing import TypeVar
 
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
 
 def configure_logging() -> None:
     logging.basicConfig(
@@ -9,6 +13,21 @@ def configure_logging() -> None:
         stream=sys.stdout,
         format="%(asctime)s %(levelname)s %(message)s",
     )
+
+
+def get_retrying_session() -> requests.Session:
+    session = requests.Session()
+    adapter = HTTPAdapter(
+        max_retries=Retry(
+            total=2,
+            backoff_factor=1,
+            status_forcelist=(429, 500, 502, 503, 504),
+            raise_on_status=False,
+        )
+    )
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
 
 
 T = TypeVar("T")

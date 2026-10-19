@@ -3,21 +3,18 @@ import logging
 import math
 import os
 import re
-import time
 from collections import namedtuple
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
-import requests
-import requests.adapters
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.compute import ComputeManagementClient
 
 from gpuhunt import AcceleratorVendor
 from gpuhunt._internal.models import CatalogItem, QueryFilter
-from gpuhunt._internal.utils import get_or_error
+from gpuhunt._internal.utils import get_or_error, get_retrying_session
 from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
@@ -127,8 +124,7 @@ class AzureProvider(OfflineProvider):
     def _get_region_pages(self, region: str) -> list[list[dict]]:
         pages = []
         page_id = 0
-        session = requests.Session()
-        session.mount("https://", requests.adapters.HTTPAdapter(max_retries=3))
+        session = get_retrying_session()
         while True:
             cached_page = None
             if self.cache_dir is not None:
@@ -145,10 +141,6 @@ class AzureProvider(OfflineProvider):
                         "$skip": page_id * retail_prices_page_size,
                     },
                 )
-                if res.status_code == 429:
-                    logger.warning("Got 429 for %s: sleep 3 & retry", region)
-                    time.sleep(3)
-                    continue
                 res.raise_for_status()
                 if cached_page is not None:
                     with open(cached_page, "w") as f:

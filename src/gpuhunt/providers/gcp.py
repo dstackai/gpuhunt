@@ -14,7 +14,6 @@ from typing import cast
 import google.auth
 import google.cloud.billing_v1 as billing_v1
 import google.cloud.compute_v1 as compute_v1
-import requests
 from google.auth import identity_pool
 from google.auth.credentials import Credentials, with_scopes_if_required
 from google.auth.transport.requests import Request
@@ -22,11 +21,10 @@ from google.cloud import tpu_v2
 from google.cloud.billing_v1 import CloudCatalogClient, ListSkusRequest
 from google.cloud.billing_v1.types.cloud_catalog import Sku
 from google.cloud.location import locations_pb2
-from requests.adapters import HTTPAdapter
 from typing_extensions import NotRequired, TypedDict
-from urllib3.util.retry import Retry
 
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
+from gpuhunt._internal.utils import get_retrying_session
 from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
@@ -375,17 +373,7 @@ def _get_credentials() -> Credentials:
 class _RetryingIdentityPoolCredentials(identity_pool.Credentials):
     def retrieve_subject_token(self, request):
         # Retry the token URL before google-auth discards its HTTP status.
-        with requests.Session() as session:
-            adapter = HTTPAdapter(
-                max_retries=Retry(
-                    total=2,
-                    backoff_factor=1,
-                    status_forcelist=(429, 500, 502, 503, 504),
-                    raise_on_status=False,
-                )
-            )
-            session.mount("http://", adapter)
-            session.mount("https://", adapter)
+        with get_retrying_session() as session:
             return super().retrieve_subject_token(Request(session))
 
 
