@@ -8,6 +8,7 @@ from gpuhunt.providers import gcp
 
 @pytest.fixture
 def offers(monkeypatch: pytest.MonkeyPatch) -> list[CatalogItem]:
+    monkeypatch.setattr(gcp, "_get_credentials", Mock())
     # GCP reports one accelerator even for fractional G4 machines.
     machine_types = [
         gcp.compute_v1.MachineType(
