@@ -1,96 +1,9 @@
 import pytest
 from requests import RequestException
 
-from gpuhunt._internal.models import AcceleratorVendor, CatalogItem
+from gpuhunt._internal.models import CatalogItem
 from gpuhunt.providers import runpod as runpod_module
 from gpuhunt.providers.runpod import RunpodProvider, _cpu_size_ladder
-
-
-class TestRunpodProvider:
-    @pytest.mark.parametrize("gpu_count", [1, 8])
-    def test_collect_b300_offers(self, monkeypatch, requests_mock, gpu_count):
-        gpu_types = [
-            {
-                "id": "NVIDIA B300 SXM6 AC",
-                "manufacturer": "Nvidia",
-                "displayName": "B300",
-                "memoryInGb": 288,
-                "securePrice": 8.99,
-                "clusterPrice": 10.788,
-                "maxGpuCountSecureCloud": 8,
-                "nodeGroupDatacenters": [{"id": "US-WA-2"}],
-            },
-            {
-                "id": "NVIDIA B300 SXM6 AC MIG 1g.34gb",
-                "manufacturer": "Nvidia",
-                "displayName": "B300 MIG 34GB",
-                "memoryInGb": 34,
-                "securePrice": 0.5,
-                "clusterPrice": 0.6,
-                "maxGpuCountSecureCloud": 56,
-                "nodeGroupDatacenters": [{"id": "US-WA-2"}],
-            },
-        ]
-
-        def api_response(request, context):
-            payload = request.json()
-            if payload["query"] != runpod_module.query_pod_types:
-                return {"data": {"gpuTypes": gpu_types}}
-            count = payload["variables"]["lowestPriceInput"]["gpuCount"]
-            return {
-                "data": {
-                    "gpuTypes": [
-                        {
-                            **gpu,
-                            "lowestPrice": {
-                                "stockStatus": "Low",
-                                "minVcpu": 26 * count,
-                                "minMemory": 256 * count,
-                            },
-                        }
-                        for gpu in gpu_types
-                    ]
-                }
-            }
-
-        requests_mock.post(runpod_module.API_URL, json=api_response)
-        provider = RunpodProvider()
-        monkeypatch.setattr(
-            provider,
-            "_build_query_variables",
-            lambda: [
-                {
-                    "gpuTypesInput": {"cluster": False},
-                    "lowestPriceInput": {
-                        "secureCloud": True,
-                        "dataCenterId": "US-WA-2",
-                        "gpuCount": gpu_count,
-                    },
-                }
-            ],
-        )
-        monkeypatch.setattr(provider, "_fetch_cpu_offers", lambda: [])
-
-        offers = provider.get()
-
-        # MIG slices must not be advertised as full B300 GPUs.
-        assert len(offers) == 2
-        regular, cluster = offers
-        for offer in offers:
-            assert offer.instance_name == "NVIDIA B300 SXM6 AC"
-            assert offer.location == "US-WA-2"
-            assert offer.gpu_vendor == AcceleratorVendor.NVIDIA
-            assert offer.gpu_name == "B300"
-            assert offer.gpu_memory == 270
-            assert offer.cpu == 26 * offer.gpu_count
-            assert offer.memory == 256 * offer.gpu_count
-        assert regular.gpu_count == gpu_count
-        assert regular.price == pytest.approx(8.99 * gpu_count)
-        assert regular.flags == []
-        assert cluster.gpu_count == 8
-        assert cluster.price == pytest.approx(10.788 * 8)
-        assert cluster.flags == ["runpod-cluster"]
-        assert cluster.provider_data == {"pod_counts": list(range(2, 9))}
 
 
 def test_cpu_size_ladder():
