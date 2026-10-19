@@ -73,6 +73,7 @@ Its public plan locations can omit available VDM plans.
 * Hot Aisle
 * JarvisLabs
 * LambdaLabs
+* Lium
 * Nebius
 * OCI
 * Runpod
