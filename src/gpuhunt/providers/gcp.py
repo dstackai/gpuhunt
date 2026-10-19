@@ -16,7 +16,7 @@ import google.cloud.billing_v1 as billing_v1
 import google.cloud.compute_v1 as compute_v1
 import requests
 from google.auth import identity_pool
-from google.auth.credentials import Credentials
+from google.auth.credentials import Credentials, with_scopes_if_required
 from google.auth.transport.requests import Request
 from google.cloud import tpu_v2
 from google.cloud.billing_v1 import CloudCatalogClient, ListSkusRequest
@@ -359,14 +359,17 @@ class GCPProvider(OfflineProvider):
 
 
 def _get_credentials() -> Credentials:
-    credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+    credentials, _ = google.auth.default()
     if isinstance(credentials, identity_pool.Credentials) and credentials.info.get(
         "credential_source", {}
     ).get("url"):
-        return _RetryingIdentityPoolCredentials.from_info(
+        credentials = _RetryingIdentityPoolCredentials.from_info(
             credentials.info, scopes=credentials.scopes
         )
-    return credentials
+    return cast(
+        Credentials,
+        with_scopes_if_required(credentials, ["https://www.googleapis.com/auth/cloud-platform"]),
+    )
 
 
 class _RetryingIdentityPoolCredentials(identity_pool.Credentials):
