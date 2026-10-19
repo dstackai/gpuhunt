@@ -6,7 +6,7 @@ import requests
 from requests import RequestException
 from typing_extensions import NotRequired, TypedDict
 
-from gpuhunt._internal.constraints import correct_gpu_memory_gib, find_accelerators
+from gpuhunt._internal.constraints import find_accelerators
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt.providers.base import OfflineProvider
 
@@ -164,9 +164,7 @@ class RunpodProvider(OfflineProvider):
                 gpu_vendor=listed_gpu_vendor_and_name[0],
                 gpu_count=lowest_price_input_variables["gpuCount"],
                 gpu_name=listed_gpu_vendor_and_name[1],
-                gpu_memory=correct_gpu_memory_gib(
-                    listed_gpu_vendor_and_name[1], pod["memoryInGb"] * 1024
-                ),
+                gpu_memory=pod["memoryInGb"],
                 spot=False,
                 disk_size=None,
                 provider_data={},
@@ -213,7 +211,7 @@ class RunpodProvider(OfflineProvider):
                     gpu_vendor=gpu_vendor,
                     gpu_count=pod_type["maxGpuCountSecureCloud"],
                     gpu_name=gpu_name,
-                    gpu_memory=correct_gpu_memory_gib(gpu_name, pod_type["memoryInGb"] * 1024),
+                    gpu_memory=pod_type["memoryInGb"],
                     spot=False,
                     disk_size=None,
                     flags=["runpod-cluster"],
