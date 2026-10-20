@@ -141,7 +141,6 @@ class AzureProvider(OfflineProvider):
                         "$filter": " and ".join([*prices_filters, f"armRegionName eq '{region}'"]),
                         "$skip": page_id * retail_prices_page_size,
                     },
-                    timeout=(10, 60),
                 )
                 res.raise_for_status()
                 if cached_page is not None:
