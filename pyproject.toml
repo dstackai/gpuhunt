@@ -20,7 +20,7 @@ dynamic = ["version"]
 dependencies = [
     "requests",
     "typing-extensions",
-    "urllib3>=1.26",
+    "urllib3>=1.26",  # Retry.allowed_methods requires urllib3 1.26+.
 ]
 
 [project.urls]
