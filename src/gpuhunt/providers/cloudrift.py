@@ -1,10 +1,9 @@
 import logging
 import os
 
-import requests
-
 from gpuhunt import CatalogItem, QueryFilter
 from gpuhunt._internal.models import AcceleratorVendor
+from gpuhunt._internal.utils import get_retrying_session
 from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
@@ -76,12 +75,13 @@ GPU_MAP = [
 
 def _make_request(endpoint: str, request_data: dict) -> dict | str:
     server = os.environ.get("CLOUDRIFT_SERVER_ADDRESS", CLOUDRIFT_SERVER_ADDRESS)
-    response = requests.request(
-        "POST",
-        f"{server}/api/v1/{endpoint}",
-        json={"version": CLOUDRIFT_API_VERSION, "data": request_data},
-        timeout=5.0,
-    )
+    # instance-types/list is a read-only POST, so it is safe to retry.
+    with get_retrying_session(allowed_methods={"POST"}) as session:
+        response = session.post(
+            f"{server}/api/v1/{endpoint}",
+            json={"version": CLOUDRIFT_API_VERSION, "data": request_data},
+            timeout=15,
+        )
     if not response.ok:
         response.raise_for_status()
     response_json = response.json()
