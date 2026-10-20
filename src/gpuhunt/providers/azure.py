@@ -3,6 +3,7 @@ import logging
 import math
 import os
 import re
+import time
 from collections import namedtuple
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -141,6 +142,10 @@ class AzureProvider(OfflineProvider):
                         "$skip": page_id * retail_prices_page_size,
                     },
                 )
+                if res.status_code == 429:
+                    logger.warning("Got 429 for %s: sleep 3 & retry", region)
+                    time.sleep(3)
+                    continue
                 res.raise_for_status()
                 if cached_page is not None:
                     with open(cached_page, "w") as f:
