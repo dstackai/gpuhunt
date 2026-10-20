@@ -1,5 +1,6 @@
 import logging
 import sys
+from collections.abc import Collection
 from typing import TypeVar
 
 import requests
@@ -15,12 +16,18 @@ def configure_logging() -> None:
     )
 
 
-def get_retrying_session() -> requests.Session:
+def get_retrying_session(
+    *,
+    retries: int = 2,
+    backoff_factor: float = 1,
+    allowed_methods: Collection[str] = Retry.DEFAULT_ALLOWED_METHODS,
+) -> requests.Session:
     session = requests.Session()
     adapter = HTTPAdapter(
         max_retries=Retry(
-            total=2,
-            backoff_factor=1,
+            total=retries,
+            backoff_factor=backoff_factor,
+            allowed_methods=allowed_methods,
             status_forcelist=(429, 500, 502, 503, 504),
             raise_on_status=False,
         )

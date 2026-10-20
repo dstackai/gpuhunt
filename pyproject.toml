@@ -19,7 +19,8 @@ keywords = ["gpu", "cloud", "pricing"]
 dynamic = ["version"]
 dependencies = [
     "requests",
-    "typing-extensions"
+    "typing-extensions",
+    "urllib3>=1.26",  # Retry.allowed_methods requires urllib3 1.26+.
 ]
 
 [project.urls]

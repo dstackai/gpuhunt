@@ -124,7 +124,8 @@ class AzureProvider(OfflineProvider):
     def _get_region_pages(self, region: str) -> list[list[dict]]:
         pages = []
         page_id = 0
-        session = get_retrying_session()
+        # Without Retry-After, five retries span a minute to allow throttling to subside.
+        session = get_retrying_session(retries=5, backoff_factor=2)
         while True:
             cached_page = None
             if self.cache_dir is not None:
