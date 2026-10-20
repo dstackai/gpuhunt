@@ -3,7 +3,6 @@ import logging
 import math
 import os
 import re
-import time
 from collections import namedtuple
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -125,7 +124,8 @@ class AzureProvider(OfflineProvider):
     def _get_region_pages(self, region: str) -> list[list[dict]]:
         pages = []
         page_id = 0
-        session = get_retrying_session()
+        # Without Retry-After, five retries span a minute to allow throttling to subside.
+        session = get_retrying_session(retries=5, backoff_factor=2)
         while True:
             cached_page = None
             if self.cache_dir is not None:
@@ -141,13 +141,8 @@ class AzureProvider(OfflineProvider):
                         "$filter": " and ".join([*prices_filters, f"armRegionName eq '{region}'"]),
                         "$skip": page_id * retail_prices_page_size,
                     },
+                    timeout=(10, 60),
                 )
-                if res.status_code == 429:
-                    # Rate limiting can outlast the HTTP adapter's retry budget. Keep retrying
-                    # this page so a throttled region does not abort the entire catalog.
-                    logger.warning("Got 429 for %s: sleep 3 & retry", region)
-                    time.sleep(3)
-                    continue
                 res.raise_for_status()
                 if cached_page is not None:
                     with open(cached_page, "w") as f:

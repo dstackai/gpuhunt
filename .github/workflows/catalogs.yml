@@ -73,6 +73,7 @@ jobs:
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: uv run python -m gpuhunt azure --output ../azure.csv
+        timeout-minutes: 15
       - name: Test catalog integrity
         env:
           CATALOG_DIR: .

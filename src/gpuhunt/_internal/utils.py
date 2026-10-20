@@ -15,12 +15,12 @@ def configure_logging() -> None:
     )
 
 
-def get_retrying_session() -> requests.Session:
+def get_retrying_session(*, retries: int = 2, backoff_factor: float = 1) -> requests.Session:
     session = requests.Session()
     adapter = HTTPAdapter(
         max_retries=Retry(
-            total=2,
-            backoff_factor=1,
+            total=retries,
+            backoff_factor=backoff_factor,
             status_forcelist=(429, 500, 502, 503, 504),
             raise_on_status=False,
         )
