@@ -143,6 +143,8 @@ class AzureProvider(OfflineProvider):
                     },
                 )
                 if res.status_code == 429:
+                    # Rate limiting can outlast the HTTP adapter's retry budget. Keep retrying
+                    # this page so a throttled region does not abort the entire catalog.
                     logger.warning("Got 429 for %s: sleep 3 & retry", region)
                     time.sleep(3)
                     continue
