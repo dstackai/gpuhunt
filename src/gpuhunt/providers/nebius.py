@@ -52,6 +52,10 @@ GPU_NAME_OVERRIDES = {
 # > NVIDIA L40S preemptible instances are excluded from spot pricing and billed at the current flat rate
 # https://nebius.com/prices
 PREEMPTIBLE_FLAT_RATE_GPUS = ("L40S",)
+SKIPPED_PLATFORMS = {
+    # Listed at zero price as of this writing. Revise later.
+    ("eu-south1", "gpu-b300-sxm-a"),
+}
 
 
 @dataclass(frozen=True)
@@ -100,6 +104,13 @@ class NebiusProvider(OfflineProvider):
             for region, project_id in region_to_project_id.items():
                 platforms = list_platforms(sdk, project_id).items
                 for platform in platforms:
+                    if (region, platform.metadata.name) in SKIPPED_PLATFORMS:
+                        logger.warning(
+                            "Skipping %s/%s: explicitly ignored",
+                            region,
+                            platform.metadata.name,
+                        )
+                        continue
                     logger.info("Processing %s/%s", region, platform.metadata.name)
                     gpu = get_gpu_info(platform)
                     for preset in platform.spec.presets:
