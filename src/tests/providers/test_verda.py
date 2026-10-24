@@ -364,3 +364,26 @@ def test_order(mocker, raw_instance_types):
     assert len(query_result) == 8
 
     assert [r.price for r in query_result] == sorted(r.price for r in query_result)
+
+
+class TestGpuMemory:
+    @pytest.mark.parametrize(
+        ("description", "reported_per_gpu", "expected"),
+        [
+            ("8x B300 SXM6 268GB", 268, 270),
+            ("8x A100 SXM4 40GB", 40, 40),
+            ("8x A100 SXM4 40GB", 39, 40),
+            ("8x A100 SXM4 80GB", 80, 80),
+            ("8x A100 SXM4 80GB", 79.5, 80),
+        ],
+    )
+    def test_full_gpu_configuration(
+        self, raw_instance_types, description, reported_per_gpu, expected
+    ):
+        raw = dict(raw_instance_types[0])
+        raw["gpu"] = {"number_of_gpus": 8, "description": description}
+        raw["gpu_memory"] = {"description": "", "size_in_gigabytes": reported_per_gpu * 8}
+        offer = _make_offer(instance_types(raw), False, "FIN-01")
+        assert offer is not None
+        assert offer.gpu_count == 8
+        assert offer.gpu_memory == expected

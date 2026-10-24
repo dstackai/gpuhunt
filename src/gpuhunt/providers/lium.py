@@ -6,7 +6,7 @@ from typing import cast
 import requests
 from typing_extensions import NotRequired, TypedDict
 
-from gpuhunt._internal.constraints import correct_gpu_memory_gib, find_accelerators
+from gpuhunt._internal.constraints import find_accelerators, get_gpu_memory_gib
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, JSONObject, QueryFilter
 from gpuhunt.providers.base import OnlineProvider
 
@@ -114,11 +114,13 @@ def _make_offers(node: dict) -> list[CatalogItem]:
         return []
     gpu_name = get_dstack_gpu_name(gpu_model)
     if not find_accelerators(names=[gpu_name], vendors=[AcceleratorVendor.NVIDIA]):
-        # Like the seeweb and jarvislabs providers, keep unmapped models out of the catalog
-        # rather than publishing a name nothing can match; the warning makes them easy to spot.
         logger.warning("Skipping Lium node %s: unknown gpu_model %r", node_id, gpu_model)
         return []
-    gpu_memory = correct_gpu_memory_gib(gpu_name, gpu_memory_gb * 1024)
+    gpu_memory = get_gpu_memory_gib(
+        gpu_name,
+        gpu_memory_gb,
+        context=f"provider={LiumProvider.NAME}, node={node_id}, location={location}",
+    )
     provider_data = LiumCatalogItemProviderData()
     rent_url = node.get("rent_url")
     if rent_url:

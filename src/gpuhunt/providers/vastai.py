@@ -8,7 +8,7 @@ from typing import Any, Literal, cast
 import requests
 from typing_extensions import NotRequired, TypedDict
 
-from gpuhunt._internal.constraints import correct_gpu_memory_gib
+from gpuhunt._internal.constraints import GPU_MEMORY_TOLERANCE, get_gpu_memory_gib
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt.providers.base import OnlineProvider
 
@@ -76,12 +76,18 @@ class VastAIProvider(OnlineProvider):
                 logger.warning("Offer %s does not satisfy filters", offer["id"])
                 continue
             gpu_name = get_dstack_gpu_name(offer["gpu_name"])
-            gpu_memory = correct_gpu_memory_gib(gpu_name, offer["gpu_ram"])
+            location = get_location(offer["geolocation"])
+            # Vast reports measured VRAM in MiB.
+            gpu_memory = get_gpu_memory_gib(
+                gpu_name,
+                offer["gpu_ram"] / 1024,
+                context=f"provider={self.NAME}, offer={offer['id']}, location={location}",
+            )
             disk_cost = disk_size * offer["storage_cost"] / 30 / 24
             ondemand_offer = CatalogItem(
                 provider=VastAIProvider.NAME,
                 instance_name=str(offer["id"]),
-                location=get_location(offer["geolocation"]),
+                location=location,
                 # storage_cost is $/gb/month
                 price=round(offer["dph_base"] + disk_cost, 5),
                 cpu=cpu,
@@ -136,11 +142,10 @@ class VastAIProvider(OnlineProvider):
             else:
                 # If GPU name mapping fails, fetch all offers (to filter locally)
                 filters["limit"] = 3000
-        # See correct_gpu_memory_gib in gpuhunt/_internal/constraints.py
         if q.min_gpu_memory is not None:
-            filters["gpu_ram"]["gte"] = q.min_gpu_memory * 1024 * 0.93
+            filters["gpu_ram"]["gte"] = q.min_gpu_memory * (1 - GPU_MEMORY_TOLERANCE) * 1024
         if q.max_gpu_memory is not None:
-            filters["gpu_ram"]["lte"] = q.max_gpu_memory * 1024 * 1.07
+            filters["gpu_ram"]["lte"] = q.max_gpu_memory * (1 + GPU_MEMORY_TOLERANCE) * 1024
         if q.min_disk_size is not None:
             filters["disk_space"]["gte"] = q.min_disk_size
         if q.max_disk_size is not None:
@@ -213,6 +218,17 @@ GPU_MAPPING = {
     "H100": ["H100 PCIE", "H100 SXM"],
     "H100NVL": ["H100 NVL"],
     "B300": ["B300", "B300 PC"],
+    "RTX2060SUPER": ["RTX 2060S"],
+    "RTX2070SUPER": ["RTX 2070S"],
+    "RTX4070SUPER": ["RTX 4070S"],
+    "RTX4070TiSUPER": ["RTX 4070S Ti"],
+    "RTX4080SUPER": ["RTX 4080S"],
+    "RTX4000": ["Q RTX 4000", "RTX 4000"],
+    "RTX5000": ["Q RTX 5000", "RTX 5000"],
+    "RTX6000": ["Q RTX 6000", "RTX 6000"],
+    "RTX8000": ["Q RTX 8000", "RTX 8000"],
+    "RTXPRO4000": ["RTX PRO 4000"],
+    "RTXPRO5000": ["RTX PRO 5000"],
 }
 
 GPU_MAPPING_RULES = {
@@ -234,18 +250,15 @@ def get_vastai_gpu_names(gpu_name: str) -> list[str]:
 
 
 def get_dstack_gpu_name(gpu_name: str) -> str:
-    """
-    Convert VastAI GPU names to a standardized format using essential heuristics
-    """
+    """Convert a Vast product label to the catalog model name."""
+    for name, labels in GPU_MAPPING.items():
+        if gpu_name in labels:
+            return name
     gpu_name = gpu_name.replace("RTX A", "A").replace("Tesla ", "")
     if gpu_name.startswith("A100 "):
         return "A100"
     if gpu_name.startswith("H100 ") and "NVL" not in gpu_name:
         return "H100"
-    # "B300 PC" is how Vast lists boards that report "NVIDIA B300 SXM6 PC" rather than
-    # "NVIDIA B300 SXM6 AC": the same B300 GPU (PCI device 0x3182) on a different board SKU
-    if gpu_name == "B300 PC":
-        return "B300"
     return gpu_name.replace(" ", "")
 
 

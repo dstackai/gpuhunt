@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from gpuhunt.providers.oci import CostEstimatorShapeList, get_gpu_name
+from gpuhunt.providers.oci import CostEstimatorShapeList, get_gpu_name, shape_to_resources
 
 # Trimmed excerpts of the real Cost Estimator payload
 # (https://www.oracle.com/a/ocom/docs/cloudestimator2/data/shapes.json).
@@ -82,3 +82,27 @@ class TestGetGpuName:
     )
     def test_get_gpu_name(self, shape_name, gpu_name):
         assert get_gpu_name(shape_name) == gpu_name
+
+
+class TestGpuMemory:
+    @pytest.mark.parametrize(
+        ("name", "total_memory", "expected"),
+        [
+            ("BM.GPU.B300.8", 2100, 270),
+            ("BM.GPU4.8", 312, 40),
+            ("BM.GPU.A100-v2.8", 632, 80),
+            ("BM.GPU3.8", 124, 16),
+            ("BM.GPU.RTXPRO.8", 760, 96),
+        ],
+    )
+    def test_normalizes_full_gpu_shapes(self, name, total_memory, expected, mocker):
+        shape = {
+            **SHAPES["items"][1],
+            "name": name,
+            "gpuQty": 8,
+            "gpuMemoryQty": total_memory,
+        }
+        parsed = CostEstimatorShapeList.model_validate({"items": [shape]}).items[0]
+        mocker.patch("gpuhunt.providers.oci.get_product_price_usd_per_hour", return_value=2)
+        resources = shape_to_resources(parsed, mocker.Mock())
+        assert resources.gpu.unit_memory_gb == expected

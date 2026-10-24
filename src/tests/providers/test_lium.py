@@ -174,7 +174,6 @@ class TestGet:
         assert h200[5].price == 19.95
         assert h200[5].cpu == 120
         assert h200[5].memory == 1246
-        # The feed reports 140 GB for a 141 GB card; the known size wins.
         assert all(o.gpu_memory == 141 for o in h200.values())
 
     def test_spot_tier(self, requests_mock, feed):
@@ -397,3 +396,29 @@ def test_get_location():
     assert get_location("DE", None) == "de"
     assert get_location("DE", "") == "de"
     assert get_location(None, "CA") == ""
+
+
+class TestGpuMemory:
+    @pytest.mark.parametrize(
+        ("label", "reported", "expected", "warns"),
+        [
+            ("A100-SXM4-80GB", 79.5, 80, False),
+            ("A100-SXM4-40GB", 39.5, 40, False),
+            ("A100", 39, 40, False),
+            ("A100", 79.5, 80, False),
+            ("A100", 60, 60, True),
+            ("RTX 4090", 48, 48, True),
+            ("B300 SXM6 AC", 269, 270, False),
+        ],
+    )
+    def test_normalizes_reported_capacity(
+        self, requests_mock, label, reported, expected, warns, caplog
+    ):
+        node = copy.deepcopy(RECORDED_FEED["nodes"][0])
+        node.update(gpu_model=label, gpu_memory_gb=reported)
+        requests_mock.get(NODES_URL, json={"nodes": [node]})
+        offers = LiumProvider().get()
+        assert offers and {offer.gpu_memory for offer in offers} == {expected}
+        assert bool(caplog.records) == warns
+        if warns:
+            assert f"provider=lium, node={node['id']}, location=jp-13" in caplog.text
