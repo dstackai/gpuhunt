@@ -13,6 +13,7 @@ from typing_extensions import TypedDict
 
 from gpuhunt._internal.constraints import (
     find_accelerators,
+    get_gpu_memory_gib,
     get_gpu_vendor,
     is_nvidia_superchip,
 )
@@ -309,9 +310,14 @@ def shape_to_resources(
             vcpus = qty if cpu_arch == CPUArchitecture.ARM else qty * 2
             if shape.gpu_qty:
                 # For GPU shapes the "ocpu" product is priced per GPU-hour
+                gpu_memory = shape.get_gpu_unit_memory_gb()
+                if gpu_name is not None and gpu_memory is not None:
+                    gpu_memory = get_gpu_memory_gib(
+                        gpu_name, gpu_memory, context=f"provider=oci, shape={shape.name}"
+                    )
                 gpu = GPUConfiguration(
                     units_count=shape.gpu_qty,
-                    unit_memory_gb=shape.get_gpu_unit_memory_gb(),
+                    unit_memory_gb=gpu_memory,
                     name=gpu_name,
                     vendor=get_gpu_vendor(gpu_name),
                     price=product_price * shape.gpu_qty,

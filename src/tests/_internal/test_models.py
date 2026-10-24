@@ -7,7 +7,7 @@ from gpuhunt._internal.models import AMDArchitecture, QueryFilter
 @pytest.mark.parametrize(
     ["model", "architecture", "expected_memory"],
     [
-        pytest.param("MI325X", AMDArchitecture.CDNA3, 288, id="MI325X"),
+        pytest.param("MI325X", AMDArchitecture.CDNA3, 256, id="MI325X"),
         pytest.param("MI308X", AMDArchitecture.CDNA3, 128, id="MI308X"),
         pytest.param("MI300X", AMDArchitecture.CDNA3, 192, id="MI300X"),
         pytest.param("MI300A", AMDArchitecture.CDNA3, 128, id="MI300A"),

@@ -208,3 +208,42 @@ def test_fetch_offers_appends_cpu_items(monkeypatch):
     offers = provider._fetch_offers()
 
     assert offers == [cpu_item]
+
+
+class TestGpuMemory:
+    @pytest.mark.parametrize(("count", "cluster"), [(1, False), (8, False), (8, True)])
+    def test_normalizes_per_gpu_memory_for_individual_and_cluster_offers(
+        self, count, cluster, monkeypatch
+    ):
+        name = "B300"
+        provider = object.__new__(RunpodProvider)
+        provider._gpu_map = {name: (runpod_module.AcceleratorVendor.NVIDIA, name)}
+        pod = {
+            "id": name,
+            "memoryInGb": 288,
+            "lowestPrice": {"stockStatus": "High", "minVcpu": 16, "minMemory": 128},
+            "securePrice": 2,
+            "clusterPrice": 2,
+            "maxGpuCountSecureCloud": count,
+            "nodeGroupDatacenters": [{"id": "EU-IS-1"}],
+        }
+        if cluster:
+            monkeypatch.setattr(provider, "_get_pods", lambda variables: [pod])
+            offers = provider._fetch_cluster_offers()
+        else:
+            offers = provider._make_offers(
+                {
+                    "lowestPriceInput": {
+                        "gpuCount": count,
+                        "secureCloud": True,
+                        "dataCenterId": "EU-IS-1",
+                    }
+                },
+                pod,
+            )
+        assert len(offers) == 1
+        assert offers[0].gpu_memory == 270
+        assert offers[0].gpu_count == count
+
+    def test_b300_mig_is_not_treated_as_full_gpu(self):
+        assert runpod_module._get_nvidia_gpu_name("B300 1g.35gb") is None

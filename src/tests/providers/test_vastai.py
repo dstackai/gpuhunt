@@ -1,5 +1,7 @@
 import pytest
 
+import gpuhunt._internal.catalog as internal_catalog
+from gpuhunt import Catalog
 from gpuhunt._internal.models import QueryFilter
 from gpuhunt.providers.vastai import (
     VastAIProvider,
@@ -135,6 +137,15 @@ def test_compute_cap(cc: tuple[int, int], expected: int):
         ("H100 NVL", "H100NVL"),
         ("B300", "B300"),
         ("B300 PC", "B300"),
+        ("RTX 2060S", "RTX2060SUPER"),
+        ("RTX 2070S", "RTX2070SUPER"),
+        ("RTX 4070S", "RTX4070SUPER"),
+        ("RTX 4070S Ti", "RTX4070TiSUPER"),
+        ("RTX 4080S", "RTX4080SUPER"),
+        ("Q RTX 4000", "RTX4000"),
+        ("Q RTX 5000", "RTX5000"),
+        ("Q RTX 6000", "RTX6000"),
+        ("Q RTX 8000", "RTX8000"),
     ],
 )
 def test_get_dstack_gpu_name(vastai_name: str, expected: str):
@@ -143,3 +154,43 @@ def test_get_dstack_gpu_name(vastai_name: str, expected: str):
 
 def test_get_vastai_gpu_names_includes_b300_pc():
     assert get_vastai_gpu_names("B300") == ["B300", "B300 PC"]
+
+
+class TestGpuMemory:
+    @pytest.mark.parametrize(
+        ("name", "memory_mib", "expected", "warns"),
+        [
+            ("A100 SXM4", 39936, 40, False),
+            ("A100 SXM4", 80896, 80, False),
+            ("RTX 4090", 49140, 49140 / 1024, True),
+            ("unregistered", 17777, 17777 / 1024, True),
+            ("RTX A2000", 6138, 6, False),
+            ("RTX A2000", 12282, 12, False),
+            ("RTX PRO 5000", 48935, 48, False),
+            ("RTX PRO 5000", 73415, 72, False),
+        ],
+    )
+    def test_reported_vram_matches_exact_filters(
+        self, requests_mock, name, memory_mib, expected, warns, caplog, monkeypatch
+    ):
+        requests_mock.post(
+            bundles_url, json={"offers": [make_offer(gpu_name=name, gpu_ram=memory_mib)]}
+        )
+        monkeypatch.setattr(internal_catalog, "ONLINE_PROVIDERS", ["vastai"])
+        monkeypatch.setattr(internal_catalog, "OFFLINE_PROVIDERS", [])
+        catalog = Catalog(auto_reload=False)
+        catalog.add_provider(VastAIProvider())
+        unfiltered = catalog.query(provider="vastai")
+        assert unfiltered and unfiltered[0].gpu_memory == expected
+        assert (
+            catalog.query(provider="vastai", min_gpu_memory=expected, max_gpu_memory=expected)
+            == unfiltered
+        )
+        assert requests_mock.last_request.json()["gpu_ram"] == pytest.approx(
+            {"gte": expected * 0.93 * 1024, "lte": expected * 1.07 * 1024}
+        )
+        assert bool(caplog.records) == warns
+        if warns:
+            assert "provider=vastai, offer=1, location=bg-bulgaria" in caplog.text
+            assert f"reported VRAM={memory_mib / 1024} GiB per GPU" in caplog.text
+            assert "keeping reported VRAM" in caplog.text
