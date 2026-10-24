@@ -237,8 +237,6 @@ KNOWN_NVIDIA_GPUS: list[NvidiaGPUInfo] = [
     NvidiaGPUInfo(name="RTX5070Ti", memory=16, compute_capability=(12, 0)),
     NvidiaGPUInfo(name="RTX5080", memory=16, compute_capability=(12, 0)),
     NvidiaGPUInfo(name="RTX5090", memory=32, compute_capability=(12, 0)),
-    NvidiaGPUInfo(name="RTX4000", memory=8, compute_capability=(7, 5)),
-    NvidiaGPUInfo(name="RTX5000", memory=16, compute_capability=(7, 5)),
     NvidiaGPUInfo(name="RTX6000", memory=24, compute_capability=(7, 5)),
     NvidiaGPUInfo(name="RTX8000", memory=48, compute_capability=(7, 5)),
     NvidiaGPUInfo(name="RTX2000Ada", memory=16, compute_capability=(8, 9)),

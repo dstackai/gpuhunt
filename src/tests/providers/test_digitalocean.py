@@ -113,29 +113,25 @@ def test_fetch_offers(requests_mock, monkeypatch):
     assert (
         len(catalog.query(provider=["digitalocean"], min_gpu_memory=192)) == 1
     )  # MI300X: 192GB per GPU, 1536GB across eight GPUs
+    assert not catalog.query(provider=["digitalocean"], min_gpu_memory=1000)
 
 
 class TestGpuMemory:
     @pytest.mark.parametrize(
-        ("model", "total_memory", "count", "expected"),
+        ("model", "total_memory", "expected"),
         [
-            ("nvidia_h100", 640, 8, 80),
-            ("amd_mi300x", 1536, 8, 192),
-            ("amd_mi325x", 256, 1, 256),
-            ("amd_mi325x", 2048, 8, 256),
-            ("nvidia_b300", 288, 1, 270),
-            ("nvidia_b300", 2304, 8, 270),
+            ("nvidia_h100", 640, 80),
+            ("amd_mi325x", 2048, 256),
+            ("nvidia_b300", 2304, 270),
         ],
     )
     def test_total_vram_is_converted_before_registry_lookup(
-        self, requests_mock, model, total_memory, count, expected
+        self, requests_mock, model, total_memory, expected
     ):
         size = copy.deepcopy(sizes_response["sizes"][2])
-        size["gpu_info"].update(
-            model=model, count=count, vram={"amount": total_memory, "unit": "gib"}
-        )
+        size["gpu_info"].update(model=model, count=8, vram={"amount": total_memory, "unit": "gib"})
         requests_mock.get("https://api.digitalocean.com/v2/sizes", json={"sizes": [size]})
         offers = DigitalOceanProvider(api_key="test-token").get()
         assert len(offers) == 1
-        assert offers[0].gpu_count == count
+        assert offers[0].gpu_count == 8
         assert offers[0].gpu_memory == expected

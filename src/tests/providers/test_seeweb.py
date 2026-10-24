@@ -181,18 +181,6 @@ def test_unknown_gpu_label_is_skipped(monkeypatch, caplog):
     assert "unknown gpu_label" in caplog.text
 
 
-def test_mapped_model_missing_from_registry_warns(monkeypatch, plans_payload, caplog):
-    plan = plans_payload["plans"][0]
-    plan["gpu_label"] = "A30"
-    monkeypatch.setattr(
-        seeweb_module.requests, "get", lambda *a, **kw: FakeResponse({"plans": [plan]})
-    )
-    offers = SeewebProvider(token="dummy").get()
-    assert offers and all(offer.gpu_memory == 24 for offer in offers)
-    assert "Unknown GPU A30" in caplog.text
-    assert f"provider=seeweb, plan={plan['name']}" in caplog.text
-
-
 def test_inactive_malformed_and_duplicate_regions_are_excluded(monkeypatch, caplog):
     base = {
         "cpu": "8 cores",

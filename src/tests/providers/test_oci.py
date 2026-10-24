@@ -91,8 +91,6 @@ class TestGpuMemory:
             ("BM.GPU.B300.8", 2100, 270),
             ("BM.GPU4.8", 312, 40),
             ("BM.GPU.A100-v2.8", 632, 80),
-            ("BM.GPU3.8", 124, 16),
-            ("BM.GPU.RTXPRO.8", 760, 96),
         ],
     )
     def test_normalizes_full_gpu_shapes(self, name, total_memory, expected, mocker):

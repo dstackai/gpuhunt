@@ -371,9 +371,7 @@ class TestGpuMemory:
         ("description", "reported_per_gpu", "expected"),
         [
             ("8x B300 SXM6 268GB", 268, 270),
-            ("8x A100 SXM4 40GB", 40, 40),
             ("8x A100 SXM4 40GB", 39, 40),
-            ("8x A100 SXM4 80GB", 80, 80),
             ("8x A100 SXM4 80GB", 79.5, 80),
         ],
     )

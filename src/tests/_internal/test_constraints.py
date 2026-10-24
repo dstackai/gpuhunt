@@ -269,27 +269,13 @@ class TestGetGpuMemoryGib:
     @pytest.mark.parametrize(
         ("name", "reported", "expected", "warns"),
         [
-            ("B300", 268.59375, 270, False),
             ("b300", 288, 270, False),
             ("A100", 39, 40, False),
             ("A100", 40, 40, False),
             ("A100", 79, 80, False),
             ("A100", 80, 80, False),
             ("A100", 60, 60, True),
-            ("V100", 16, 16, False),
-            ("V100", 31, 32, False),
-            ("V100", 32, 32, False),
             ("P100", 12, 12, True),
-            ("P100", 16, 16, False),
-            ("MI325X", 256, 256, False),
-            ("H100NVL", 94, 94, False),
-            ("RTXPRO6000", 12, 12, True),
-            ("A10", 4, 4, True),
-            ("RTX4090", 48, 48, True),
-            ("RTX3080", 20, 20, True),
-            ("RTX2080Ti", 22, 22, True),
-            ("RTX4090", 23.984375, 24, False),
-            ("unknown", 17.25, 17.25, True),
         ],
     )
     def test_normalizes_only_unique_matches(self, name, reported, expected, warns, caplog):

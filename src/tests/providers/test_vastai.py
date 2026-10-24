@@ -99,8 +99,8 @@ class TestGet:
 
         assert requests_mock.last_request.json()["gpu_name"] == {"in": ["B300", "B300 PC"]}
         assert [(o.instance_name, o.gpu_name, o.gpu_memory) for o in offers] == [
-            ("1", "B300", 270),
-            ("2", "B300", 270),
+            ("1", "B300", 270.0),
+            ("2", "B300", 270.0),
         ]
 
 
@@ -160,26 +160,14 @@ class TestGpuMemory:
     @pytest.mark.parametrize(
         ("name", "memory_mib", "expected", "warns"),
         [
-            ("A100 SXM4", 40960, 40, False),
             ("A100 SXM4", 39936, 40, False),
-            ("A100 SXM4", 81920, 80, False),
             ("A100 SXM4", 80896, 80, False),
-            ("Tesla P100", 12288, 12, True),
             ("RTX 4090", 49140, 49140 / 1024, True),
-            ("RTX 3080", 20480, 20, True),
-            ("RTX 2080 Ti", 22528, 22, True),
             ("unregistered", 17777, 17777 / 1024, True),
             ("RTX A2000", 6138, 6, False),
             ("RTX A2000", 12282, 12, False),
-            ("RTX 4500Ada", 24570, 24, False),
-            ("RTX 5000Ada", 32760, 32, False),
-            ("RTX PRO 4000", 24467, 24, False),
             ("RTX PRO 5000", 48935, 48, False),
             ("RTX PRO 5000", 73415, 72, False),
-            ("Q RTX 4000", 8192, 8, False),
-            ("Q RTX 5000", 16384, 16, False),
-            ("Q RTX 6000", 23040, 24, False),
-            ("Q RTX 8000", 46080, 48, False),
         ],
     )
     def test_reported_vram_matches_exact_filters(

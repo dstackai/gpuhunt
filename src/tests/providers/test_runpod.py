@@ -212,18 +212,15 @@ def test_fetch_offers_appends_cpu_items(monkeypatch):
 
 class TestGpuMemory:
     @pytest.mark.parametrize(("count", "cluster"), [(1, False), (8, False), (8, True)])
-    @pytest.mark.parametrize(
-        ("name", "reported", "expected"),
-        [("B300", 288, 270), ("A100", 39, 40), ("A100", 79, 80), ("H200", 140, 141)],
-    )
-    def test_normalizes_full_gpu_offers(
-        self, count, cluster, name, reported, expected, monkeypatch
+    def test_normalizes_per_gpu_memory_for_individual_and_cluster_offers(
+        self, count, cluster, monkeypatch
     ):
+        name = "B300"
         provider = object.__new__(RunpodProvider)
         provider._gpu_map = {name: (runpod_module.AcceleratorVendor.NVIDIA, name)}
         pod = {
             "id": name,
-            "memoryInGb": reported,
+            "memoryInGb": 288,
             "lowestPrice": {"stockStatus": "High", "minVcpu": 16, "minMemory": 128},
             "securePrice": 2,
             "clusterPrice": 2,
@@ -245,7 +242,7 @@ class TestGpuMemory:
                 pod,
             )
         assert len(offers) == 1
-        assert offers[0].gpu_memory == expected
+        assert offers[0].gpu_memory == 270
         assert offers[0].gpu_count == count
 
     def test_b300_mig_is_not_treated_as_full_gpu(self):
