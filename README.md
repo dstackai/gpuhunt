@@ -76,6 +76,7 @@ Its public plan locations can omit available VDM plans.
 * Lium
 * Nebius
 * OCI
+* Runcrate
 * Runpod
 * Seeweb
 * Vast AI
