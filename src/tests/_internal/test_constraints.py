@@ -78,6 +78,13 @@ class TestMatches:
         assert not matches(item, QueryFilter(min_memory=128.0))
         assert not matches(item, QueryFilter(max_memory=32.0))
 
+    def test_disk_size(self, item: CatalogItem):
+        item.disk_size = 100.5
+        assert matches(item, QueryFilter(min_disk_size=100.5))
+        assert matches(item, QueryFilter(max_disk_size=100.5))
+        assert not matches(item, QueryFilter(min_disk_size=100.6))
+        assert not matches(item, QueryFilter(max_disk_size=100.4))
+
     def test_gpu_vendor_nvidia(self, item: CatalogItem):
         assert matches(item, QueryFilter(gpu_vendor=AcceleratorVendor.NVIDIA))
         assert not matches(item, QueryFilter(gpu_vendor=AcceleratorVendor.AMD))

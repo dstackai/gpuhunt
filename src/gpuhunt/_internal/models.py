@@ -146,8 +146,8 @@ class QueryFilter:
     max_gpu_memory: float | None = None
     min_total_gpu_memory: float | None = None
     max_total_gpu_memory: float | None = None
-    min_disk_size: int | None = None
-    max_disk_size: int | None = None
+    min_disk_size: float | None = None
+    max_disk_size: float | None = None
     min_price: float | None = None
     max_price: float | None = None
     min_compute_capability: tuple[int, int] | None = None
