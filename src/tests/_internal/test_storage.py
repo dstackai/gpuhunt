@@ -92,11 +92,15 @@ class TestItemFromRow:
         assert item.provider_data == {}
 
     def test_gpu_without_vendor_is_nvidia(self) -> None:
-        item = storage.item_from_row(row(gpu_count="1", gpu_name="A100"), provider="test")
+        item = storage.item_from_row(
+            row(gpu_count="1", gpu_name="A100", gpu_memory="40.0"), provider="test"
+        )
         assert item.gpu_vendor == AcceleratorVendor.NVIDIA
 
     def test_tpu_name_prefix_implies_google(self) -> None:
-        item = storage.item_from_row(row(gpu_count="1", gpu_name="tpu-v3"), provider="test")
+        item = storage.item_from_row(
+            row(gpu_count="1", gpu_name="tpu-v3", gpu_memory="16.0"), provider="test"
+        )
         assert item.gpu_name == "v3"
         assert item.gpu_vendor == AcceleratorVendor.GOOGLE
 
@@ -127,5 +131,12 @@ class TestLoad:
         header = ",".join(storage.CATALOG_V2_FIELDS)
         good = "i,loc,1.0,1,1.0,0,,,False,,,,x86,{}"
         bad = ",loc,1.0,1,1.0,0,,,False,,,,x86,{}"
+        f = io.StringIO(f"{header}\n{bad}\n{good}\n")
+        assert [i.instance_name for i in storage.load(f, provider="test")] == ["i"]
+
+    def test_gpu_row_without_gpu_details_is_skipped(self) -> None:
+        header = ",".join(storage.CATALOG_V2_FIELDS)
+        good = "i,loc,1.0,1,1.0,1,A100,40.0,False,,nvidia,,x86,{}"
+        bad = "j,loc,1.0,1,1.0,1,A100,,False,,nvidia,,x86,{}"
         f = io.StringIO(f"{header}\n{bad}\n{good}\n")
         assert [i.instance_name for i in storage.load(f, provider="test")] == ["i"]
