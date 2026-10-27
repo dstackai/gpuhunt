@@ -216,6 +216,9 @@ class AzureProvider(OfflineProvider):
                 if gpu_name is None and gpu_count:
                     logger.warning("Can't parse VM name: %s", resource.name)
                     continue
+                if gpu_memory is None and gpu_count:
+                    logger.warning("GPU memory is unknown: %s", resource.name)
+                    continue
             instance_name_to_spec_map[resource.name] = _InstanceSpec(
                 instance_name=resource.name,
                 cpu=int(cpu),

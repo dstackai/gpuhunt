@@ -100,8 +100,14 @@ class CatalogItem:
     provider_data: JSONObject = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if self.gpu_count and self.gpu_vendor is None:
+        if not self.gpu_count:
+            return
+        if self.gpu_vendor is None:
             raise ValueError(f"gpu_vendor is required when gpu_count is non-zero: {self}")
+        if self.gpu_name is None:
+            raise ValueError(f"gpu_name is required when gpu_count is non-zero: {self}")
+        if self.gpu_memory is None:
+            raise ValueError(f"gpu_memory is required when gpu_count is non-zero: {self}")
 
 
 @dataclass
