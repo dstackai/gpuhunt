@@ -74,6 +74,17 @@ def test_fetch_offers_bare_metal(requests_mock):
     assert offer.provider_data == {"bare_metal_specs": AVAILABLE_BARE_METAL["Specs"]}
 
 
+def test_fetch_offers_skips_unknown_gpu(requests_mock):
+    unknown_gpu_vm = {
+        **AVAILABLE_VM,
+        "Specs": {**AVAILABLE_VM["Specs"], "gpus": [{"count": 1, "model": "MI999X"}]},
+    }
+    requests_mock.get(VM_AVAILABLE_URL, json=[unknown_gpu_vm, AVAILABLE_VM])
+    requests_mock.get(BARE_METAL_AVAILABLE_URL, text="null")
+    offers = HotAisleProvider(api_key="test-key", team_handle="test-team").fetch_offers()
+    assert [offer.instance_name for offer in offers] == ["vm-mi300x-1"]
+
+
 def test_fetch_offers_none_available(requests_mock):
     requests_mock.get(VM_AVAILABLE_URL, text="null")
     requests_mock.get(BARE_METAL_AVAILABLE_URL, text="null")
