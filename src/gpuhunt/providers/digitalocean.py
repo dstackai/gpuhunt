@@ -3,7 +3,7 @@ import os
 
 import requests
 
-from gpuhunt._internal.constraints import get_gpu_vendor
+from gpuhunt._internal.constraints import correct_gpu_memory_gib, get_gpu_vendor
 from gpuhunt._internal.models import CatalogItem, QueryFilter
 from gpuhunt.providers.base import OnlineProvider, get_creds_env
 
@@ -64,7 +64,8 @@ def _make_offers(response) -> list[CatalogItem]:
         if gpu_info:
             gpu_count = gpu_info["count"]
             gpu_vram_info = gpu_info["vram"]
-            gpu_memory = float(gpu_vram_info["amount"])
+            # vram.amount is the combined VRAM of all GPUs, in GiB.
+            gpu_memory = float(gpu_vram_info["amount"]) / gpu_count
             gpu_model = gpu_info["model"]
             # gpu_model uses patterns like "amd_mi300x", "nvidia_h100", "nvidia_rtx6000_ada"
             model_parts = gpu_model.split("_")
@@ -75,6 +76,11 @@ def _make_offers(response) -> list[CatalogItem]:
                     f"Could not determine GPU vendor for model '{gpu_model}'. Skipping droplet '{size['slug']}'."
                 )
                 continue
+            gpu_memory = correct_gpu_memory_gib(
+                gpu_name,
+                gpu_memory * 1024,
+                context=f"provider={DigitalOceanProvider.NAME}, instance={size['slug']}",
+            )
         else:
             gpu_count = 0
             gpu_vendor = None

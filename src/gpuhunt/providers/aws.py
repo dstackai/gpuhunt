@@ -17,6 +17,7 @@ import requests
 from botocore.config import Config
 from botocore.exceptions import ClientError, ConnectTimeoutError, EndpointConnectionError
 
+from gpuhunt._internal.constraints import correct_gpu_memory_gib
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt.providers.base import OfflineProvider
 
@@ -223,7 +224,10 @@ class AWSProvider(OfflineProvider):
                                 gpus[i["InstanceType"]] = (
                                     GPU_NAME_MAPPING.get(gpu["Name"]) or gpu["Name"],
                                     _get_gpu_memory_gib(
-                                        gpu["Name"], gpu["MemoryInfo"]["SizeInMiB"]
+                                        gpu["Name"],
+                                        gpu["MemoryInfo"]["SizeInMiB"],
+                                        context=f"provider={self.NAME}, instance={i['InstanceType']}, "
+                                        f"location={region}",
                                     ),
                                 )
             except ConnectTimeoutError as e:
@@ -468,20 +472,12 @@ def _make_offer(row: _PricingRow, gpus: dict[str, tuple[str, float]]) -> Catalog
     )
 
 
-def _get_gpu_memory_gib(gpu_name: str, reported_memory_mib: int) -> float:
-    """
-    Fixes L4 memory size misreported by AWS API
-    """
-
-    if gpu_name != "L4":
-        return reported_memory_mib / 1024
-
-    if reported_memory_mib not in (22888, 91553, 183105):
-        logger.warning(
-            "The L4 memory size reported by AWS changed. "
-            "Please check that it is now correct and remove the hardcoded size if it is."
-        )
-    return 24
+def _get_gpu_memory_gib(
+    gpu_name: str, reported_memory_mib: int, *, context: str | None = None
+) -> int:
+    """Resolve the EC2 model name and normalize its per-device MiB to whole GiB."""
+    gpu_name = GPU_NAME_MAPPING.get(gpu_name, gpu_name)
+    return correct_gpu_memory_gib(gpu_name, reported_memory_mib, context=context)
 
 
 def _prefilter_rows(lines: Iterable[str]) -> Iterator[str]:

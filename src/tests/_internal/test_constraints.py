@@ -8,7 +8,7 @@ from gpuhunt._internal.constraints import (
     get_gpu_vendor,
     matches,
 )
-from gpuhunt._internal.models import AcceleratorVendor
+from gpuhunt._internal.models import AcceleratorVendor, NvidiaGPUInfo
 
 
 @pytest.fixture
@@ -224,20 +224,6 @@ class TestMatches:
 
 
 @pytest.mark.parametrize(
-    ("gpu_name", "memory_mib", "expected_memory_gib"),
-    [
-        ("H100NVL", 95830.0, 94),
-        ("L40S", 46068.0, 48),
-        ("A10G", 23028.0, 24),
-        ("A10", 4096.0, 4),
-        ("unknown", 8200.1, 8),
-    ],
-)
-def test_correct_gpu_memory(gpu_name: str, memory_mib: float, expected_memory_gib: int) -> None:
-    assert correct_gpu_memory_gib(gpu_name, memory_mib) == expected_memory_gib
-
-
-@pytest.mark.parametrize(
     ("gpu_name", "expected_memories_gib"),
     [
         ("n150", {12}),
@@ -269,3 +255,74 @@ def test_rtx_pro_6000_accelerator() -> None:
     assert [accelerator.memory for accelerator in accelerators] == [96]
     assert get_compute_capability("RTXPRO6000") == (12, 0)
     assert get_gpu_vendor("RTXPRO6000") == AcceleratorVendor.NVIDIA
+
+
+class TestCorrectGpuMemoryGib:
+    @pytest.mark.parametrize(
+        ("name", "memory_mib", "expected", "warns"),
+        [
+            ("H100NVL", 95830.0, 94, False),
+            ("L40S", 46068.0, 48, False),
+            ("A10G", 23028.0, 24, False),
+            ("A10", 4096.0, 4, True),
+            ("unknown", 8200.1, 8, True),
+            ("b300", 288 * 1024, 270, False),
+            ("A100", 39 * 1024, 40, False),
+            ("A100", 40 * 1024, 40, False),
+            ("A100", 79 * 1024, 80, False),
+            ("A100", 80 * 1024, 80, False),
+            ("A100", 60 * 1024, 60, True),
+            ("P100", 12 * 1024, 12, True),
+        ],
+    )
+    def test_normalizes_mib_to_whole_gib(self, name, memory_mib, expected, warns, caplog):
+        memory_gib = correct_gpu_memory_gib(name, memory_mib)
+        assert memory_gib == expected
+        assert isinstance(memory_gib, int)
+        assert bool(caplog.records) == warns
+        if warns:
+            assert f"using rounded VRAM={expected} GiB per GPU" in caplog.text
+            assert name in caplog.text
+
+    def test_unknown_model_warns_and_rounds(self, caplog):
+        assert (
+            correct_gpu_memory_gib(
+                "unregistered", 17.25 * 1024, context="provider=example, offer=123"
+            )
+            == 17
+        )
+        assert caplog.messages == [
+            "Unknown GPU unregistered (provider=example, offer=123): "
+            "model is not in KNOWN_ACCELERATORS; reported VRAM=17.25 GiB per GPU; "
+            "using rounded VRAM=17 GiB per GPU"
+        ]
+
+    def test_unmatched_capacity_warns_and_rounds(self, caplog):
+        assert (
+            correct_gpu_memory_gib(
+                "RTX4090", 49140, context="provider=example, offer=123, location=eu"
+            )
+            == 48
+        )
+        assert caplog.messages == [
+            "Cannot normalize VRAM for GPU RTX4090 "
+            "(provider=example, offer=123, location=eu): reported VRAM=47.98828125 GiB per GPU; "
+            "no registered capacity matches within ±7%; registered capacities=[24] GiB; "
+            "using rounded VRAM=48 GiB per GPU"
+        ]
+
+    @pytest.mark.parametrize(("reported", "expected"), [(40, 40), (41.25, 41)])
+    def test_overlapping_capacity_windows(self, reported, expected, mocker, caplog):
+        mocker.patch(
+            "gpuhunt._internal.constraints.find_accelerators",
+            return_value=[
+                NvidiaGPUInfo(name="test", memory=40, compute_capability=(8, 0)),
+                NvidiaGPUInfo(name="test", memory=42, compute_capability=(8, 0)),
+            ],
+        )
+        assert correct_gpu_memory_gib("test", reported * 1024) == expected
+        assert bool(caplog.records) == (reported == 41.25)
+        if reported == 41.25:
+            assert "multiple registered capacities match within ±7%" in caplog.text
+            assert "registered capacities=[40, 42] GiB" in caplog.text
+            assert "using rounded VRAM=41 GiB per GPU" in caplog.text

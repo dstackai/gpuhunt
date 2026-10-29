@@ -1,3 +1,4 @@
+import logging
 import re
 from collections.abc import Container, Iterable
 from typing import TypeVar
@@ -14,6 +15,10 @@ from gpuhunt._internal.models import (
     TenstorrentAcceleratorInfo,
     TPUInfo,
 )
+
+logger = logging.getLogger(__name__)
+
+GPU_MEMORY_TOLERANCE = 0.07
 
 
 def matches(i: CatalogItem, q: QueryFilter) -> bool:
@@ -108,25 +113,54 @@ def get_gpu_vendor(gpu_name: str | None) -> AcceleratorVendor | None:
     return None
 
 
-def correct_gpu_memory_gib(gpu_name: str, memory_mib: float) -> int:
-    """
-    Round to whole number of gibibytes and attempt correcting the reported GPU
-    memory size if the actual memory size for that GPU is known and the
-    difference between the reported and the known memory is within a heuristic
-    threshold.
+def correct_gpu_memory_gib(gpu_name: str, memory_mib: float, *, context: str | None = None) -> int:
+    """Normalize full-GPU, per-device MiB to whole GiB using KNOWN_ACCELERATORS.
 
-    This is useful for cases when nvidia-smi or cloud providers report the GPU
-    memory imprecisely.
+    Preserve exact capacities. Otherwise, return a registered capacity only if the
+    reported value is within ±7% of exactly one registered capacity for gpu_name.
+    Unknown models and unmatched or ambiguous values warn and are rounded to whole GiB.
+    Callers must exclude partial GPU allocations. context identifies the provider and
+    offer (or host/node) in warnings only.
     """
-
-    memory_gib = memory_mib / 1024
-    known_memories_gib = {gpu.memory for gpu in find_accelerators(names=[gpu_name])}
-    if known_memories_gib:
-        closest_known_memory_gib = min(known_memories_gib, key=lambda x: abs(x - memory_gib))
-        difference_gib = abs(closest_known_memory_gib - memory_gib)
-        if difference_gib / closest_known_memory_gib < 0.07:
-            return closest_known_memory_gib
-    return round(memory_gib)
+    reported_memory_gib = memory_mib / 1024
+    rounded_memory_gib = round(reported_memory_gib)
+    context = f" ({context})" if context else ""
+    memories = {gpu.memory for gpu in find_accelerators(names=[gpu_name]) if gpu.memory > 0}
+    if not memories:
+        logger.warning(
+            "Unknown GPU %s%s: model is not in KNOWN_ACCELERATORS; "
+            "reported VRAM=%s GiB per GPU; using rounded VRAM=%s GiB per GPU",
+            gpu_name,
+            context,
+            reported_memory_gib,
+            rounded_memory_gib,
+        )
+        return rounded_memory_gib
+    if reported_memory_gib in memories:
+        return rounded_memory_gib
+    candidates = [
+        memory
+        for memory in memories
+        if memory * (1 - GPU_MEMORY_TOLERANCE)
+        <= reported_memory_gib
+        <= memory * (1 + GPU_MEMORY_TOLERANCE)
+    ]
+    if len(candidates) == 1:
+        return candidates[0]
+    logger.warning(
+        "Cannot normalize VRAM for GPU %s%s: reported VRAM=%s GiB per GPU; "
+        "%s within ±%g%%; registered capacities=%s GiB; using rounded VRAM=%s GiB per GPU",
+        gpu_name,
+        context,
+        reported_memory_gib,
+        "no registered capacity matches"
+        if not candidates
+        else "multiple registered capacities match",
+        GPU_MEMORY_TOLERANCE * 100,
+        sorted(memories),
+        rounded_memory_gib,
+    )
+    return rounded_memory_gib
 
 
 def is_nvidia_superchip(gpu_name: str) -> bool:
@@ -146,6 +180,8 @@ KNOWN_NVIDIA_GPUS: list[NvidiaGPUInfo] = [
     NvidiaGPUInfo(name="A100", memory=40, compute_capability=(8, 0)),
     NvidiaGPUInfo(name="A100", memory=80, compute_capability=(8, 0)),
     NvidiaGPUInfo(name="A10G", memory=24, compute_capability=(8, 6)),
+    NvidiaGPUInfo(name="A2000", memory=6, compute_capability=(8, 6)),
+    NvidiaGPUInfo(name="A2000", memory=12, compute_capability=(8, 6)),
     NvidiaGPUInfo(name="A4000", memory=16, compute_capability=(8, 6)),
     NvidiaGPUInfo(name="A4500", memory=20, compute_capability=(8, 6)),
     NvidiaGPUInfo(name="A5000", memory=24, compute_capability=(8, 6)),
@@ -199,10 +235,16 @@ KNOWN_NVIDIA_GPUS: list[NvidiaGPUInfo] = [
     NvidiaGPUInfo(name="RTX5080", memory=16, compute_capability=(12, 0)),
     NvidiaGPUInfo(name="RTX5090", memory=32, compute_capability=(12, 0)),
     NvidiaGPUInfo(name="RTX6000", memory=24, compute_capability=(7, 5)),
+    NvidiaGPUInfo(name="RTX8000", memory=48, compute_capability=(7, 5)),
     NvidiaGPUInfo(name="RTX2000Ada", memory=16, compute_capability=(8, 9)),
     NvidiaGPUInfo(name="RTX4000Ada", memory=20, compute_capability=(8, 9)),
+    NvidiaGPUInfo(name="RTX4500Ada", memory=24, compute_capability=(8, 9)),
+    NvidiaGPUInfo(name="RTX5000Ada", memory=32, compute_capability=(8, 9)),
     NvidiaGPUInfo(name="RTX6000Ada", memory=48, compute_capability=(8, 9)),
+    NvidiaGPUInfo(name="RTXPRO4000", memory=24, compute_capability=(12, 0)),
     NvidiaGPUInfo(name="RTXPRO4500", memory=32, compute_capability=(12, 0)),
+    NvidiaGPUInfo(name="RTXPRO5000", memory=48, compute_capability=(12, 0)),
+    NvidiaGPUInfo(name="RTXPRO5000", memory=72, compute_capability=(12, 0)),
     NvidiaGPUInfo(name="RTXPRO6000", memory=96, compute_capability=(12, 0)),
     NvidiaGPUInfo(name="T4", memory=16, compute_capability=(7, 5)),
     NvidiaGPUInfo(name="V100", memory=16, compute_capability=(7, 0)),
@@ -259,7 +301,7 @@ KNOWN_AMD_GPUS: list[AMDGPUInfo] = [
     ),
     AMDGPUInfo(
         name="MI325X",
-        memory=288,
+        memory=256,
         architecture=AMDArchitecture.CDNA3,
         device_ids=(0x74A5,),
     ),
