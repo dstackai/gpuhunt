@@ -8,7 +8,7 @@ from verda import VerdaClient
 from verda.instance_types import InstanceType
 
 from gpuhunt import AcceleratorVendor, CatalogItem, QueryFilter
-from gpuhunt._internal.constraints import get_gpu_memory_gib
+from gpuhunt._internal.constraints import correct_gpu_memory_gib
 from gpuhunt.providers.base import OfflineProvider
 
 logger = logging.getLogger(__name__)
@@ -72,9 +72,9 @@ def _make_offer(instance: InstanceType, spot: bool, location: str) -> CatalogIte
         gpu_name = get_gpu_name(instance.gpu["description"])
         gpu_vendor = AcceleratorVendor.NVIDIA
         if gpu_name is not None:
-            gpu_memory = get_gpu_memory_gib(
+            gpu_memory = correct_gpu_memory_gib(
                 gpu_name,
-                gpu_memory,
+                gpu_memory * 1024,
                 context=f"provider={VerdaProvider.NAME}, instance={instance.instance_type}, "
                 f"location={location}, spot={spot}",
             )

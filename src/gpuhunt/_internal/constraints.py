@@ -113,35 +113,31 @@ def get_gpu_vendor(gpu_name: str | None) -> AcceleratorVendor | None:
     return None
 
 
-def correct_gpu_memory_gib(gpu_name: str, memory_mib: float) -> int:
-    """Normalize GPU memory from MiB and round the result to whole GiB."""
-    return round(get_gpu_memory_gib(gpu_name, memory_mib / 1024))
-
-
-def get_gpu_memory_gib(
-    gpu_name: str, reported_memory_gib: float, *, context: str | None = None
-) -> float:
-    """Normalize full-GPU, per-device GiB against KNOWN_ACCELERATORS.
+def correct_gpu_memory_gib(gpu_name: str, memory_mib: float, *, context: str | None = None) -> int:
+    """Normalize full-GPU, per-device MiB to whole GiB using KNOWN_ACCELERATORS.
 
     Preserve exact capacities. Otherwise, return a registered capacity only if the
     reported value is within ±7% of exactly one registered capacity for gpu_name.
-    Unknown models and unmatched or ambiguous values warn and remain unchanged.
+    Unknown models and unmatched or ambiguous values warn and are rounded to whole GiB.
     Callers must exclude partial GPU allocations. context identifies the provider and
     offer (or host/node) in warnings only.
     """
+    reported_memory_gib = memory_mib / 1024
+    rounded_memory_gib = round(reported_memory_gib)
     context = f" ({context})" if context else ""
     memories = {gpu.memory for gpu in find_accelerators(names=[gpu_name]) if gpu.memory > 0}
     if not memories:
         logger.warning(
             "Unknown GPU %s%s: model is not in KNOWN_ACCELERATORS; "
-            "reported VRAM=%s GiB per GPU; keeping reported VRAM",
+            "reported VRAM=%s GiB per GPU; using rounded VRAM=%s GiB per GPU",
             gpu_name,
             context,
             reported_memory_gib,
+            rounded_memory_gib,
         )
-        return reported_memory_gib
+        return rounded_memory_gib
     if reported_memory_gib in memories:
-        return reported_memory_gib
+        return rounded_memory_gib
     candidates = [
         memory
         for memory in memories
@@ -153,7 +149,7 @@ def get_gpu_memory_gib(
         return candidates[0]
     logger.warning(
         "Cannot normalize VRAM for GPU %s%s: reported VRAM=%s GiB per GPU; "
-        "%s within ±%g%%; registered capacities=%s GiB; keeping reported VRAM",
+        "%s within ±%g%%; registered capacities=%s GiB; using rounded VRAM=%s GiB per GPU",
         gpu_name,
         context,
         reported_memory_gib,
@@ -162,8 +158,9 @@ def get_gpu_memory_gib(
         else "multiple registered capacities match",
         GPU_MEMORY_TOLERANCE * 100,
         sorted(memories),
+        rounded_memory_gib,
     )
-    return reported_memory_gib
+    return rounded_memory_gib
 
 
 def is_nvidia_superchip(gpu_name: str) -> bool:

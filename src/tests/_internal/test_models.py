@@ -1,7 +1,7 @@
 import pytest
 
 from gpuhunt._internal.constraints import KNOWN_AMD_GPUS
-from gpuhunt._internal.models import AMDArchitecture, QueryFilter
+from gpuhunt._internal.models import AcceleratorVendor, AMDArchitecture, CatalogItem, QueryFilter
 
 
 @pytest.mark.parametrize(
@@ -41,3 +41,35 @@ def test_amd_gpu_architecture(model: str, architecture: AMDArchitecture, expecte
 )
 def test_query_filter_repr(query_filter: QueryFilter, expected: str):
     assert repr(query_filter) == expected
+
+
+class TestCatalogItem:
+    def make_item(self, **kwargs) -> CatalogItem:
+        defaults = dict(
+            provider="test",
+            instance_name="test-instance",
+            location="eu-west-1",
+            price=1.0,
+            cpu=1,
+            memory=32.0,
+            gpu_count=1,
+            gpu_name="A100",
+            gpu_memory=40.0,
+            gpu_vendor=AcceleratorVendor.NVIDIA,
+            spot=False,
+            disk_size=None,
+        )
+        return CatalogItem(**{**defaults, **kwargs})
+
+    def test_gpu_item(self):
+        item = self.make_item()
+        assert item.gpu_name == "A100"
+
+    def test_cpu_item_without_gpu_details(self):
+        item = self.make_item(gpu_count=0, gpu_name=None, gpu_memory=None, gpu_vendor=None)
+        assert item.gpu_count == 0
+
+    @pytest.mark.parametrize("field", ["gpu_vendor", "gpu_name", "gpu_memory"])
+    def test_gpu_item_requires_gpu_details(self, field: str):
+        with pytest.raises(ValueError, match=f"{field} is required"):
+            self.make_item(**{field: None})

@@ -3,7 +3,7 @@ import os
 
 import requests
 
-from gpuhunt._internal.constraints import get_gpu_memory_gib, get_gpu_vendor
+from gpuhunt._internal.constraints import correct_gpu_memory_gib, get_gpu_vendor
 from gpuhunt._internal.models import CatalogItem, QueryFilter
 from gpuhunt.providers.base import OnlineProvider, get_creds_env
 
@@ -76,9 +76,9 @@ def _make_offers(response) -> list[CatalogItem]:
                     f"Could not determine GPU vendor for model '{gpu_model}'. Skipping droplet '{size['slug']}'."
                 )
                 continue
-            gpu_memory = get_gpu_memory_gib(
+            gpu_memory = correct_gpu_memory_gib(
                 gpu_name,
-                gpu_memory,
+                gpu_memory * 1024,
                 context=f"provider={DigitalOceanProvider.NAME}, instance={size['slug']}",
             )
         else:

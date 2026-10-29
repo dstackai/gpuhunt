@@ -6,7 +6,7 @@ from typing import cast
 import requests
 from typing_extensions import NotRequired, TypedDict
 
-from gpuhunt._internal.constraints import find_accelerators, get_gpu_memory_gib
+from gpuhunt._internal.constraints import correct_gpu_memory_gib, find_accelerators
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, JSONObject, QueryFilter
 from gpuhunt.providers.base import OnlineProvider
 
@@ -116,9 +116,9 @@ def _make_offers(node: dict) -> list[CatalogItem]:
     if not find_accelerators(names=[gpu_name], vendors=[AcceleratorVendor.NVIDIA]):
         logger.warning("Skipping Lium node %s: unknown gpu_model %r", node_id, gpu_model)
         return []
-    gpu_memory = get_gpu_memory_gib(
+    gpu_memory = correct_gpu_memory_gib(
         gpu_name,
-        gpu_memory_gb,
+        gpu_memory_gb * 1024,
         context=f"provider={LiumProvider.NAME}, node={node_id}, location={location}",
     )
     provider_data = LiumCatalogItemProviderData()

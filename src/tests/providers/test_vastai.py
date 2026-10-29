@@ -162,8 +162,8 @@ class TestGpuMemory:
         [
             ("A100 SXM4", 39936, 40, False),
             ("A100 SXM4", 80896, 80, False),
-            ("RTX 4090", 49140, 49140 / 1024, True),
-            ("unregistered", 17777, 17777 / 1024, True),
+            ("RTX 4090", 49140, 48, True),
+            ("unregistered", 17777, 17, True),
             ("RTX A2000", 6138, 6, False),
             ("RTX A2000", 12282, 12, False),
             ("RTX PRO 5000", 48935, 48, False),
@@ -193,4 +193,4 @@ class TestGpuMemory:
         if warns:
             assert "provider=vastai, offer=1, location=bg-bulgaria" in caplog.text
             assert f"reported VRAM={memory_mib / 1024} GiB per GPU" in caplog.text
-            assert "keeping reported VRAM" in caplog.text
+            assert f"using rounded VRAM={expected} GiB per GPU" in caplog.text

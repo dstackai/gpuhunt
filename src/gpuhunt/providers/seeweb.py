@@ -3,7 +3,7 @@ import re
 
 import requests
 
-from gpuhunt._internal.constraints import find_accelerators, get_gpu_memory_gib
+from gpuhunt._internal.constraints import correct_gpu_memory_gib, find_accelerators
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt.providers.base import OnlineProvider, get_creds_env
 
@@ -101,8 +101,8 @@ def _make_offers(plan: dict) -> list[CatalogItem]:
         logger.warning("Skipping Seeweb plan %s: unknown gpu_label %r", plan_name, gpu_label)
         return []
     gpu_name, gpu_memory = resolved
-    gpu_memory = get_gpu_memory_gib(
-        gpu_name, gpu_memory, context=f"provider={SeewebProvider.NAME}, plan={plan_name}"
+    gpu_memory = correct_gpu_memory_gib(
+        gpu_name, gpu_memory * 1024, context=f"provider={SeewebProvider.NAME}, plan={plan_name}"
     )
 
     try:

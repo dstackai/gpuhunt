@@ -105,6 +105,8 @@ def _make_offers(response: Response, bare_metal: bool) -> list[CatalogItem]:
         gpu_name = gpu["model"]
         gpu_vendor = AcceleratorVendor.AMD  # All GPUs are AMD with HotAisle.
         gpu_memory = get_gpu_memory(gpu_name)
+        if gpu_memory is None:
+            continue
 
         kind = "vm"
         flags = []

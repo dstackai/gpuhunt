@@ -8,7 +8,7 @@ from typing import Any, Literal, cast
 import requests
 from typing_extensions import NotRequired, TypedDict
 
-from gpuhunt._internal.constraints import GPU_MEMORY_TOLERANCE, get_gpu_memory_gib
+from gpuhunt._internal.constraints import GPU_MEMORY_TOLERANCE, correct_gpu_memory_gib
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt.providers.base import OnlineProvider
 
@@ -78,9 +78,9 @@ class VastAIProvider(OnlineProvider):
             gpu_name = get_dstack_gpu_name(offer["gpu_name"])
             location = get_location(offer["geolocation"])
             # Vast reports measured VRAM in MiB.
-            gpu_memory = get_gpu_memory_gib(
+            gpu_memory = correct_gpu_memory_gib(
                 gpu_name,
-                offer["gpu_ram"] / 1024,
+                offer["gpu_ram"],
                 context=f"provider={self.NAME}, offer={offer['id']}, location={location}",
             )
             disk_cost = disk_size * offer["storage_cost"] / 30 / 24

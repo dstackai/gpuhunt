@@ -5,7 +5,6 @@ from gpuhunt._internal.constraints import (
     correct_gpu_memory_gib,
     find_accelerators,
     get_compute_capability,
-    get_gpu_memory_gib,
     get_gpu_vendor,
     matches,
 )
@@ -78,6 +77,13 @@ class TestMatches:
         assert matches(item, QueryFilter(max_memory=64.0))
         assert not matches(item, QueryFilter(min_memory=128.0))
         assert not matches(item, QueryFilter(max_memory=32.0))
+
+    def test_disk_size(self, item: CatalogItem):
+        item.disk_size = 100.5
+        assert matches(item, QueryFilter(min_disk_size=100.5))
+        assert matches(item, QueryFilter(max_disk_size=100.5))
+        assert not matches(item, QueryFilter(min_disk_size=100.6))
+        assert not matches(item, QueryFilter(max_disk_size=100.4))
 
     def test_gpu_vendor_nvidia(self, item: CatalogItem):
         assert matches(item, QueryFilter(gpu_vendor=AcceleratorVendor.NVIDIA))
@@ -218,20 +224,6 @@ class TestMatches:
 
 
 @pytest.mark.parametrize(
-    ("gpu_name", "memory_mib", "expected_memory_gib"),
-    [
-        ("H100NVL", 95830.0, 94),
-        ("L40S", 46068.0, 48),
-        ("A10G", 23028.0, 24),
-        ("A10", 4096.0, 4),
-        ("unknown", 8200.1, 8),
-    ],
-)
-def test_correct_gpu_memory(gpu_name: str, memory_mib: float, expected_memory_gib: int) -> None:
-    assert correct_gpu_memory_gib(gpu_name, memory_mib) == expected_memory_gib
-
-
-@pytest.mark.parametrize(
     ("gpu_name", "expected_memories_gib"),
     [
         ("n150", {12}),
@@ -265,51 +257,62 @@ def test_rtx_pro_6000_accelerator() -> None:
     assert get_gpu_vendor("RTXPRO6000") == AcceleratorVendor.NVIDIA
 
 
-class TestGetGpuMemoryGib:
+class TestCorrectGpuMemoryGib:
     @pytest.mark.parametrize(
-        ("name", "reported", "expected", "warns"),
+        ("name", "memory_mib", "expected", "warns"),
         [
-            ("b300", 288, 270, False),
-            ("A100", 39, 40, False),
-            ("A100", 40, 40, False),
-            ("A100", 79, 80, False),
-            ("A100", 80, 80, False),
-            ("A100", 60, 60, True),
-            ("P100", 12, 12, True),
+            ("H100NVL", 95830.0, 94, False),
+            ("L40S", 46068.0, 48, False),
+            ("A10G", 23028.0, 24, False),
+            ("A10", 4096.0, 4, True),
+            ("unknown", 8200.1, 8, True),
+            ("b300", 288 * 1024, 270, False),
+            ("A100", 39 * 1024, 40, False),
+            ("A100", 40 * 1024, 40, False),
+            ("A100", 79 * 1024, 80, False),
+            ("A100", 80 * 1024, 80, False),
+            ("A100", 60 * 1024, 60, True),
+            ("P100", 12 * 1024, 12, True),
         ],
     )
-    def test_normalizes_only_unique_matches(self, name, reported, expected, warns, caplog):
-        assert get_gpu_memory_gib(name, reported) == expected
+    def test_normalizes_mib_to_whole_gib(self, name, memory_mib, expected, warns, caplog):
+        memory_gib = correct_gpu_memory_gib(name, memory_mib)
+        assert memory_gib == expected
+        assert isinstance(memory_gib, int)
         assert bool(caplog.records) == warns
         if warns:
-            assert "keeping reported VRAM" in caplog.text
+            assert f"using rounded VRAM={expected} GiB per GPU" in caplog.text
             assert name in caplog.text
 
-    def test_unknown_model_warning(self, caplog):
+    def test_unknown_model_warns_and_rounds(self, caplog):
         assert (
-            get_gpu_memory_gib("unregistered", 17.25, context="provider=example, offer=123")
-            == 17.25
+            correct_gpu_memory_gib(
+                "unregistered", 17.25 * 1024, context="provider=example, offer=123"
+            )
+            == 17
         )
         assert caplog.messages == [
             "Unknown GPU unregistered (provider=example, offer=123): "
             "model is not in KNOWN_ACCELERATORS; reported VRAM=17.25 GiB per GPU; "
-            "keeping reported VRAM"
+            "using rounded VRAM=17 GiB per GPU"
         ]
 
-    def test_unmatched_capacity_warning(self, caplog):
+    def test_unmatched_capacity_warns_and_rounds(self, caplog):
         assert (
-            get_gpu_memory_gib("RTX4090", 48, context="provider=example, offer=123, location=eu")
+            correct_gpu_memory_gib(
+                "RTX4090", 49140, context="provider=example, offer=123, location=eu"
+            )
             == 48
         )
         assert caplog.messages == [
             "Cannot normalize VRAM for GPU RTX4090 "
-            "(provider=example, offer=123, location=eu): reported VRAM=48 GiB per GPU; "
+            "(provider=example, offer=123, location=eu): reported VRAM=47.98828125 GiB per GPU; "
             "no registered capacity matches within ±7%; registered capacities=[24] GiB; "
-            "keeping reported VRAM"
+            "using rounded VRAM=48 GiB per GPU"
         ]
 
-    @pytest.mark.parametrize("reported", [40, 41])
-    def test_overlapping_capacity_windows(self, reported, mocker, caplog):
+    @pytest.mark.parametrize(("reported", "expected"), [(40, 40), (41.25, 41)])
+    def test_overlapping_capacity_windows(self, reported, expected, mocker, caplog):
         mocker.patch(
             "gpuhunt._internal.constraints.find_accelerators",
             return_value=[
@@ -317,8 +320,9 @@ class TestGetGpuMemoryGib:
                 NvidiaGPUInfo(name="test", memory=42, compute_capability=(8, 0)),
             ],
         )
-        assert get_gpu_memory_gib("test", reported) == reported
-        assert bool(caplog.records) == (reported == 41)
-        if reported == 41:
+        assert correct_gpu_memory_gib("test", reported * 1024) == expected
+        assert bool(caplog.records) == (reported == 41.25)
+        if reported == 41.25:
             assert "multiple registered capacities match within ±7%" in caplog.text
             assert "registered capacities=[40, 42] GiB" in caplog.text
+            assert "using rounded VRAM=41 GiB per GPU" in caplog.text

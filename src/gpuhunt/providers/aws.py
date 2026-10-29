@@ -9,6 +9,7 @@ import time
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from itertools import islice
 
 import boto3
@@ -16,7 +17,7 @@ import requests
 from botocore.config import Config
 from botocore.exceptions import ClientError, ConnectTimeoutError, EndpointConnectionError
 
-from gpuhunt._internal.constraints import get_gpu_memory_gib
+from gpuhunt._internal.constraints import correct_gpu_memory_gib
 from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
 from gpuhunt.providers.base import OfflineProvider
 
@@ -140,7 +141,7 @@ class AWSProvider(OfflineProvider):
         if not os.path.exists(self.cache_path):
             self._download_pricing_file()
 
-        offers: list[CatalogItem] = []
+        rows: list[_PricingRow] = []
         with open(self.cache_path, newline="") as f:
             for _ in range(DISCLAIMER_ROWS_SKIP):
                 f.readline()
@@ -151,22 +152,18 @@ class AWSProvider(OfflineProvider):
                 gpu_count = _parse_gpu_count(row["GPU"])
                 if gpu_count is None:
                     continue
-                offer = CatalogItem(
-                    provider=AWSProvider.NAME,
-                    instance_name=row["Instance Type"],
-                    location=row["Region Code"],
-                    price=float(row["PricePerUnit"]),
-                    cpu=int(row["vCPU"]),
-                    memory=_parse_memory(row["Memory"]),
-                    gpu_vendor=AcceleratorVendor.NVIDIA if gpu_count else None,
-                    gpu_count=gpu_count,
-                    spot=False,
-                    gpu_name=None,
-                    gpu_memory=None,
-                    disk_size=None,
+                rows.append(
+                    _PricingRow(
+                        instance_name=row["Instance Type"],
+                        location=row["Region Code"],
+                        price=float(row["PricePerUnit"]),
+                        cpu=int(row["vCPU"]),
+                        memory=_parse_memory(row["Memory"]),
+                        gpu_count=gpu_count,
+                    )
                 )
-                offers.append(offer)
-        self._fill_gpu_details(offers)
+        gpus = self._get_gpu_details(rows)
+        offers = [_make_offer(row, gpus) for row in rows]
         if apply_filter:
             # Spot prices are fetched per instance type, so dropping the offers that are not
             # stored in the catalog before fetching them saves most of the requests.
@@ -188,15 +185,19 @@ class AWSProvider(OfflineProvider):
                 return True
         return False
 
-    def _fill_gpu_details(self, offers: list[CatalogItem]) -> None:
+    def _get_gpu_details(self, rows: list["_PricingRow"]) -> dict[str, tuple[str, float]]:
+        """
+        Returns GPU name and memory by instance type for GPU instance types
+        """
+
         regions = defaultdict(list)
         non_ec2_api_regions = set()
-        for offer in offers:
-            if offer.gpu_count > 0 and offer.instance_name not in self.preview_gpus:
-                if offer.location not in self.ec2_api_regions:
-                    non_ec2_api_regions.add(offer.location)
+        for row in rows:
+            if row.gpu_count > 0 and row.instance_name not in self.preview_gpus:
+                if row.location not in self.ec2_api_regions:
+                    non_ec2_api_regions.add(row.location)
                     continue
-                regions[offer.location].append(offer.instance_name)
+                regions[row.location].append(row.instance_name)
         if non_ec2_api_regions:
             logger.info(
                 "Skipping non-EC2 location codes for GPU details: %s",
@@ -266,17 +267,7 @@ class AWSProvider(OfflineProvider):
                 for region, names in regions.items()
                 if (left := [i for i in names if i not in instance_types])
             }
-
-        for offer in offers:
-            if offer.gpu_count > 0:
-                if offer.instance_name in gpus:
-                    offer.gpu_name, offer.gpu_memory = gpus[offer.instance_name]
-                else:
-                    logger.warning(
-                        "GPU info not available for instance type %s, skipping GPU details",
-                        offer.instance_name,
-                    )
-                    offer.gpu_count = 0
+        return gpus
 
     def _add_spots_worker(
         self, region: str, instance_types: set[str]
@@ -442,13 +433,51 @@ class AWSProvider(OfflineProvider):
         ]
 
 
+@dataclass(frozen=True)
+class _PricingRow:
+    instance_name: str
+    location: str
+    price: float
+    cpu: int
+    memory: float
+    gpu_count: int
+
+
+def _make_offer(row: _PricingRow, gpus: dict[str, tuple[str, float]]) -> CatalogItem:
+    gpu_count = row.gpu_count
+    gpu_name = None
+    gpu_memory = None
+    if gpu_count > 0:
+        if row.instance_name in gpus:
+            gpu_name, gpu_memory = gpus[row.instance_name]
+        else:
+            logger.warning(
+                "GPU info not available for instance type %s, skipping GPU details",
+                row.instance_name,
+            )
+            gpu_count = 0
+    return CatalogItem(
+        provider=AWSProvider.NAME,
+        instance_name=row.instance_name,
+        location=row.location,
+        price=row.price,
+        cpu=row.cpu,
+        memory=row.memory,
+        gpu_vendor=AcceleratorVendor.NVIDIA if gpu_count else None,
+        gpu_count=gpu_count,
+        spot=False,
+        gpu_name=gpu_name,
+        gpu_memory=gpu_memory,
+        disk_size=None,
+    )
+
+
 def _get_gpu_memory_gib(
     gpu_name: str, reported_memory_mib: int, *, context: str | None = None
-) -> float:
-    """Convert full EC2 GPU VRAM from MiB and normalize against the registry."""
+) -> int:
+    """Resolve the EC2 model name and normalize its per-device MiB to whole GiB."""
     gpu_name = GPU_NAME_MAPPING.get(gpu_name, gpu_name)
-    reported_memory_gib = reported_memory_mib / 1024
-    return get_gpu_memory_gib(gpu_name, reported_memory_gib, context=context)
+    return correct_gpu_memory_gib(gpu_name, reported_memory_mib, context=context)
 
 
 def _prefilter_rows(lines: Iterable[str]) -> Iterator[str]:
