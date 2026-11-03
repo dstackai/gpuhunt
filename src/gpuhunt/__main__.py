@@ -26,6 +26,7 @@ def main():
             "lium",
             "nebius",
             "oci",
+            "runcrate",
             "runpod",
             "seeweb",
             "vastai",
@@ -117,6 +118,10 @@ def main():
                 region=os.getenv("OCI_CLI_REGION"),
             )
         )
+    elif args.provider == "runcrate":
+        from gpuhunt.providers.runcrate import RuncrateProvider
+
+        provider = RuncrateProvider.from_env()
     elif args.provider == "runpod":
         from gpuhunt.providers.runpod import RunpodProvider
 
