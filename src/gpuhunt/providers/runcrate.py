@@ -40,6 +40,8 @@ GPU_MAP: dict[str, tuple[str, float]] = {
     "L40": ("L40", 48),
     "L40S": ("L40S", 48),
     "RTX4000Ada": ("RTX4000Ada", 20),
+    "RTX4090": ("RTX4090", 24),
+    "RTX5090": ("RTX5090", 32),
     "RTX6000Ada": ("RTX6000Ada", 48),
     "RTXPro6000": ("RTXPRO6000", 96),
     "V100": ("V100", 16),
