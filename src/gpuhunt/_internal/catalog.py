@@ -39,6 +39,7 @@ ONLINE_PROVIDERS = [
     "daytona",
     "digitalocean",
     "hotaisle",
+    "hydrahost",
     "jarvislabs",
     "lium",
     "seeweb",
