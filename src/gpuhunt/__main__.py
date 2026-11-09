@@ -21,6 +21,7 @@ def main():
             "digitalocean",
             "gcp",
             "hotaisle",
+            "hydrahost",
             "jarvislabs",
             "lambdalabs",
             "lium",
@@ -76,6 +77,10 @@ def main():
         from gpuhunt.providers.hotaisle import HotAisleProvider
 
         provider = HotAisleProvider.from_env()
+    elif args.provider == "hydrahost":
+        from gpuhunt.providers.hydrahost import HydraHostProvider
+
+        provider = HydraHostProvider.from_env()
     elif args.provider == "jarvislabs":
         from gpuhunt.providers.jarvislabs import JarvisLabsProvider
 

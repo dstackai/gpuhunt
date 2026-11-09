@@ -71,6 +71,7 @@ Its public plan locations can omit available VDM plans.
 * DigitalOcean
 * GCP
 * Hot Aisle
+* Hydra Host
 * JarvisLabs
 * LambdaLabs
 * Lium
