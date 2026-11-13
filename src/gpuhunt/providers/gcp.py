@@ -190,7 +190,8 @@ class GCPProvider(OfflineProvider):
         return [
             i
             for i in offers
-            if (
+            if i.instance_name not in fractional_g4_gpu_memory
+            and (
                 any(
                     i.instance_name.startswith(family)
                     for family in [

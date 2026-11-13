@@ -85,3 +85,18 @@ class TestGet:
             assert offer.gpu_count == gpu_count
             assert offer.gpu_memory == gpu_memory
             assert offer.gpu_vendor == (AcceleratorVendor.NVIDIA if gpu_count else None)
+
+
+class TestFilter:
+    @pytest.mark.parametrize("spot", [False, True])
+    def test_excludes_fractional_g4(self, offers, spot):
+        selected = gcp.GCPProvider.filter([offer for offer in offers if offer.spot == spot])
+
+        assert {offer.instance_name for offer in selected} == {
+            "g4-standard-48",
+            "g4-standard-96",
+            "g4-standard-192",
+            "g4-standard-384",
+            "g2-standard-4",
+            "n2-standard-2",
+        }
