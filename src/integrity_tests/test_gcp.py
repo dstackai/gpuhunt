@@ -160,27 +160,12 @@ class TestGCPCatalog(CatalogFileIntegrityTests):
         gpu_memory = {o.gpu_memory for o in offers if o.gpu_name == "A100"}
         assert gpu_memory == {40.0, 80.0}
 
-    @pytest.mark.parametrize(
-        ("instance_name", "gpu_memory"),
-        [("g4-standard-6", 12.0), ("g4-standard-12", 24.0), ("g4-standard-24", 48.0)],
-    )
-    def test_fractional_g4_specs(
-        self, offers: list[CatalogItem], instance_name: str, gpu_memory: float
-    ) -> None:
-        machine_offers = [o for o in offers if o.instance_name == instance_name]
-        assert machine_offers
-        for offer in machine_offers:
-            assert offer.gpu_name == "RTXPRO6000", str(offer)
-            assert offer.gpu_count == 1, str(offer)
-            assert offer.gpu_memory == gpu_memory, str(offer)
+    def test_fractional_g4_absent(self, offers: list[CatalogItem]) -> None:
+        names = {offer.instance_name for offer in offers}
+        assert not names & {"g4-standard-6", "g4-standard-12", "g4-standard-24"}
 
     def test_full_g4_specs(self, offers: list[CatalogItem]) -> None:
-        full_g4_offers = [
-            o
-            for o in offers
-            if o.instance_name.startswith("g4-standard-")
-            and o.instance_name not in {"g4-standard-6", "g4-standard-12", "g4-standard-24"}
-        ]
+        full_g4_offers = [o for o in offers if o.instance_name.startswith("g4-standard-")]
         assert full_g4_offers
         for offer in full_g4_offers:
             assert offer.gpu_memory == 96.0, str(offer)
