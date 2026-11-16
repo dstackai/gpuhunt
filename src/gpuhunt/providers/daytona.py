@@ -9,8 +9,8 @@ import requests
 from typing_extensions import NotRequired, TypedDict
 
 from gpuhunt import CatalogItem, QueryFilter
-from gpuhunt._internal.constraints import matches
-from gpuhunt._internal.models import AcceleratorVendor, JSONObject
+from gpuhunt._internal.constraints import find_accelerators, matches
+from gpuhunt._internal.models import AcceleratorInfo, JSONObject
 from gpuhunt.providers.base import OnlineProvider
 
 logger = logging.getLogger(__name__)
@@ -33,17 +33,12 @@ MAX_CPUS_PER_GPU = 16
 MAX_MEMORY_PER_GPU = 192
 MAX_DISK_PER_GPU = 512
 
-# Only types supported by sandbox creation belong here. B200 has billing rates,
-# but the create API rejects gpuType=["B200"] as an invalid GPU type.
-GPU_MAP: dict[str, tuple[str, AcceleratorVendor, float, float]] = {
-    "B300": ("B300", AcceleratorVendor.NVIDIA, 270.0, MEMORY_PER_GPU),
-    "H100": ("H100", AcceleratorVendor.NVIDIA, 80.0, MEMORY_PER_GPU),
-    "H200": ("H200", AcceleratorVendor.NVIDIA, 141.0, MEMORY_PER_GPU),
-    "MI355X": ("MI355X", AcceleratorVendor.AMD, 288.0, MEMORY_PER_GPU),
-    "RTX-PRO-6000": ("RTXPRO6000", AcceleratorVendor.NVIDIA, 96.0, MEMORY_PER_GPU),
-    "RTX-5090": ("RTX5090", AcceleratorVendor.NVIDIA, 32.0, CONSUMER_MEMORY_PER_GPU),
-    "RTX-4090": ("RTX4090", AcceleratorVendor.NVIDIA, 24.0, CONSUMER_MEMORY_PER_GPU),
-}
+# Every GPU type in the public pricing feed is orderable, so the feed alone
+# defines which GPUs are offered. Daytona type identifiers are matched to
+# gpuhunt's known accelerators by dropping separators: "RTX-PRO-6000" ->
+# "RTXPRO6000". GPUs with at most this much memory (GiB) get the smaller
+# representative memory shape, as consumer cards like the RTX 5090 do.
+CONSUMER_GPU_MAX_MEMORY = 32
 
 
 class DaytonaCatalogItemProviderData(TypedDict):
@@ -187,10 +182,8 @@ def _make_gpu_offers(
     offers = []
     for gpu in pricing["gpus"]:
         gpu_type = gpu["type"]
-        if gpu_type not in GPU_MAP:
-            # B200 is a known billing-only entry, not a newly introduced type.
-            if gpu_type != "B200":
-                logger.warning("Failed to find GPU name matching '%s'", gpu_type)
+        if _find_gpu(gpu_type) is None:
+            logger.warning("Failed to find GPU name matching '%s'", gpu_type)
             continue
         for pricing_type in ("onDemand", "spot"):
             available = MAX_GPU_COUNT
@@ -227,7 +220,15 @@ def _make_offer(
         gpu_price = 0
         provider_data = {}
     else:
-        gpu_name, gpu_vendor, gpu_memory, memory_per_gpu = GPU_MAP[gpu["type"]]
+        accelerator = _find_gpu(gpu["type"])
+        assert accelerator is not None
+        gpu_name, gpu_vendor = accelerator.name, accelerator.vendor
+        gpu_memory = float(accelerator.memory)
+        memory_per_gpu = (
+            CONSUMER_MEMORY_PER_GPU
+            if accelerator.memory <= CONSUMER_GPU_MAX_MEMORY
+            else MEMORY_PER_GPU
+        )
         default_cpu = CPUS_PER_GPU * gpu_count if balance_resources else 1
         default_memory = memory_per_gpu * gpu_count if balance_resources else 1
         default_disk = DISK_PER_GPU * gpu_count if balance_resources else 1
@@ -275,3 +276,8 @@ def _gpu_provider_data(gpu_type: str, gpu_name: str) -> JSONObject:
     if gpu_type == gpu_name:
         return {}
     return cast(JSONObject, DaytonaCatalogItemProviderData(gpu_type=gpu_type))
+
+
+def _find_gpu(gpu_type: str) -> AcceleratorInfo | None:
+    accelerators = find_accelerators(names=[gpu_type.replace("-", "").replace("_", "")])
+    return accelerators[0] if accelerators else None
