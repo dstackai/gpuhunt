@@ -1,32 +1,40 @@
 import re
 
+import pytest
+
 from gpuhunt import CatalogItem
-from gpuhunt.providers.runpod import get_gpu_map
-from integrity_tests.base import CatalogFileIntegrityTests
+from gpuhunt.providers.runpod import RunpodProvider
+from integrity_tests.base import OffersIntegrityTests
 
 
-class TestRunpodCatalog(CatalogFileIntegrityTests):
-    CATALOG_NAME = "runpod"
+class TestRunpodOffers(OffersIntegrityTests):
+    @pytest.fixture(scope="class")
+    def offers(self) -> list[CatalogItem]:
+        return RunpodProvider.from_env().get()
 
-    def test_locations(self, offers: list[CatalogItem]) -> None:
-        locations = {o.location for o in offers}
-        assert 10 <= len(locations) <= 300
-        # Secure cloud locations are datacenter IDs, e.g., EU-RO-1
-        secure_cloud = {loc for loc in locations if re.fullmatch(r"[A-Z]+-[A-Z]+-\d+", loc)}
-        # Community cloud locations are country codes, e.g., FR
-        community_cloud = {loc for loc in locations if re.fullmatch(r"[A-Z]{2}", loc)}
-        assert secure_cloud
-        assert community_cloud
+    def test_secure_cloud_locations(self, offers: list[CatalogItem]) -> None:
+        # Secure Cloud locations are data center IDs, e.g., EU-RO-1
+        for offer in offers:
+            assert re.fullmatch(r"[A-Z]+-[A-Z]+-\d+", offer.location), str(offer)
 
     def test_gpu_present(self, offers: list[CatalogItem]) -> None:
-        expected_gpus = {name for _, name in get_gpu_map().values()}
-        gpus = {o.gpu_name for o in offers if o.gpu_name}
-        assert len(expected_gpus & gpus) > 7
+        gpus = {o.gpu_name for o in offers if o.gpu_count}
+        assert len(gpus) >= 3, gpus
 
-    def test_cpu_offers_integrity(self, offers: list[CatalogItem]) -> None:
+    def test_not_spot(self, offers: list[CatalogItem]) -> None:
+        assert not any(o.spot for o in offers)
+
+    def test_cpu_offers(self, offers: list[CatalogItem]) -> None:
         cpu_offers = [o for o in offers if o.gpu_count == 0]
         assert cpu_offers
         for offer in cpu_offers:
-            assert "runpod-cpu" in offer.flags, str(offer)
-            assert not offer.spot, str(offer)
-            assert "-" in offer.location, str(offer)
+            # dstack parses the flavor ID and vCPU count from the name
+            match = re.fullmatch(
+                r"(?P<flavor>.+)-(?P<vcpu>\d+)-(?P<memory>\d+)", offer.instance_name
+            )
+            assert match, str(offer)
+            assert int(match.group("vcpu")) == offer.cpu, str(offer)
+            # Pod creation only accepts power-of-two vCPU counts
+            assert offer.cpu & (offer.cpu - 1) == 0, str(offer)
+            # The maximum container disk size
+            assert offer.disk_size, str(offer)

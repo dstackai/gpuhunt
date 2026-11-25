@@ -1,0 +1,448 @@
+import logging
+from concurrent.futures import ThreadPoolExecutor
+from typing import cast
+
+import requests
+from requests import RequestException
+from typing_extensions import NotRequired, TypedDict
+
+from gpuhunt._internal.constraints import correct_gpu_memory_gib
+from gpuhunt._internal.models import AcceleratorVendor, CatalogItem, QueryFilter
+from gpuhunt.providers.base import OfflineProvider
+from gpuhunt.providers.runpod import _get_gpu_name
+
+logger = logging.getLogger(__name__)
+API_URL = "https://api.runpod.io/graphql"
+
+
+class RunpodCatalogItemProviderData(TypedDict):
+    # `pod_counts` is the number of pods that can be deployed in a cluster for the given offer.
+    # Used to distinguish Runpod Clusters offers and check if multinode runs fit into clusters.
+    pod_counts: NotRequired[list[int]]
+
+
+class RunpodLegacyOfflineProvider(OfflineProvider):
+    """
+    The GraphQL-based provider that collects the offline `runpod` catalog for gpuhunt versions
+    released before `RunpodProvider` became an online provider. Not used by `Catalog`; only
+    run by the catalog CI job. Remove once Runpod retires the GraphQL API.
+    """
+
+    NAME = "runpod"
+    # Minimum CUDA version on the host. Used to filter available offers
+    # and should also be used when provisioning pods.
+    MIN_CUDA_VERSION = "12.8"
+
+    def __init__(self) -> None:
+        self._gpu_map = get_gpu_map()
+
+    def get(
+        self,
+        query_filter: QueryFilter | None = None,
+        balance_resources: bool = True,
+        apply_filter: bool = False,
+    ) -> list[CatalogItem]:
+        offers = self._fetch_offers()
+        return sorted(offers, key=lambda i: i.price or 0)
+
+    @classmethod
+    def filter(cls, offers: list[CatalogItem]) -> list[CatalogItem]:
+        return [
+            o
+            for o in offers
+            if o.location
+            not in [
+                "AR",  # network problems, unusable
+            ]
+        ]
+
+    def _fetch_offers(self) -> list[CatalogItem]:
+        query_variables = self._build_query_variables()
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [
+                executor.submit(self._get_pods, query_variable)
+                for query_variable in query_variables
+            ]
+        pods_by_query = []
+        for future in futures:
+            try:
+                pods_by_query.append(future.result())
+            except RequestException as e:
+                logger.exception("Failed to get pods data: %s", e)
+
+        offers: list[CatalogItem] = []
+        for query_variable, pods in zip(query_variables, pods_by_query):
+            for pod in pods:
+                offers.extend(self._make_offers(query_variable, pod))
+
+        cluster_offers = self._fetch_cluster_offers()
+        offers.extend(cluster_offers)
+        cpu_offers = self._fetch_cpu_offers()
+        offers.extend(cpu_offers)
+        return offers
+
+    def _build_query_variables(self) -> list[dict]:
+        """Prepare different combinations of API query filters to cover all available GPUs."""
+
+        gpu_types = _make_request({"query": gpu_types_query, "variables": {}})
+        data_centers = [dc["id"] for dc in gpu_types["data"]["dataCenters"] if dc["listed"]]
+        max_secure_gpu_count = max(
+            gpu["maxGpuCountSecureCloud"] for gpu in gpu_types["data"]["gpuTypes"]
+        )
+        max_community_gpu_count = max(
+            gpu["maxGpuCountCommunityCloud"] for gpu in gpu_types["data"]["gpuTypes"]
+        )
+
+        variables = []
+        for gpu_count in range(1, max_secure_gpu_count + 1):
+            # Secure cloud is queryable by datacenter ID
+            for dc_id in data_centers:
+                variables.append(
+                    {
+                        "GpuTypeFilter": {
+                            "cluster": False,
+                        },
+                        "lowestPriceInput": {
+                            "secureCloud": True,
+                            "dataCenterId": dc_id,
+                            "gpuCount": gpu_count,
+                            "minDisk": None,
+                            "minMemoryInGb": None,
+                            "minVcpuCount": None,
+                            "minCudaVersion": RunpodLegacyOfflineProvider.MIN_CUDA_VERSION,
+                        },
+                    }
+                )
+        for gpu_count in range(1, max_community_gpu_count + 1):
+            # Community cloud is queryable by country code
+            for country_code in gpu_types["data"]["countryCodes"]:
+                if country_code is None:
+                    continue
+                variables.append(
+                    {
+                        "GpuTypeFilter": {
+                            "cluster": False,
+                        },
+                        "lowestPriceInput": {
+                            "secureCloud": False,
+                            "countryCode": country_code,
+                            "gpuCount": gpu_count,
+                            "minDisk": None,
+                            "minMemoryInGb": None,
+                            "minVcpuCount": None,
+                            "minCudaVersion": RunpodLegacyOfflineProvider.MIN_CUDA_VERSION,
+                        },
+                    }
+                )
+        return variables
+
+    def _get_pods(self, query_variables: dict) -> list[dict]:
+        resp = _make_request(
+            {
+                "query": query_pod_types,
+                "variables": query_variables,
+            }
+        )
+        return resp["data"]["gpuTypes"]
+
+    def _make_offers(self, query_variables: dict, pod: dict) -> list[CatalogItem]:
+        lowest_price_input_variables = query_variables["lowestPriceInput"]
+        if pod["lowestPrice"]["stockStatus"] is None:
+            return []
+        listed_gpu_vendor_and_name = self._get_gpu_vendor_and_name(pod["id"])
+        if listed_gpu_vendor_and_name is None:
+            logger.warning(f"{pod['id']} missing in runpod GPU_MAP")
+            return []
+        if lowest_price_input_variables["secureCloud"]:
+            location = lowest_price_input_variables["dataCenterId"]
+            on_demand_gpu_price = pod["securePrice"]
+        else:
+            location = lowest_price_input_variables["countryCode"]
+            on_demand_gpu_price = pod["communityPrice"]
+        offers: list[CatalogItem] = []
+        if on_demand_gpu_price:
+            offer = CatalogItem(
+                provider=RunpodLegacyOfflineProvider.NAME,
+                instance_name=pod["id"],
+                location=location,
+                price=lowest_price_input_variables["gpuCount"] * on_demand_gpu_price,
+                cpu=pod["lowestPrice"]["minVcpu"],
+                memory=pod["lowestPrice"]["minMemory"],
+                gpu_vendor=listed_gpu_vendor_and_name[0],
+                gpu_count=lowest_price_input_variables["gpuCount"],
+                gpu_name=listed_gpu_vendor_and_name[1],
+                gpu_memory=correct_gpu_memory_gib(
+                    listed_gpu_vendor_and_name[1],
+                    pod["memoryInGb"] * 1024,
+                    context=f"provider={self.NAME}, instance={pod['id']}, location={location}",
+                ),
+                spot=False,
+                disk_size=None,
+                provider_data={},
+            )
+            offers.append(offer)
+        return offers
+
+    def _fetch_cluster_offers(self) -> list[CatalogItem]:
+        cluster_offers: list[CatalogItem] = []
+        query_variables = {
+            "gpuTypesInput": {
+                "cluster": True,
+            },
+            "lowestPriceInput": {
+                "gpuCount": 8,  # Needed to get CPU and RAM
+            },
+        }
+        pod_type = self._get_pods(query_variables)
+        for pod_type in pod_type:
+            listed_gpu_vendor_and_name = self._get_gpu_vendor_and_name(pod_type["id"])
+            if listed_gpu_vendor_and_name is None:
+                logger.warning(f"{pod_type['id']} missing in runpod GPU_MAP")
+                continue
+            gpu_vendor, gpu_name = listed_gpu_vendor_and_name
+            # Runpod returns no CPU and memory if the offer is out of stock.
+            # Out of stock appears to be different from no capacity meaning
+            # the offer is not available for a prolonged period.
+            cpu = pod_type["lowestPrice"].get("minVcpu")
+            memory = pod_type["lowestPrice"].get("minMemory")
+            if cpu is None:
+                logger.warning(f"{pod_type['id']} cluster offer missing minVcpu")
+                continue
+            if memory is None:
+                logger.warning(f"{pod_type['id']} cluster offer missing minMemory")
+                continue
+            for location in pod_type["nodeGroupDatacenters"]:
+                offer = CatalogItem(
+                    provider=RunpodLegacyOfflineProvider.NAME,
+                    instance_name=pod_type["id"],
+                    location=location["id"],
+                    price=pod_type["clusterPrice"] * pod_type["maxGpuCountSecureCloud"],
+                    cpu=cpu,
+                    memory=memory,
+                    gpu_vendor=gpu_vendor,
+                    gpu_count=pod_type["maxGpuCountSecureCloud"],
+                    gpu_name=gpu_name,
+                    gpu_memory=correct_gpu_memory_gib(
+                        gpu_name,
+                        pod_type["memoryInGb"] * 1024,
+                        context=f"provider={self.NAME}, instance={pod_type['id']}, "
+                        f"location={location['id']}, cluster=True",
+                    ),
+                    spot=False,
+                    disk_size=None,
+                    flags=["runpod-cluster"],
+                    # The API does not return supported pod counts but for now it's always 2-8 for all offers.
+                    provider_data=cast(
+                        dict, RunpodCatalogItemProviderData(pod_counts=list(range(2, 9)))
+                    ),
+                )
+                cluster_offers.append(offer)
+        return cluster_offers
+
+    def _fetch_cpu_offers(self) -> list[CatalogItem]:
+        response = _make_request({"query": cpu_data_centers_query, "variables": {}})
+        data_centers = [dc["id"] for dc in response["data"]["dataCenters"] if dc["listed"]]
+        if len(data_centers) == 0:
+            return []
+
+        cpu_flavors_by_data_center: dict[str, list[dict]] = {}
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_data_center = {
+                executor.submit(self._get_cpu_flavors, dc_id): dc_id for dc_id in data_centers
+            }
+            for future, dc_id in future_to_data_center.items():
+                try:
+                    cpu_flavors_by_data_center[dc_id] = future.result()
+                except RequestException as e:
+                    logger.exception("Failed to get cpuFlavors data for %s: %s", dc_id, e)
+
+        offers: list[CatalogItem] = []
+        for dc_id in data_centers:
+            cpu_flavors = cpu_flavors_by_data_center.get(dc_id)
+            if cpu_flavors is None:
+                continue
+            offers.extend(self._make_cpu_offers(dc_id, cpu_flavors))
+        return offers
+
+    def _get_cpu_flavors(self, data_center_id: str) -> list[dict]:
+        response = _make_request(
+            {"query": query_cpu_flavors, "variables": {"dataCenterId": data_center_id}}
+        )
+        return response["data"]["cpuFlavors"]
+
+    def _make_cpu_offers(self, data_center_id: str, cpu_flavors: list[dict]) -> list[CatalogItem]:
+        offers: list[CatalogItem] = []
+        for flavor in cpu_flavors:
+            specifics = flavor.get("specifics") or {}
+            if specifics.get("stockStatus") is None:
+                continue
+            base_secure_price = specifics.get("securePrice")
+            if base_secure_price is None:
+                continue
+
+            min_vcpu = flavor.get("minVcpu")
+            max_vcpu = flavor.get("maxVcpu")
+            ram_multiplier = flavor.get("ramMultiplier")
+            disk_limit_per_vcpu = flavor.get("diskLimitPerVcpu")
+            if (
+                min_vcpu is None
+                or max_vcpu is None
+                or ram_multiplier is None
+                or disk_limit_per_vcpu is None
+            ):
+                continue
+            if min_vcpu <= 0 or max_vcpu <= 0 or min_vcpu > max_vcpu:
+                continue
+            if int(disk_limit_per_vcpu) <= 0:
+                continue
+
+            for vcpu in _cpu_size_ladder(int(min_vcpu), int(max_vcpu)):
+                # `ramMultiplier` maps vCPU to RAM in GB.
+                memory = int(vcpu * int(ram_multiplier))
+                disk_size = float(vcpu * int(disk_limit_per_vcpu))
+                scale = vcpu / min_vcpu
+                price = base_secure_price * scale
+                offers.append(
+                    CatalogItem(
+                        provider=RunpodLegacyOfflineProvider.NAME,
+                        instance_name=f"{flavor['id']}-{vcpu}-{memory}",
+                        location=data_center_id,
+                        price=price,
+                        cpu=vcpu,
+                        memory=memory,
+                        gpu_count=0,
+                        gpu_name=None,
+                        gpu_memory=None,
+                        spot=False,
+                        disk_size=disk_size,
+                        flags=["runpod-cpu"],
+                        provider_data={},
+                    )
+                )
+        return offers
+
+    def _get_gpu_vendor_and_name(
+        self,
+        gpu_id: str,
+    ) -> tuple[AcceleratorVendor, str] | None:
+        if not gpu_id:
+            return None
+        return self._gpu_map.get(gpu_id)
+
+
+def get_gpu_map() -> dict[str, tuple[AcceleratorVendor, str]]:
+    payload_gpus = {
+        "query": "query GpuTypes { gpuTypes { id manufacturer displayName memoryInGb } }"
+    }
+    response = _make_request(payload_gpus)
+    gpu_map: dict[str, tuple[AcceleratorVendor, str]] = {}
+    for gpu_type in response["data"]["gpuTypes"]:
+        try:
+            vendor = AcceleratorVendor.cast(gpu_type["manufacturer"])
+        except ValueError:
+            continue
+        gpu_name = _get_gpu_name(vendor, gpu_type["displayName"])
+        if gpu_name:
+            gpu_map[gpu_type["id"]] = (vendor, gpu_name)
+    return gpu_map
+
+
+def _make_request(payload: dict):
+    resp = requests.post(API_URL, json=payload, timeout=10)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _cpu_size_ladder(min_vcpu: int, max_vcpu: int) -> list[int]:
+    sizes = []
+    current = min_vcpu
+    while current <= max_vcpu:
+        sizes.append(current)
+        current *= 2
+    if sizes and sizes[-1] != max_vcpu:
+        sizes.append(max_vcpu)
+    return sorted(set(sizes))
+
+
+cpu_data_centers_query = """
+query CpuDataCenters {
+  dataCenters {
+    id
+    listed
+  }
+}
+"""
+
+query_cpu_flavors = """
+query CpuFlavors($dataCenterId: String!) {
+  cpuFlavors {
+    id
+    displayName
+    groupId
+    minVcpu
+    maxVcpu
+    ramMultiplier
+    diskLimitPerVcpu
+    specifics(input: { dataCenterId: $dataCenterId }) {
+      stockStatus
+      securePrice
+    }
+  }
+}
+"""
+
+
+gpu_types_query = """
+query GpuTypes {
+  countryCodes
+  dataCenters {
+    id
+    name
+    listed
+    __typename
+  }
+  gpuTypes {
+    maxGpuCountCommunityCloud
+    maxGpuCountSecureCloud
+    minPodGpuCount
+    id
+    displayName
+    memoryInGb
+    secureCloud
+    communityCloud
+    __typename
+  }
+}
+"""
+
+query_pod_types = """
+query GpuTypes($lowestPriceInput: GpuLowestPriceInput, $gpuTypesInput: GpuTypeFilter) {
+  gpuTypes(input: $gpuTypesInput) {
+    lowestPrice(input: $lowestPriceInput) {
+      minimumBidPrice
+      uninterruptablePrice
+      minVcpu
+      minMemory
+      stockStatus
+      compliance
+      countryCode
+      __typename
+    }
+    maxGpuCountCommunityCloud
+    maxGpuCountSecureCloud
+    id
+    nodeGroupDatacenters {
+        id
+    }
+    clusterPrice
+    displayName
+    memoryInGb
+    securePrice
+    communityPrice
+    oneMonthPrice
+    threeMonthPrice
+    sixMonthPrice
+    __typename
+  }
+}
+"""
