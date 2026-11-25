@@ -74,10 +74,12 @@ INFINIBAND_FABRICS = [
     InfinibandFabric("fabric-6", "gpu-h100-sxm", "eu-north1"),
     InfinibandFabric("fabric-7", "gpu-h200-sxm", "eu-north1"),
     InfinibandFabric("eu-north2-a", "gpu-h200-sxm", "eu-north2"),
+    InfinibandFabric("eu-west2-a", "gpu-b300-sxm", "eu-west2"),
     InfinibandFabric("me-west1-a", "gpu-b200-sxm-a", "me-west1"),
     InfinibandFabric("uk-south1-a", "gpu-b300-sxm", "uk-south1"),
     InfinibandFabric("us-central1-a", "gpu-h200-sxm", "us-central1"),
     InfinibandFabric("us-central1-b", "gpu-b200-sxm", "us-central1"),
+    InfinibandFabric("us-north1-a", "gpu-b300-sxm", "us-north1"),
 ]
 
 

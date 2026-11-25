@@ -192,7 +192,7 @@ KNOWN_NVIDIA_GPUS: list[NvidiaGPUInfo] = [
     NvidiaGPUInfo(name="H200NVL", memory=141, compute_capability=(9, 0)),
     NvidiaGPUInfo(name="B200", memory=180, compute_capability=(10, 0)),
     NvidiaGPUInfo(name="GB200", memory=186, compute_capability=(10, 0)),
-    NvidiaGPUInfo(name="B300", memory=270, compute_capability=(10, 0)),
+    NvidiaGPUInfo(name="B300", memory=270, compute_capability=(10, 3)),
     NvidiaGPUInfo(name="GB300", memory=270, compute_capability=(10, 0)),
     NvidiaGPUInfo(name="L4", memory=24, compute_capability=(8, 9)),
     NvidiaGPUInfo(name="L40", memory=48, compute_capability=(8, 9)),
