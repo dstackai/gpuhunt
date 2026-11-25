@@ -178,6 +178,8 @@ class AWSProvider(OfflineProvider):
         return sorted(offers, key=lambda i: i.price)
 
     def _skip(self, row: dict[str, str]) -> bool:
+        if row["Instance Family"] == "Machine Learning ASIC Instances":
+            return True
         if any(row["Instance Type"].startswith(family) for family in PREVIOUS_GENERATION_FAMILIES):
             return True
         for key, values in PRICING_FILTERS.items():
