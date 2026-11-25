@@ -147,6 +147,13 @@ class TestMatches:
         assert not matches(item, QueryFilter(min_compute_capability=(8, 0)))
         assert not matches(item, QueryFilter(max_compute_capability=(8, 0)))
 
+    def test_b300_compute_capability(self, item: CatalogItem):
+        item.gpu_name = "B300"
+        item.gpu_memory = 270
+
+        assert matches(item, QueryFilter(min_compute_capability=(10, 3)))
+        assert not matches(item, QueryFilter(max_compute_capability=(10, 0)))
+
     def test_ti_gpu(self):
         item = CatalogItem(
             instance_name="large",
