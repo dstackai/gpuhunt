@@ -10,6 +10,10 @@ import gpuhunt.providers.base
 from gpuhunt._internal.catalog import OFFLINE_PROVIDERS, ONLINE_PROVIDERS
 from gpuhunt._internal.default import ONLINE_PROVIDER_MODULES
 from gpuhunt.providers.base import OfflineProvider, OnlineProvider
+from gpuhunt.providers.runpod_legacy import RunpodLegacyOfflineProvider
+
+# Providers that only collect catalogs for old gpuhunt versions. Not used by `Catalog`.
+LEGACY_PROVIDERS = [RunpodLegacyOfflineProvider]
 
 
 @pytest.fixture()
@@ -30,6 +34,8 @@ def providers():
                 continue
             if inspect.isabstract(member):
                 continue  # skip AbstractProvider, OnlineProvider, OfflineProvider
+            if member in LEGACY_PROVIDERS:
+                continue
             members.append(member)
     assert members
     return members

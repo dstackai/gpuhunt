@@ -31,7 +31,6 @@ OFFLINE_PROVIDERS = [
     "lambdalabs",
     "nebius",
     "oci",
-    "runpod",
     "cloudrift",
 ]
 ONLINE_PROVIDERS = [
@@ -41,6 +40,7 @@ ONLINE_PROVIDERS = [
     "hotaisle",
     "jarvislabs",
     "lium",
+    "runpod",
     "seeweb",
     "vastai",
     "vultr",

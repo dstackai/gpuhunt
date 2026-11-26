@@ -27,6 +27,8 @@ def main():
             "nebius",
             "oci",
             "runpod",
+            # The offline catalog for gpuhunt versions with the offline `runpod` provider
+            "runpod-legacy",
             "seeweb",
             "vastai",
             "vultr",
@@ -120,7 +122,11 @@ def main():
     elif args.provider == "runpod":
         from gpuhunt.providers.runpod import RunpodProvider
 
-        provider = RunpodProvider()
+        provider = RunpodProvider.from_env()
+    elif args.provider == "runpod-legacy":
+        from gpuhunt.providers.runpod_legacy import RunpodLegacyOfflineProvider
+
+        provider = RunpodLegacyOfflineProvider()
     elif args.provider == "seeweb":
         from gpuhunt.providers.seeweb import SeewebProvider
 
