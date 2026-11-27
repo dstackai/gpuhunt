@@ -74,6 +74,7 @@ Its public plan locations can omit available VDM plans.
 * JarvisLabs
 * LambdaLabs
 * Lium
+* MassedCompute (`MASSEDCOMPUTE_API_KEY`)
 * Nebius
 * OCI
 * Runpod

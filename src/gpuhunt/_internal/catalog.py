@@ -40,6 +40,7 @@ ONLINE_PROVIDERS = [
     "hotaisle",
     "jarvislabs",
     "lium",
+    "massedcompute",
     "runpod",
     "seeweb",
     "vastai",

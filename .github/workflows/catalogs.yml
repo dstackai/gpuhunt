@@ -449,6 +449,22 @@ jobs:
       - name: Run integrity tests
         run: uv run pytest src/integrity_tests/test_lium.py
 
+  test-massedcompute:
+    name: Test MassedCompute integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: uv sync --extra dev
+      - name: Run integrity tests
+        env:
+          MASSEDCOMPUTE_API_KEY: ${{ secrets.MASSEDCOMPUTE_API_KEY }}
+        run: uv run pytest src/integrity_tests/test_massedcompute.py
+
   test-seeweb:
     name: Test Seeweb integrity
     runs-on: ubuntu-latest
@@ -561,6 +577,7 @@ jobs:
       - test-hotaisle
       - test-jarvislabs
       - test-lium
+      - test-massedcompute
       - test-seeweb
       - test-vastai
       - test-vultr

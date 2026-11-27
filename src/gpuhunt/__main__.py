@@ -24,6 +24,7 @@ def main():
             "jarvislabs",
             "lambdalabs",
             "lium",
+            "massedcompute",
             "nebius",
             "oci",
             "runpod",
@@ -90,6 +91,10 @@ def main():
         from gpuhunt.providers.lium import LiumProvider
 
         provider = LiumProvider.from_env()
+    elif args.provider == "massedcompute":
+        from gpuhunt.providers.massedcompute import MassedComputeProvider
+
+        provider = MassedComputeProvider.from_env()
     elif args.provider == "nebius":
         from nebius.base.service_account.pk_file import Reader as PKReader
 
