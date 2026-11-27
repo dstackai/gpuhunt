@@ -42,6 +42,11 @@ PAYLOAD = {
             "spotPricePerHour": 1.74,
         },
         {
+            "type": "L40S",
+            "onDemandPricePerHour": 1.99,
+            "spotPricePerHour": 1.14,
+        },
+        {
             "type": "RTX-5090",
             "onDemandPricePerHour": 1.29,
             "spotPricePerHour": 0.74,
@@ -76,8 +81,8 @@ CAPACITY_PAYLOAD = {
     "capacity": [
         {"gpuType": "H100", "availableOnDemand": 8, "availableSpot": 8},
         {"gpuType": "RTX-PRO-6000", "availableOnDemand": 2, "availableSpot": 0},
-        # Billing rates and physical capacity do not imply create API support.
-        {"gpuType": "B200", "availableOnDemand": 8, "availableSpot": 8},
+        # Capacity for GPU types missing from the pricing feed is ignored.
+        {"gpuType": "B400", "availableOnDemand": 8, "availableSpot": 8},
     ],
 }
 
@@ -128,15 +133,17 @@ def no_key_warnings(caplog):
 def test_public_offers_cover_supported_counts_and_preserve_create_tokens(pricing, requests_mock):
     offers = DaytonaProvider().get()
 
-    assert len(offers) == 7 * 8 * 2 + 2
+    assert len(offers) == 9 * 8 * 2 + 2
     gpu_offers = [offer for offer in offers if offer.gpu_count]
     cpu_offers = [offer for offer in offers if not offer.gpu_count]
     assert {offer.gpu_name for offer in gpu_offers} == {
         "B300",
+        "B200",
         "H100",
         "H200",
         "MI355X",
         "RTXPRO6000",
+        "L40S",
         "RTX5090",
         "RTX4090",
     }
@@ -160,10 +167,12 @@ def test_public_offers_cover_supported_counts_and_preserve_create_tokens(pricing
     )
     expected_metadata = {
         "B300": {},
+        "B200": {},
         "H100": {},
         "H200": {},
         "MI355X": {},
         "RTXPRO6000": {"gpu_type": "RTX-PRO-6000"},
+        "L40S": {},
         "RTX5090": {"gpu_type": "RTX-5090"},
         "RTX4090": {"gpu_type": "RTX-4090"},
     }
@@ -504,14 +513,14 @@ def test_gpu_and_price_filters_are_applied_to_final_offers(pricing):
     assert offers[0].price == 18.002544
 
 
-def test_unknown_and_uncreatable_gpu_types_are_not_advertised(pricing, caplog):
+def test_unknown_gpu_types_are_not_advertised(pricing, caplog):
     pricing["gpus"].append(
         {"type": "B400", "onDemandPricePerHour": 9.99, "spotPricePerHour": 5.99}
     )
     with caplog.at_level(logging.WARNING, logger=daytona_module.__name__):
         offers = DaytonaProvider().get(query_filter=QueryFilter(min_gpu_count=1))
-    assert len(offers) == 112
-    assert not {"B200", "B400"} & {offer.gpu_name for offer in offers}
+    assert len(offers) == 9 * 8 * 2
+    assert "B400" not in {offer.gpu_name for offer in offers}
     assert "B400" in caplog.text
 
 
@@ -523,7 +532,7 @@ def test_authenticated_offers_follow_capacity_by_gpu_and_purchase_option(pricing
     h100 = [offer for offer in offers if offer.gpu_name == "H100"]
     assert {offer.gpu_count for offer in h100 if not offer.spot} == {1, 2, 3, 4, 5}
     assert {offer.gpu_count for offer in h100 if offer.spot} == {1, 2, 3}
-    assert not any(offer.gpu_name == "B200" for offer in offers)
+    assert not any(offer.gpu_name == "B400" for offer in offers)
     assert not any(offer.gpu_name == "RTXPRO6000" and offer.spot for offer in offers)
     assert all(offer.provider_data == {} for offer in h100)
     assert find_offer(offers, "RTXPRO6000").provider_data == {"gpu_type": "RTX-PRO-6000"}
@@ -641,3 +650,32 @@ def test_malformed_rate_card_is_rejected(requests_mock, payload):
     requests_mock.get(PRICING_URL, json=payload)
     with pytest.raises(ValueError):
         DaytonaProvider().get()
+
+
+def test_new_feed_gpu_types_are_offered_without_code_changes(pricing):
+    # Every type in the pricing feed is orderable; known accelerators need no mapping.
+    pricing["gpus"].append(
+        {"type": "MI300X", "onDemandPricePerHour": 2.5, "spotPricePerHour": 1.5}
+    )
+    pricing["gpus"].append(
+        {"type": "RTX-PRO-4500", "onDemandPricePerHour": 1.0, "spotPricePerHour": 0.6}
+    )
+    offers = DaytonaProvider().get(query_filter=QueryFilter(min_gpu_count=1))
+
+    mi300x = find_offer(offers, "MI300X")
+    assert mi300x.gpu_vendor == AcceleratorVendor.AMD
+    assert mi300x.gpu_memory == 192
+    assert mi300x.memory == 100
+    assert mi300x.provider_data == {}
+    assert len([offer for offer in offers if offer.gpu_name == "MI300X"]) == 16
+    rtx_pro = find_offer(offers, "RTXPRO4500")
+    assert rtx_pro.provider_data == {"gpu_type": "RTX-PRO-4500"}
+    assert rtx_pro.memory == 50  # 32 GB card -> smaller memory shape
+
+
+def test_consumer_memory_shape_follows_gpu_memory(pricing):
+    offers = DaytonaProvider().get(query_filter=QueryFilter(min_gpu_count=1))
+
+    assert find_offer(offers, "RTX5090").memory == 50
+    assert find_offer(offers, "RTX4090", gpu_count=2).memory == 100
+    assert find_offer(offers, "L40S").memory == 100

@@ -1,8 +1,13 @@
 import pytest
 
 from gpuhunt import CatalogItem
-from gpuhunt.providers.daytona import GPU_MAP, DaytonaProvider
+from gpuhunt.providers.daytona import DaytonaProvider, _fetch_pricing, _find_gpu
 from integrity_tests.base import OffersIntegrityTests
+
+
+@pytest.fixture(scope="module")
+def feed_gpu_types() -> set[str]:
+    return {gpu["type"] for gpu in _fetch_pricing()["gpus"]}
 
 
 class TestDaytonaOffers(OffersIntegrityTests):
@@ -14,8 +19,12 @@ class TestDaytonaOffers(OffersIntegrityTests):
             pytest.skip("No Daytona offers are currently available")
         return offers
 
-    def test_no_unexpected_gpus(self, offers: list[CatalogItem]) -> None:
-        expected_gpus = {info[0] for info in GPU_MAP.values()}
+    def test_feed_gpu_types_are_known(self, feed_gpu_types: set[str]) -> None:
+        # A new Daytona GPU is offered automatically once gpuhunt knows the accelerator.
+        assert {t for t in feed_gpu_types if _find_gpu(t) is None} == set()
+
+    def test_no_unexpected_gpus(self, offers: list[CatalogItem], feed_gpu_types: set[str]) -> None:
+        expected_gpus = {gpu.name for t in feed_gpu_types if (gpu := _find_gpu(t))}
         gpus = {o.gpu_name for o in offers if o.gpu_name}
         assert not gpus - expected_gpus
 
@@ -32,14 +41,15 @@ class TestDaytonaOffers(OffersIntegrityTests):
                 assert offer.provider_data == {}
                 assert not offer.spot
 
-    def test_gpu_type_metadata(self, offers: list[CatalogItem]) -> None:
+    def test_gpu_type_metadata(self, offers: list[CatalogItem], feed_gpu_types: set[str]) -> None:
         for offer in offers:
             if offer.gpu_count == 0:
                 continue
             gpu_type = offer.provider_data.get("gpu_type", offer.gpu_name)
             assert isinstance(gpu_type, str)
-            assert gpu_type in GPU_MAP
-            assert GPU_MAP[gpu_type][0] == offer.gpu_name
+            assert gpu_type in feed_gpu_types
+            gpu = _find_gpu(gpu_type)
+            assert gpu is not None and gpu.name == offer.gpu_name
             if gpu_type == offer.gpu_name:
                 assert offer.provider_data == {}
             else:
