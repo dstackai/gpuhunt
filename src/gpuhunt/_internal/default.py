@@ -21,6 +21,7 @@ ONLINE_PROVIDER_MODULES = [
     ("gpuhunt.providers.jarvislabs", "JarvisLabsProvider"),
     ("gpuhunt.providers.lium", "LiumProvider"),
     ("gpuhunt.providers.massedcompute", "MassedComputeProvider"),
+    ("gpuhunt.providers.runpod", "RunpodProvider"),
     ("gpuhunt.providers.seeweb", "SeewebProvider"),
     ("gpuhunt.providers.vastai", "VastAIProvider"),
     ("gpuhunt.providers.vultr", "VultrProvider"),

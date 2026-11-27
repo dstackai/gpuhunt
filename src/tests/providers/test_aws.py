@@ -1,7 +1,13 @@
 import pytest
 
 from gpuhunt._internal.models import AcceleratorVendor
-from gpuhunt.providers.aws import _get_gpu_memory_gib, _make_offer, _PricingRow
+from gpuhunt.providers.aws import (
+    PRICING_FILTERS,
+    AWSProvider,
+    _get_gpu_memory_gib,
+    _make_offer,
+    _PricingRow,
+)
 
 
 def pricing_row(**kwargs) -> _PricingRow:
@@ -14,6 +20,17 @@ def pricing_row(**kwargs) -> _PricingRow:
         gpu_count=1,
     )
     return _PricingRow(**{**defaults, **kwargs})
+
+
+class TestSkip:
+    def test_skips_trainium(self):
+        row = {
+            **{key: values[0] for key, values in PRICING_FILTERS.items()},
+            "Instance Type": "trn3.3xlarge",
+            "Instance Family": "Machine Learning ASIC Instances",
+            "GPU": "1",
+        }
+        assert AWSProvider()._skip(row)
 
 
 class TestMakeOffer:
